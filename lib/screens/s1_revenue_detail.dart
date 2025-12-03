@@ -1,8 +1,117 @@
 import 'package:flutter/material.dart';
-import 'package:data_table_2/data_table_2.dart';
-import '../models/revenue_entry.dart';
-import '../utils/number_formatter.dart';
+import 'package:intl/intl.dart';
 
+// ===================================================================
+// FILTER SECTION (ĐÃ TÍCH HỢP)
+// ===================================================================
+class FilterSection extends StatefulWidget {
+  final Function(DateTime?, DateTime?) onFilter;
+
+  const FilterSection({super.key, required this.onFilter});
+
+  @override
+  State<FilterSection> createState() => _FilterSectionState();
+}
+
+class _FilterSectionState extends State<FilterSection> {
+  DateTime? _fromDate;
+  DateTime? _toDate;
+
+  final dateFormat = DateFormat("dd/MM/yyyy");
+
+  Future<void> _pickDate({required bool isFrom}) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(now.year + 1),
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isFrom) {
+          _fromDate = picked;
+        } else {
+          _toDate = picked;
+        }
+      });
+
+      widget.onFilter(_fromDate, _toDate);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+      ),
+
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          // FROM DATE
+          _buildDateBox(
+            label: _fromDate != null
+                ? dateFormat.format(_fromDate!)
+                : "Từ ngày",
+            onTap: () => _pickDate(isFrom: true),
+          ),
+
+          // TO DATE
+          _buildDateBox(
+            label: _toDate != null
+                ? dateFormat.format(_toDate!)
+                : "Đến ngày",
+            onTap: () => _pickDate(isFrom: false),
+          ),
+
+          // BUTTON
+          SizedBox(
+            width: 160,
+            child: ElevatedButton(
+              onPressed: () {
+                widget.onFilter(_fromDate, _toDate);
+              },
+              child: const Text("Lọc dữ liệu"),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateBox({required String label, required VoidCallback onTap}) {
+    return SizedBox(
+      width: 200,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.grey, width: 1),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.date_range),
+              const SizedBox(width: 8),
+              Expanded(child: Text(label))
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===================================================================
+// MAIN SCREEN (TABLE + FILTER ĐÃ GỘP)
+// ===================================================================
 class S1RevenueDetailScreen extends StatefulWidget {
   const S1RevenueDetailScreen({super.key});
 
@@ -11,354 +120,181 @@ class S1RevenueDetailScreen extends StatefulWidget {
 }
 
 class _S1RevenueDetailScreenState extends State<S1RevenueDetailScreen> {
-  DateTime fromDate = DateTime(2025, 1, 1);
-  DateTime toDate = DateTime(2025, 1, 31);
-  final List<RevenueEntry> data = RevenueEntry.getMockData();
+  DateTime? fromDate;
+  DateTime? toDate;
+
+  // Callback filter
+  void _applyFilter(DateTime? from, DateTime? to) {
+    setState(() {
+      fromDate = from;
+      toDate = to;
+    });
+
+    // TODO: Gọi API hoặc lọc danh sách theo nhu cầu
+    debugPrint("➡ Lọc từ: $fromDate  đến: $toDate");
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(theme),
-            const SizedBox(height: 24),
-            _buildFilters(theme),
-            const SizedBox(height: 24),
-            _buildDataTable(theme),
-          ],
-        ),
-      ),
-    );
-  }
+      appBar: AppBar(title: const Text("Chi tiết doanh thu")),
 
-  Widget _buildHeader(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'SỔ S1-HKD',
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'SỔ CHI TIẾT DOANH THU BÁN HÀNG HÓA, DỊCH VỤ',
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFilters(ThemeData theme) {
-    return Card(
-      child: Padding(
+      body: ListView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDatePicker(
-                    theme,
-                    'Từ ngày',
-                    fromDate,
-                    (date) => setState(() => fromDate = date),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildDatePicker(
-                    theme,
-                    'Đến ngày',
-                    toDate,
-                    (date) => setState(() => toDate = date),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Chức năng xuất Excel đang phát triển')),
-                    );
-                  },
-                  icon: const Icon(Icons.table_chart),
-                  label: const Text('Xuất Excel'),
-                ),
-                const SizedBox(width: 12),
-                FilledButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Chức năng xuất PDF đang phát triển')),
-                    );
-                  },
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text('Xuất PDF'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDatePicker(
-    ThemeData theme,
-    String label,
-    DateTime date,
-    Function(DateTime) onDateSelected,
-  ) {
-    return InkWell(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: date,
-          firstDate: DateTime(2020),
-          lastDate: DateTime(2030),
-        );
-        if (picked != null) {
-          onDateSelected(picked);
-        }
-      },
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          prefixIcon: const Icon(Icons.calendar_today),
-        ),
-        child: Text(
-          '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDataTable(ThemeData theme) {
-    // Calculate totals
-    double totalRevenue = 0;
-
-    for (var entry in data) {
-      totalRevenue += entry.totalRevenue;
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Stack(
-          children: [
-            SizedBox(
-              height: 600,
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Custom Header with merged cells
-                    _buildCustomHeader(theme),
-                    // Data Table
-                    SizedBox(
-                      height: 480,
-                      child: DataTable2(
-                        columnSpacing: 12,
-                        horizontalMargin: 12,
-                        minWidth: 900,
-                        headingRowColor: WidgetStateProperty.all(
-                          Colors.transparent,
-                        ),
-                        headingRowHeight: 0,
-                        dividerThickness: 1,
-                        dataRowHeight: 48,
-                        columns: [
-                          DataColumn2(
-                            label: const Text(''),
-                            size: ColumnSize.S,
-                          ),
-                          DataColumn2(
-                            label: const Text(''),
-                            size: ColumnSize.S,
-                          ),
-                          DataColumn2(
-                            label: const Text(''),
-                            size: ColumnSize.S,
-                          ),
-                          DataColumn2(
-                            label: const Text(''),
-                            size: ColumnSize.L,
-                          ),
-                          DataColumn2(
-                            label: const Text(''),
-                            size: ColumnSize.M,
-                            numeric: true,
-                          ),
-                          DataColumn2(
-                            label: const Text(''),
-                            size: ColumnSize.S,
-                          ),
-                        ],
-                        rows: data.map((entry) {
-                          return DataRow2(
-                            cells: [
-                              DataCell(Text(entry.recordDate)),
-                              DataCell(Text(entry.voucherNumber)),
-                              DataCell(Text(entry.voucherDate)),
-                              DataCell(Text(entry.description)),
-                              DataCell(
-                                Text(
-                                  NumberFormatter.formatCurrency(entry.totalRevenue),
-                                  textAlign: TextAlign.right,
-                                ),
-                              ),
-                              DataCell(Text('')),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    SizedBox(height: 60), // Space for fixed footer
-                  ],
-                ),
-              ),
-            ),
-            // Fixed footer row with totals
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  border: Border(
-                    top: BorderSide(
-                      color: theme.colorScheme.outline,
-                      width: 1,
-                    ),
-                  ),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                child: Row(
-                  children: [
-                    SizedBox(width: 12),
-                    SizedBox(
-                      width: 100,
-                      child: const Text(''),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 100,
-                      child: const Text(''),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 100,
-                      child: const Text(''),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Tổng cộng',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 140,
-                      child: Text(
-                        NumberFormatter.formatCurrency(totalRevenue),
-                        textAlign: TextAlign.right,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(width: 100),
-                    SizedBox(width: 12),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCustomHeader(ThemeData theme) {
-    return Container(
-      color: theme.colorScheme.primaryContainer,
-      child: Column(
         children: [
-          // First row - Main headers with merged cells
-          Row(
-            children: [
-              _buildHeaderCell(theme, 'Ngày,\ntháng ghi\nsổ', 100, isLeft: true),
-              _buildHeaderCell(theme, 'Chứng từ', 200),
-              _buildHeaderCell(theme, 'Diễn giải', 250),
-              Expanded(
-                child: _buildHeaderCell(theme, 'Doanh thu bán hàng hóa', 140),
+          FilterSection(onFilter: _applyFilter),
+          const SizedBox(height: 20),
+
+          Card(
+            margin: const EdgeInsets.all(0),
+            elevation: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final tableWidth = constraints.maxWidth * 0.998;
+
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: IntrinsicWidth(
+                      child: Column(
+                        children: [
+                          _buildCustomHeader(tableWidth),
+                          _buildRows(tableWidth),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-              _buildHeaderCell(theme, 'Ghi chú', 100, isRight: true),
-            ],
-          ),
-          // Second row - Sub headers for "Chứng từ"
-          Row(
-            children: [
-              SizedBox(width: 100 + 12),
-              _buildHeaderCell(theme, 'Số hiệu', 94),
-              _buildHeaderCell(theme, 'Ngày,\ntháng', 94),
-              SizedBox(width: 250 + 12),
-              Expanded(
-                child: SizedBox(width: 140),
-              ),
-              SizedBox(width: 100 + 12),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderCell(ThemeData theme, String text, double width, {bool isLeft = false, bool isRight = false}) {
+  // ===================================================================
+  // HEADER
+  // ===================================================================
+  Widget _buildCustomHeader(double tableWidth) {
+    final wNgayGhiSo = tableWidth * 0.14;
+    final wSoHieu = tableWidth * 0.11;
+    final wNgayCT = tableWidth * 0.11;
+    final wDienGiai = tableWidth * 0.32;
+    final wDoanhThu = tableWidth * 0.19;
+    final wGhiChu = tableWidth * 0.13;
+
+    return Container(
+      decoration: _headerBox(),
+      child: Row(
+        children: [
+          _headerMain("Ngày ghi sổ", wNgayGhiSo),
+          _headerMain("Số hiệu Chứng Từ", wSoHieu),
+          _headerMain("Ngày Chứng Từ", wNgayCT),
+          _headerMain("Diễn giải", wDienGiai),
+          _headerMain("Doanh thu", wDoanhThu),
+          _headerMain("Ghi chú", wGhiChu),
+        ],
+      ),
+    );
+  }
+
+  BoxDecoration _headerBox() => BoxDecoration(
+        color: const Color(0xFFE9F1FB)
+      );
+
+  Widget _headerMain(String text, double width) {
+    Color bgColor;
+    if (text == "Ngày ghi sổ") {
+      bgColor = const Color(0xFFBBDEFB); // Darker blue
+    } else if (text == "Số hiệu Chứng Từ") {
+      bgColor = const Color(0xFFA5D6A7); // Darker green
+    } else if (text == "Ngày Chứng Từ") {
+      bgColor = const Color(0xFF81C784); // Even darker green
+    } else if (text == "Diễn giải") {
+      bgColor = const Color(0xFFE1BEE7); // Light purple
+    } else if (text == "Doanh thu") {
+      bgColor = const Color(0xFFFFE082); // Darker yellow
+    } else if (text == "Ghi chú") {
+      bgColor = const Color(0xFFFFFFFF); // White
+    } else {
+      bgColor = const Color(0xFFE9F1FB);
+    }
     return Container(
       width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      height: 44,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(
-            color: theme.colorScheme.outline,
-            width: 0.5,
-          ),
-          bottom: BorderSide(
-            color: theme.colorScheme.outline,
-            width: 0.5,
-          ),
-        ),
+        color: bgColor,
       ),
-      child: Center(
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+      child: Text(text,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Color _getColumnColor(int columnIndex) {
+    switch (columnIndex) {
+      case 0: // Ngày ghi sổ - Light blue
+        return const Color(0xFFE3F2FD);
+      case 1: // Số hiệu CT - Light green
+        return const Color(0xFFC8E6C9);
+      case 2: // Ngày CT - Lighter green
+        return const Color(0xFFA5D6A7);
+      case 3: // Diễn giải - Light purple
+        return const Color(0xFFF3E5F5);
+      case 4: // Doanh thu - Light yellow
+        return const Color(0xFFFFF9C4);
+      case 5: // Ghi chú - White
+        return const Color(0xFFFFFFFF);
+      default:
+        return Colors.white;
+    }
+  }
+
+  // ===================================================================
+  // TABLE ROWS
+  // ===================================================================
+  Widget _buildRows(double tableWidth) {
+    final wNgayGhiSo = tableWidth * 0.14;
+    final wSoHieu = tableWidth * 0.11;
+    final wNgayCT = tableWidth * 0.11;
+    final wDienGiai = tableWidth * 0.32;
+    final wDoanhThu = tableWidth * 0.19;
+    final wGhiChu = tableWidth * 0.13;
+
+    return Column(
+      children: List.generate(15, (i) {
+        return Row(
+          children: [
+            _dataCell("01/01/2025", wNgayGhiSo, 0),
+            _dataCell("CT-${i + 1}", wSoHieu, 1),
+            _dataCell("01/01/2025", wNgayCT, 2),
+            _dataCell("Dòng diễn giải số ${i + 1}", wDienGiai, 3),
+            _dataCell("100.000", wDoanhThu, 4),
+            _dataCell("...", wGhiChu, 5),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _dataCell(String text, double width, int columnIndex) {
+    // Columns 3 (Diễn giải) and 5 (Ghi chú) are left-aligned, others are center-aligned
+    final isLeftAligned = columnIndex == 3 || columnIndex == 5;
+    final alignment = isLeftAligned ? Alignment.centerLeft : Alignment.center;
+    
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: 42,
+      alignment: alignment,
+      decoration: BoxDecoration(
+        color: _getColumnColor(columnIndex),
       ),
+      child: Text(text,
+          style: const TextStyle(fontSize: 13),
+          overflow: TextOverflow.ellipsis),
     );
   }
 }
