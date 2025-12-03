@@ -64,7 +64,8 @@ class _AppSidebarState extends State<AppSidebar> {
       onEnter: (_) => setState(() => isExpanded = true),
       onExit: (_) => setState(() => isExpanded = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
         width: isExpanded ? 320 : 80,
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
@@ -82,29 +83,31 @@ class _AppSidebarState extends State<AppSidebar> {
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(theme),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: menuItems.length,
-                itemBuilder: (context, index) {
-                  final item = menuItems[index];
-                  final isSelected = nav.selectedIndex == item.index;
+        child: ClipRect(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(theme),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: menuItems.length,
+                  itemBuilder: (context, index) {
+                    final item = menuItems[index];
+                    final isSelected = nav.selectedIndex == item.index;
 
-                  return _buildMenuItem(
-                    theme,
-                    item,
-                    isSelected,
-                    () => nav.setIndex(item.index),
-                  );
-                },
+                    return _buildMenuItem(
+                      theme,
+                      item,
+                      isSelected,
+                      () => nav.setIndex(item.index),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -112,20 +115,24 @@ class _AppSidebarState extends State<AppSidebar> {
 
   Widget _buildHeader(ThemeData theme) {
     return Container(
-      padding: EdgeInsets.all(isExpanded ? 20 : 16),
+      height: 80,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
-        mainAxisAlignment: isExpanded ? MainAxisAlignment.start : MainAxisAlignment.center,
         children: [
           Icon(
             Icons.store,
-            size: isExpanded ? 32 : 28,
+            size: 32,
             color: theme.colorScheme.primary,
           ),
-          if (isExpanded) ...[
-            const SizedBox(width: 12),
-            Expanded(
+          const SizedBox(width: 12),
+          Expanded(
+            child: AnimatedOpacity(
+              opacity: isExpanded ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     'Tạp Hóa 39',
@@ -133,17 +140,21 @@ class _AppSidebarState extends State<AppSidebar> {
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
                   ),
                   Text(
                     'Kế Toán',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -179,9 +190,12 @@ class _AppSidebarState extends State<AppSidebar> {
                       : theme.colorScheme.onSurfaceVariant,
                   size: 24,
                 ),
-                if (isExpanded) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AnimatedOpacity(
+                    opacity: isExpanded ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
                     child: Text(
                       item.title,
                       style: theme.textTheme.bodyMedium?.copyWith(
@@ -192,10 +206,10 @@ class _AppSidebarState extends State<AppSidebar> {
                             isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
                       maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.clip,
                     ),
                   ),
-                ],
+                ),
               ],
             ),
           ),
