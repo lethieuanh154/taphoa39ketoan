@@ -14,12 +14,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.13.10'
-          channel: 'stable'
-          cache: true
+      - name: Download Flutter SDK
+        run: |
+          wget https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.13.10-stable.tar.xz
+          tar xf flutter_linux_3.13.10-stable.tar.xz
+          echo "$PWD/flutter/bin" >> $GITHUB_PATH
 
       - name: Enable Web
         run: flutter config --enable-web

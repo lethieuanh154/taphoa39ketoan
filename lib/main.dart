@@ -37,7 +37,9 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        home: const MainLayout(),
+        home: const SelectionArea(
+          child: MainLayout(),
+        ),
       ),
     );
   }

@@ -12,47 +12,35 @@ class AppSidebar extends StatefulWidget {
 class _AppSidebarState extends State<AppSidebar>
     with SingleTickerProviderStateMixin {
   bool isExpanded = false;
-  late AnimationController _animationController;
-  late Animation<double> _widthAnimation;
-  late Animation<double> _opacityAnimation;
+  late AnimationController _controller;
+  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 200),
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 180),
       vsync: this,
     );
 
-    _widthAnimation = Tween<double>(
-      begin: 80,
-      end: 320,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _opacityAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
-    ));
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.fastOutSlowIn,
+    );
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   void _toggleSidebar(bool expand) {
     setState(() => isExpanded = expand);
     if (expand) {
-      _animationController.forward();
+      _controller.forward();
     } else {
-      _animationController.reverse();
+      _controller.reverse();
     }
   }
 
@@ -63,37 +51,37 @@ class _AppSidebarState extends State<AppSidebar>
       index: 0,
     ),
     MenuItem(
-      title: 'SỔ CHI TIẾT DOANH THU BÁN HÀNG HÓA, DỊCH VỤ',
+      title: 'DOANH THU BÁN HÀNG HÓA',
       icon: Icons.attach_money,
       index: 1,
     ),
     MenuItem(
-      title: 'SỔ CHI TIẾT VẬT LIỆU, DỤNG CỤ, SẢN PHẨM, HÀNG HÓA',
+      title: 'SẢN PHẨM, HÀNG HÓA',
       icon: Icons.inventory_2,
       index: 2,
     ),
     MenuItem(
-      title: 'SỔ CHI PHÍ SẢN XUẤT, KINH DOANH',
+      title: 'CHI PHÍ SẢN XUẤT, KINH DOANH',
       icon: Icons.receipt_long,
       index: 3,
     ),
     MenuItem(
-      title: 'SỔ THEO DÕI TÌNH HÌNH THỰC HIỆN NGHĨA VỤ THUẾ',
+      title: 'NGHĨA VỤ THUẾ',
       icon: Icons.account_balance,
       index: 4,
     ),
     MenuItem(
-      title: 'SỔ THEO DÕI THANH TOÁN TIỀN LƯƠNG',
+      title: 'THANH TOÁN TIỀN LƯƠNG',
       icon: Icons.payments,
       index: 5,
     ),
     MenuItem(
-      title: 'SỔ QUỸ TIỀN MẶT',
+      title: 'QUỸ TIỀN MẶT',
       icon: Icons.account_balance_wallet,
       index: 6,
     ),
     MenuItem(
-      title: 'SỔ TIỀN GỬI NGÂN HÀNG',
+      title: 'TIỀN GỬI NGÂN HÀNG',
       icon: Icons.savings,
       index: 7,
     ),
@@ -107,55 +95,52 @@ class _AppSidebarState extends State<AppSidebar>
     return MouseRegion(
       onEnter: (_) => _toggleSidebar(true),
       onExit: (_) => _toggleSidebar(false),
-      child: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return Container(
-            width: _widthAnimation.value,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(
-                right: BorderSide(
-                  color: theme.colorScheme.outlineVariant,
-                  width: 1,
-                ),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(2, 0),
-                ),
-              ],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.fastOutSlowIn,
+        width: isExpanded ? 320 : 80,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          border: Border(
+            right: BorderSide(
+              color: theme.colorScheme.outlineVariant,
+              width: 1,
             ),
-            child: ClipRect(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(theme),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: menuItems.length,
-                      itemBuilder: (context, index) {
-                        final item = menuItems[index];
-                        final isSelected = nav.selectedIndex == item.index;
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(2, 0),
+            ),
+          ],
+        ),
+        child: ClipRect(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(theme),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: menuItems.length,
+                  itemBuilder: (context, index) {
+                    final item = menuItems[index];
+                    final isSelected = nav.selectedIndex == item.index;
 
-                        return _buildMenuItem(
-                          theme,
-                          item,
-                          isSelected,
-                          () => nav.setIndex(item.index),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                    return _buildMenuItem(
+                      theme,
+                      item,
+                      isSelected,
+                      () => nav.setIndex(item.index),
+                    );
+                  },
+                ),
               ),
-            ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -173,8 +158,8 @@ class _AppSidebarState extends State<AppSidebar>
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Opacity(
-              opacity: _opacityAnimation.value,
+            child: FadeTransition(
+              opacity: _animation,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -211,58 +196,60 @@ class _AppSidebarState extends State<AppSidebar>
     bool isSelected,
     VoidCallback onTap,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? theme.colorScheme.primaryContainer
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Icon(
-                    item.icon,
-                    color: isSelected
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.onSurfaceVariant,
-                    size: 24,
+    return RepaintBoundary(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? theme.colorScheme.primaryContainer
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Icon(
+                      item.icon,
+                      color: isSelected
+                          ? theme.colorScheme.onPrimaryContainer
+                          : theme.colorScheme.onSurfaceVariant,
+                      size: 24,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Opacity(
-                    opacity: _opacityAnimation.value,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        item.title,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: isSelected
-                              ? theme.colorScheme.onPrimaryContainer
-                              : theme.colorScheme.onSurface,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FadeTransition(
+                      opacity: _animation,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          item.title,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: isSelected
+                                ? theme.colorScheme.onPrimaryContainer
+                                : theme.colorScheme.onSurface,
+                            fontWeight:
+                                isSelected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.clip,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.clip,
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
