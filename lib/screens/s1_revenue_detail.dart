@@ -154,16 +154,32 @@ class _S1RevenueDetailScreenState extends State<S1RevenueDetailScreen> {
                 builder: (context, constraints) {
                   final tableWidth = constraints.maxWidth * 0.998;
 
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: IntrinsicWidth(
-                      child: Column(
-                        children: [
-                          _buildCustomHeader(tableWidth),
-                          _buildRows(tableWidth),
-                        ],
+                  return Stack(
+                    children: [
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: IntrinsicWidth(
+                          child: Column(
+                            children: [
+                              _buildCustomHeader(tableWidth),
+                              _buildRows(tableWidth),
+                              SizedBox(height: 50), // Space for fixed footer
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: IntrinsicWidth(
+                            child: _buildFooterRow(tableWidth),
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -217,7 +233,7 @@ class _S1RevenueDetailScreenState extends State<S1RevenueDetailScreen> {
     } else if (text == "Doanh thu") {
       bgColor = const Color(0xFFFFE082); // Darker yellow
     } else if (text == "Ghi chú") {
-      bgColor = const Color(0xFFFFFFFF); // White
+      bgColor = const Color(0xFFA9A9A9); // Darker Gray
     } else {
       bgColor = const Color(0xFFE9F1FB);
     }
@@ -245,8 +261,8 @@ class _S1RevenueDetailScreenState extends State<S1RevenueDetailScreen> {
         return const Color(0xFFF3E5F5);
       case 4: // Doanh thu - Light yellow
         return const Color(0xFFFFF9C4);
-      case 5: // Ghi chú - White
-        return const Color(0xFFFFFFFF);
+      case 5: // Ghi chú - Light gray
+        return const Color(0xFFD3D3D3);
       default:
         return Colors.white;
     }
@@ -294,6 +310,47 @@ class _S1RevenueDetailScreenState extends State<S1RevenueDetailScreen> {
       ),
       child: Text(text,
           style: const TextStyle(fontSize: 13),
+          overflow: TextOverflow.ellipsis),
+    );
+  }
+
+  Widget _buildFooterRow(double tableWidth) {
+    final wNgayGhiSo = tableWidth * 0.14;
+    final wSoHieu = tableWidth * 0.11;
+    final wNgayCT = tableWidth * 0.11;
+    final wDienGiai = tableWidth * 0.32;
+    final wDoanhThu = tableWidth * 0.19;
+    final wGhiChu = tableWidth * 0.13;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        border: Border(top: BorderSide(color: Colors.grey[400]!, width: 2)),
+      ),
+      child: Row(
+        children: [
+          _footerCell("", wNgayGhiSo),
+          _footerCell("", wSoHieu),
+          _footerCell("", wNgayCT),
+          _footerCell("Tổng Doanh thu", wDienGiai),
+          _footerCell("1.500.000", wDoanhThu),
+          _footerCell("", wGhiChu),
+        ],
+      ),
+    );
+  }
+
+  Widget _footerCell(String text, double width) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: 42,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+      ),
+      child: Text(text,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           overflow: TextOverflow.ellipsis),
     );
   }
