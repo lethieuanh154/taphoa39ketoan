@@ -5,6 +5,8 @@ class DashboardStats {
   final double taxPayable;
   final double cashBalance;
   final double bankBalance;
+  final double grossProfit;
+  final double netProfit;
 
   DashboardStats({
     required this.totalRevenue,
@@ -13,16 +15,24 @@ class DashboardStats {
     required this.taxPayable,
     required this.cashBalance,
     required this.bankBalance,
+    required this.grossProfit,
+    required this.netProfit,
   });
 
   static DashboardStats getMockStats() {
+    const revenue = 260100000.0;
+    const cost = 134800000.0;
+    const tax = 27310000.0;
+
     return DashboardStats(
-      totalRevenue: 260100000,
-      totalCost: 134800000,
+      totalRevenue: revenue,
+      totalCost: cost,
       inventoryValue: 342900000,
-      taxPayable: 27310000,
+      taxPayable: tax,
       cashBalance: 40000000,
       bankBalance: 279500000,
+      grossProfit: revenue - cost,
+      netProfit: revenue - cost - tax,
     );
   }
 }
@@ -72,5 +82,24 @@ class MonthlyCost {
       MonthlyCost(month: 'T11', amount: 245000000),
       MonthlyCost(month: 'T12', amount: 260000000),
     ];
+  }
+}
+
+class MonthlyProfit {
+  final String month;
+  final double amount;
+
+  MonthlyProfit({required this.month, required this.amount});
+
+  static List<MonthlyProfit> getMockData() {
+    final revenues = MonthlyRevenue.getMockData();
+    final costs = MonthlyCost.getMockData();
+
+    return List.generate(12, (index) {
+      return MonthlyProfit(
+        month: revenues[index].month,
+        amount: revenues[index].amount - costs[index].amount,
+      );
+    });
   }
 }

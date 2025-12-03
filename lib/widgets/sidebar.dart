@@ -9,44 +9,16 @@ class AppSidebar extends StatefulWidget {
   State<AppSidebar> createState() => _AppSidebarState();
 }
 
-class _AppSidebarState extends State<AppSidebar>
-    with SingleTickerProviderStateMixin {
+class _AppSidebarState extends State<AppSidebar> {
   bool isExpanded = false;
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 180),
-      vsync: this,
-    );
-
-    _animation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.fastOutSlowIn,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   void _toggleSidebar(bool expand) {
     setState(() => isExpanded = expand);
-    if (expand) {
-      _controller.forward();
-    } else {
-      _controller.reverse();
-    }
   }
 
   final List<MenuItem> menuItems = [
     MenuItem(
-      title: 'Dashboard',
+      title: 'TỔNG QUAN',
       icon: Icons.dashboard,
       index: 0,
     ),
@@ -96,8 +68,8 @@ class _AppSidebarState extends State<AppSidebar>
       onEnter: (_) => _toggleSidebar(true),
       onExit: (_) => _toggleSidebar(false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.fastOutSlowIn,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
         width: isExpanded ? 320 : 80,
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
@@ -157,34 +129,37 @@ class _AppSidebarState extends State<AppSidebar>
             color: theme.colorScheme.primary,
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: FadeTransition(
-              opacity: _animation,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Tạp Hóa 39',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
+          if (isExpanded)
+            Expanded(
+              child: AnimatedOpacity(
+                opacity: 1.0,
+                duration: const Duration(milliseconds: 80),
+                curve: Curves.easeOut,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Tạp Hóa 39',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.clip,
-                  ),
-                  Text(
-                    'Kế Toán',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    Text(
+                      'Kế Toán',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.clip,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -228,11 +203,12 @@ class _AppSidebarState extends State<AppSidebar>
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: FadeTransition(
-                      opacity: _animation,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
+                  if (isExpanded)
+                    Expanded(
+                      child: AnimatedOpacity(
+                        opacity: 1.0,
+                        duration: const Duration(milliseconds: 80),
+                        curve: Curves.easeOut,
                         child: Text(
                           item.title,
                           style: theme.textTheme.bodyMedium?.copyWith(
@@ -243,11 +219,10 @@ class _AppSidebarState extends State<AppSidebar>
                                 isSelected ? FontWeight.w600 : FontWeight.normal,
                           ),
                           maxLines: 2,
-                          overflow: TextOverflow.clip,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
