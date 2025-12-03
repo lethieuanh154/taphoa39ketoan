@@ -32,5 +32,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: my_flutter_web
+          projectName: ketoan-taphoa39
           directory: build/web
