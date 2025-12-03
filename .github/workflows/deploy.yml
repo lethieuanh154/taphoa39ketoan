@@ -17,7 +17,7 @@ jobs:
       - name: Download Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0' # Example: Use a Flutter version known to include Dart 3.10.1 or higher
+          flutter-version: '3.27.1'
           channel: 'stable'
       - name: Enable Web
         run: flutter config --enable-web
