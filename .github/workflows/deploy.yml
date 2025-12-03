@@ -3,7 +3,7 @@ name: Deploy Flutter Web to Cloudflare Pages
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   build-deploy:
