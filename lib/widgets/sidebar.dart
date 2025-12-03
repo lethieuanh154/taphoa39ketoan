@@ -9,8 +9,52 @@ class AppSidebar extends StatefulWidget {
   State<AppSidebar> createState() => _AppSidebarState();
 }
 
-class _AppSidebarState extends State<AppSidebar> {
+class _AppSidebarState extends State<AppSidebar>
+    with SingleTickerProviderStateMixin {
   bool isExpanded = false;
+  late AnimationController _animationController;
+  late Animation<double> _widthAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+
+    _widthAnimation = Tween<double>(
+      begin: 80,
+      end: 320,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _opacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
+    ));
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _toggleSidebar(bool expand) {
+    setState(() => isExpanded = expand);
+    if (expand) {
+      _animationController.forward();
+    } else {
+      _animationController.reverse();
+    }
+  }
 
   final List<MenuItem> menuItems = [
     MenuItem(
@@ -61,54 +105,57 @@ class _AppSidebarState extends State<AppSidebar> {
     final nav = Provider.of<NavigationProvider>(context);
 
     return MouseRegion(
-      onEnter: (_) => setState(() => isExpanded = true),
-      onExit: (_) => setState(() => isExpanded = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-        width: isExpanded ? 320 : 80,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          border: Border(
-            right: BorderSide(
-              color: theme.colorScheme.outlineVariant,
-              width: 1,
-            ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(2, 0),
-            ),
-          ],
-        ),
-        child: ClipRect(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(theme),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: menuItems.length,
-                  itemBuilder: (context, index) {
-                    final item = menuItems[index];
-                    final isSelected = nav.selectedIndex == item.index;
-
-                    return _buildMenuItem(
-                      theme,
-                      item,
-                      isSelected,
-                      () => nav.setIndex(item.index),
-                    );
-                  },
+      onEnter: (_) => _toggleSidebar(true),
+      onExit: (_) => _toggleSidebar(false),
+      child: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Container(
+            width: _widthAnimation.value,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              border: Border(
+                right: BorderSide(
+                  color: theme.colorScheme.outlineVariant,
+                  width: 1,
                 ),
               ),
-            ],
-          ),
-        ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(2, 0),
+                ),
+              ],
+            ),
+            child: ClipRect(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(theme),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: menuItems.length,
+                      itemBuilder: (context, index) {
+                        final item = menuItems[index];
+                        final isSelected = nav.selectedIndex == item.index;
+
+                        return _buildMenuItem(
+                          theme,
+                          item,
+                          isSelected,
+                          () => nav.setIndex(item.index),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -126,10 +173,8 @@ class _AppSidebarState extends State<AppSidebar> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: AnimatedOpacity(
-              opacity: isExpanded ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeInOut,
+            child: Opacity(
+              opacity: _opacityAnimation.value,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -174,7 +219,8 @@ class _AppSidebarState extends State<AppSidebar> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: isSelected
                   ? theme.colorScheme.primaryContainer
@@ -182,31 +228,37 @@ class _AppSidebarState extends State<AppSidebar> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(
-                  item.icon,
-                  color: isSelected
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurfaceVariant,
-                  size: 24,
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Icon(
+                    item.icon,
+                    color: isSelected
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.onSurfaceVariant,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: AnimatedOpacity(
-                    opacity: isExpanded ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    child: Text(
-                      item.title,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isSelected
-                            ? theme.colorScheme.onPrimaryContainer
-                            : theme.colorScheme.onSurface,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
+                  child: Opacity(
+                    opacity: _opacityAnimation.value,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        item.title,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: isSelected
+                              ? theme.colorScheme.onPrimaryContainer
+                              : theme.colorScheme.onSurface,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.clip,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.clip,
                     ),
                   ),
                 ),
