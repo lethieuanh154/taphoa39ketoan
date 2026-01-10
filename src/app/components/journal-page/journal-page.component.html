@@ -1,0 +1,329 @@
+<div class="journal-page">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">
+        <i class="fa-solid fa-book-open"></i>
+        SỔ NHẬT KÝ CHUNG
+      </h1>
+      <p class="page-subtitle">Ghi nhận toàn bộ bút toán theo trình tự thời gian</p>
+    </div>
+
+    <div class="header-right">
+      <!-- Trạng thái kỳ -->
+      <div class="period-status" [class.locked]="isPeriodLocked" [class.open]="!isPeriodLocked">
+        <i class="fa-solid" [class.fa-lock]="isPeriodLocked" [class.fa-lock-open]="!isPeriodLocked"></i>
+        <span>{{ isPeriodLocked ? 'Kỳ đã khóa' : 'Kỳ đang mở' }}</span>
+      </div>
+
+      <!-- Nút xuất -->
+      <div class="header-actions">
+        <button class="btn-export" (click)="exportExcel()" title="Xuất Excel">
+          <i class="fa-solid fa-file-excel"></i>
+          Excel
+        </button>
+        <button class="btn-print" (click)="printPDF()" title="In PDF">
+          <i class="fa-solid fa-print"></i>
+          In
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       FILTER BAR
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="filter-section">
+    <div class="filter-group">
+      <label class="filter-label">Kỳ kế toán:</label>
+      <div class="period-tabs">
+        <button
+          class="period-tab"
+          [class.active]="filter.periodType === 'month'"
+          (click)="filter.periodType = 'month'; onPeriodTypeChange()">
+          Tháng
+        </button>
+        <button
+          class="period-tab"
+          [class.active]="filter.periodType === 'quarter'"
+          (click)="filter.periodType = 'quarter'; onPeriodTypeChange()">
+          Quý
+        </button>
+        <button
+          class="period-tab"
+          [class.active]="filter.periodType === 'year'"
+          (click)="filter.periodType = 'year'; onPeriodTypeChange()">
+          Năm
+        </button>
+        <button
+          class="period-tab"
+          [class.active]="filter.periodType === 'custom'"
+          (click)="filter.periodType = 'custom'; onPeriodTypeChange()">
+          Tùy chọn
+        </button>
+      </div>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'month'">
+      <select [(ngModel)]="filter.month" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let m of months" [value]="m.value">{{ m.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'quarter'">
+      <select [(ngModel)]="filter.quarter" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let q of quarters" [value]="q.value">{{ q.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <select [(ngModel)]="filter.year" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group date-range" *ngIf="filter.periodType === 'custom'">
+      <label>Từ:</label>
+      <input type="date" [(ngModel)]="filter.fromDate" (change)="onFilterChange()" class="filter-input">
+      <label>Đến:</label>
+      <input type="date" [(ngModel)]="filter.toDate" (change)="onFilterChange()" class="filter-input">
+    </div>
+
+    <div class="filter-info">
+      <span class="period-range">
+        <i class="fa-solid fa-calendar"></i>
+        {{ periodLabel }}
+      </span>
+      <span class="entry-count">
+        <i class="fa-solid fa-list"></i>
+        {{ summary.entryCount }} bút toán
+      </span>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       DATA TABLE
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="table-section">
+    <!-- Loading overlay -->
+    <div class="loading-overlay" *ngIf="isLoading">
+      <i class="fa-solid fa-spinner fa-spin"></i>
+      <span>Đang tải dữ liệu...</span>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="journal-table">
+        <thead>
+          <tr>
+            <th class="col-date sortable" (click)="sortBy('entryDate')">
+              Ngày ghi sổ
+              <i class="fa-solid" [ngClass]="getSortIcon('entryDate')"></i>
+            </th>
+            <th class="col-voucher">Số chứng từ</th>
+            <th class="col-date sortable" (click)="sortBy('voucherDate')">
+              Ngày CT
+              <i class="fa-solid" [ngClass]="getSortIcon('voucherDate')"></i>
+            </th>
+            <th class="col-desc">Diễn giải</th>
+            <th class="col-account">TK Nợ</th>
+            <th class="col-account">TK Có</th>
+            <th class="col-amount sortable" (click)="sortBy('amount')">
+              Số tiền
+              <i class="fa-solid" [ngClass]="getSortIcon('amount')"></i>
+            </th>
+            <th class="col-source">Nguồn CT</th>
+            <th class="col-status">Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let entry of entries; let i = index"
+            class="data-row"
+            [class.selected]="selectedEntry?.id === entry.id"
+            (click)="onRowClick(entry)">
+            <td class="col-date">{{ formatDate(entry.entryDate) }}</td>
+            <td class="col-voucher">
+              <span class="voucher-number">{{ entry.voucherNumber }}</span>
+            </td>
+            <td class="col-date">{{ formatDate(entry.voucherDate) }}</td>
+            <td class="col-desc" [title]="entry.description">{{ entry.description }}</td>
+            <td class="col-account">
+              <span class="account-code">{{ entry.debitAccount }}</span>
+              <span class="account-name">{{ entry.debitAccountName }}</span>
+            </td>
+            <td class="col-account">
+              <span class="account-code">{{ entry.creditAccount }}</span>
+              <span class="account-name">{{ entry.creditAccountName }}</span>
+            </td>
+            <td class="col-amount">{{ formatCurrency(entry.amount) }}</td>
+            <td class="col-source">
+              <span class="source-badge" [style.background-color]="getSourceColor(entry.sourceType)">
+                {{ getSourceLabel(entry.sourceType) }}
+              </span>
+            </td>
+            <td class="col-status">
+              <span class="status-badge" [ngClass]="getStatusClass(entry.status)">
+                {{ getStatusLabel(entry.status) }}
+              </span>
+            </td>
+          </tr>
+
+          <!-- Empty state -->
+          <tr *ngIf="entries.length === 0 && !isLoading">
+            <td colspan="9" class="empty-state">
+              <i class="fa-solid fa-inbox"></i>
+              <p>Không có bút toán nào trong kỳ này</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       FOOTER - TỔNG HỢP
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <footer class="summary-footer">
+    <div class="summary-row">
+      <div class="summary-item">
+        <span class="summary-label">Tổng phát sinh Nợ:</span>
+        <span class="summary-value debit">{{ formatCurrency(summary.totalDebit) }} đ</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Tổng phát sinh Có:</span>
+        <span class="summary-value credit">{{ formatCurrency(summary.totalCredit) }} đ</span>
+      </div>
+      <div class="summary-item balance-check" [class.balanced]="summary.isBalanced" [class.unbalanced]="!summary.isBalanced">
+        <i class="fa-solid" [class.fa-check-circle]="summary.isBalanced" [class.fa-exclamation-triangle]="!summary.isBalanced"></i>
+        <span *ngIf="summary.isBalanced">Cân đối</span>
+        <span *ngIf="!summary.isBalanced">Lệch: {{ formatCurrency(summary.difference) }} đ</span>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" *ngIf="totalPages > 1">
+      <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(1)">
+        <i class="fa-solid fa-angles-left"></i>
+      </button>
+      <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">
+        <i class="fa-solid fa-angle-left"></i>
+      </button>
+
+      <button
+        *ngFor="let page of visiblePages"
+        class="page-btn"
+        [class.active]="page === currentPage"
+        (click)="goToPage(page)">
+        {{ page }}
+      </button>
+
+      <button class="page-btn" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">
+        <i class="fa-solid fa-angle-right"></i>
+      </button>
+      <button class="page-btn" [disabled]="currentPage === totalPages" (click)="goToPage(totalPages)">
+        <i class="fa-solid fa-angles-right"></i>
+      </button>
+
+      <span class="page-info">Trang {{ currentPage }} / {{ totalPages }}</span>
+    </div>
+  </footer>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       DETAIL DRAWER - Drill-down chứng từ nguồn
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="drawer-backdrop" *ngIf="showDetailDrawer" (click)="closeDetailDrawer()"></div>
+  <aside class="detail-drawer" [class.open]="showDetailDrawer">
+    <div class="drawer-header">
+      <h3>Chi tiết bút toán</h3>
+      <button class="drawer-close" (click)="closeDetailDrawer()">
+        <i class="fa-solid fa-times"></i>
+      </button>
+    </div>
+
+    <div class="drawer-content" *ngIf="selectedEntry">
+      <!-- Thông tin bút toán -->
+      <div class="detail-section">
+        <h4><i class="fa-solid fa-file-lines"></i> Thông tin bút toán</h4>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Ngày ghi sổ:</label>
+            <span>{{ formatDate(selectedEntry.entryDate) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Số chứng từ:</label>
+            <span>{{ selectedEntry.voucherNumber }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Ngày chứng từ:</label>
+            <span>{{ formatDate(selectedEntry.voucherDate) }}</span>
+          </div>
+          <div class="detail-item full-width">
+            <label>Diễn giải:</label>
+            <span>{{ selectedEntry.description }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Định khoản -->
+      <div class="detail-section">
+        <h4><i class="fa-solid fa-scale-balanced"></i> Định khoản</h4>
+        <div class="accounting-entry">
+          <div class="entry-line debit">
+            <span class="entry-side">Nợ</span>
+            <span class="entry-account">{{ selectedEntry.debitAccount }} - {{ selectedEntry.debitAccountName }}</span>
+            <span class="entry-amount">{{ formatCurrency(selectedEntry.amount) }}</span>
+          </div>
+          <div class="entry-line credit">
+            <span class="entry-side">Có</span>
+            <span class="entry-account">{{ selectedEntry.creditAccount }} - {{ selectedEntry.creditAccountName }}</span>
+            <span class="entry-amount">{{ formatCurrency(selectedEntry.amount) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nguồn chứng từ -->
+      <div class="detail-section">
+        <h4><i class="fa-solid fa-link"></i> Nguồn chứng từ</h4>
+        <div class="source-info">
+          <span class="source-type" [style.background-color]="getSourceColor(selectedEntry.sourceType)">
+            {{ getSourceLabel(selectedEntry.sourceType) }}
+          </span>
+          <span class="source-number">{{ selectedEntry.sourceNumber }}</span>
+        </div>
+        <button class="btn-view-source">
+          <i class="fa-solid fa-external-link-alt"></i>
+          Xem chứng từ gốc
+        </button>
+      </div>
+
+      <!-- Thông tin bổ sung -->
+      <div class="detail-section">
+        <h4><i class="fa-solid fa-info-circle"></i> Thông tin bổ sung</h4>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Kỳ kế toán:</label>
+            <span>{{ selectedEntry.period }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Năm tài chính:</label>
+            <span>{{ selectedEntry.fiscalYear }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Trạng thái:</label>
+            <span class="status-badge" [ngClass]="getStatusClass(selectedEntry.status)">
+              {{ getStatusLabel(selectedEntry.status) }}
+            </span>
+          </div>
+          <div class="detail-item">
+            <label>Khóa sổ:</label>
+            <span>{{ selectedEntry.isLocked ? 'Đã khóa' : 'Chưa khóa' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>

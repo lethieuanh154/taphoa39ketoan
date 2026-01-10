@@ -1,0 +1,775 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH - STYLES
+   Mẫu B02-DNN theo Thông tư 133/2016/TT-BTC
+═══════════════════════════════════════════════════════════════════════════════ */
+
+/* === VARIABLES === */
+:host {
+  --primary: #2563eb;
+  --primary-light: #3b82f6;
+  --primary-dark: #1d4ed8;
+  --success: #10b981;
+  --success-light: #d1fae5;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --danger: #ef4444;
+  --danger-light: #fee2e2;
+  --info: #06b6d4;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow: 0 1px 3px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+/* === PAGE CONTAINER === */
+.income-statement-page {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* === PAGE HEADER === */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.page-title i {
+  color: var(--primary);
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--gray-500);
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* === BUTTONS === */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+.btn-primary:disabled {
+  background: var(--gray-300);
+  cursor: not-allowed;
+}
+
+.btn-outline {
+  background: white;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+}
+
+.btn-outline:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+}
+
+/* === FILTER BAR === */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 20px;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-600);
+}
+
+.filter-select {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius);
+  background: white;
+  min-width: 140px;
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.filter-actions {
+  margin-left: auto;
+}
+
+/* === LOADING STATE === */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 80px 20px;
+}
+
+.loading-spinner {
+  text-align: center;
+  color: var(--gray-500);
+}
+
+.loading-spinner i {
+  color: var(--primary);
+  margin-bottom: 16px;
+}
+
+.loading-spinner p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* === ERROR STATE === */
+.error-container {
+  padding: 20px;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--danger-light);
+  color: var(--danger);
+  border-radius: var(--radius);
+  font-size: 14px;
+}
+
+/* === CANNOT GENERATE STATE === */
+.cannot-generate-container {
+  display: flex;
+  justify-content: center;
+  padding: 60px 20px;
+}
+
+.cannot-generate-card {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  max-width: 500px;
+}
+
+.cannot-generate-card .card-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--warning-light);
+  color: var(--warning);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 28px;
+}
+
+.cannot-generate-card h3 {
+  margin: 0 0 16px;
+  color: var(--gray-800);
+}
+
+.reasons-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.reasons-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--gray-600);
+  font-size: 14px;
+}
+
+.reasons-list li i {
+  color: var(--danger);
+}
+
+/* === REPORT CONTENT === */
+.report-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* === SUMMARY SECTION === */
+.summary-section {
+  margin-bottom: 8px;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.summary-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--gray-300);
+}
+
+.summary-card.revenue {
+  border-left-color: var(--primary);
+}
+
+.summary-card.revenue .card-icon {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--primary);
+}
+
+.summary-card.gross-profit {
+  border-left-color: var(--info);
+}
+
+.summary-card.gross-profit .card-icon {
+  background: rgba(6, 182, 212, 0.1);
+  color: var(--info);
+}
+
+.summary-card.operating-profit {
+  border-left-color: var(--warning);
+}
+
+.summary-card.operating-profit .card-icon {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+
+.summary-card.net-profit.profit {
+  border-left-color: var(--success);
+}
+
+.summary-card.net-profit.profit .card-icon {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+
+.summary-card.net-profit.loss {
+  border-left-color: var(--danger);
+}
+
+.summary-card.net-profit.loss .card-icon {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.summary-card .card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.summary-card .card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.summary-card .card-label {
+  font-size: 12px;
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
+.summary-card .card-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.summary-card .card-value.negative {
+  color: var(--danger);
+}
+
+.summary-card .card-sub {
+  font-size: 11px;
+  color: var(--gray-400);
+}
+
+/* === VALIDATION SECTION === */
+.validation-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.validation-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.validation-item.error {
+  background: var(--danger-light);
+  color: #b91c1c;
+}
+
+.validation-item.warning {
+  background: var(--warning-light);
+  color: #b45309;
+}
+
+/* === REPORT HEADER SECTION === */
+.report-header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.company-info {
+  text-align: left;
+}
+
+.company-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin: 0 0 4px;
+}
+
+.tax-code {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin: 0;
+}
+
+.report-title-block {
+  text-align: center;
+  flex: 1;
+}
+
+.report-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.report-period {
+  font-size: 14px;
+  color: var(--gray-600);
+  margin: 0 0 4px;
+}
+
+.report-form {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin: 0;
+  font-style: italic;
+}
+
+.report-meta {
+  text-align: right;
+}
+
+.period-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.period-status.locked {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.period-status.open {
+  background: var(--warning-light);
+  color: var(--warning);
+}
+
+/* === REPORT TABLE === */
+.report-table-section {
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.report-table thead {
+  background: var(--gray-50);
+}
+
+.report-table th {
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--gray-700);
+  border-bottom: 2px solid var(--gray-200);
+  white-space: nowrap;
+}
+
+.report-table th.col-code {
+  width: 70px;
+  text-align: center;
+}
+
+.report-table th.col-name {
+  min-width: 400px;
+}
+
+.report-table th.col-note {
+  width: 60px;
+  text-align: center;
+}
+
+.report-table th.col-amount {
+  width: 150px;
+  text-align: right;
+}
+
+.report-table th.col-change {
+  width: 100px;
+  text-align: right;
+}
+
+.report-table tbody tr {
+  border-bottom: 1px solid var(--gray-100);
+  transition: background 0.15s;
+}
+
+.report-table tbody tr:hover {
+  background: var(--gray-50);
+}
+
+.report-table td {
+  padding: 12px 16px;
+  color: var(--gray-700);
+}
+
+.report-table td.col-code {
+  text-align: center;
+  font-weight: 500;
+  color: var(--gray-500);
+}
+
+.report-table td.col-note {
+  text-align: center;
+  font-size: 11px;
+  color: var(--gray-400);
+}
+
+.report-table td.col-amount {
+  text-align: right;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  font-size: 13px;
+}
+
+.report-table td.col-change {
+  text-align: right;
+  font-size: 12px;
+}
+
+/* Row levels */
+.report-table tr.level-0 {
+  background: var(--gray-50);
+  font-weight: 600;
+}
+
+.report-table tr.level-0 td {
+  color: var(--gray-900);
+}
+
+.report-table tr.level-1 td {
+  font-weight: 500;
+}
+
+.report-table tr.level-2 td.col-name {
+  color: var(--gray-600);
+}
+
+.report-table tr.total-row {
+  background: linear-gradient(135deg, var(--gray-50), white);
+}
+
+.report-table tr.highlight-row {
+  background: rgba(37, 99, 235, 0.03);
+}
+
+.report-table tr.highlight-row:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* Profit/Loss indication */
+.report-table tr.profit td.col-amount:first-of-type {
+  color: var(--success);
+}
+
+.report-table tr.loss td.col-amount:first-of-type {
+  color: var(--danger);
+}
+
+/* Amount classes */
+.negative-amount {
+  color: var(--danger) !important;
+}
+
+.zero-amount {
+  color: var(--gray-400) !important;
+}
+
+/* Change classes */
+.positive-change {
+  color: var(--success) !important;
+}
+
+.negative-change {
+  color: var(--danger) !important;
+}
+
+/* === REPORT FOOTER === */
+.report-footer-section {
+  padding: 24px;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.footer-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 24px;
+  padding-top: 20px;
+}
+
+.footer-col {
+  text-align: center;
+}
+
+.footer-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin: 0 0 4px;
+}
+
+.footer-name {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin: 0;
+  font-style: italic;
+}
+
+.footer-info {
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.footer-info p {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin: 0 0 8px;
+}
+
+.footer-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gray-400) !important;
+  font-style: italic;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 1200px) {
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .income-statement-page {
+    padding: 16px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+    margin-top: 8px;
+  }
+
+  .filter-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .summary-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .report-header-section {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .company-info,
+  .report-meta {
+    text-align: center;
+  }
+
+  .footer-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* === PRINT STYLES === */
+@media print {
+  .income-statement-page {
+    padding: 0;
+  }
+
+  .page-header,
+  .filter-bar,
+  .header-actions,
+  .validation-section {
+    display: none !important;
+  }
+
+  .summary-cards {
+    display: none;
+  }
+
+  .report-table-section,
+  .report-header-section,
+  .report-footer-section {
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .report-table {
+    font-size: 11px;
+  }
+
+  .report-table th,
+  .report-table td {
+    padding: 8px 10px;
+  }
+}

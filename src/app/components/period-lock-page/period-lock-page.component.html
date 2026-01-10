@@ -1,0 +1,320 @@
+<div class="period-lock-page">
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="header-content">
+      <div class="header-title">
+        <i class="fa-solid fa-lock"></i>
+        <h1>Khóa sổ Kế toán</h1>
+      </div>
+      <p class="header-subtitle">
+        Quản lý khóa kỳ kế toán - Đảm bảo tính toàn vẹn dữ liệu
+      </p>
+    </div>
+    <div class="header-actions">
+      <div class="year-selector">
+        <label>Năm:</label>
+        <select [(ngModel)]="selectedYear" (change)="onYearChange()">
+          <option *ngFor="let year of availableYears" [value]="year">{{ year }}</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SUMMARY CARDS
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="summary-cards">
+    <div class="summary-card">
+      <div class="summary-icon purple">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <div class="summary-info">
+        <span class="summary-value">{{ lockedCount }}</span>
+        <span class="summary-label">Kỳ đã khóa</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-icon green">
+        <i class="fa-solid fa-lock-open"></i>
+      </div>
+      <div class="summary-info">
+        <span class="summary-value">{{ openCount }}</span>
+        <span class="summary-label">Kỳ đang mở</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-icon blue">
+        <i class="fa-solid fa-calendar"></i>
+      </div>
+      <div class="summary-info">
+        <span class="summary-value">{{ totalPeriods }}</span>
+        <span class="summary-label">Tổng số kỳ</span>
+      </div>
+    </div>
+
+    <div class="summary-card highlight" *ngIf="nextLockablePeriod">
+      <div class="summary-icon amber">
+        <i class="fa-solid fa-arrow-right"></i>
+      </div>
+      <div class="summary-info">
+        <span class="summary-value">{{ formatPeriod(nextLockablePeriod) }}</span>
+        <span class="summary-label">Kỳ tiếp theo cần khóa</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       INFO BANNER
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="info-banner">
+    <i class="fa-solid fa-circle-info"></i>
+    <div class="info-content">
+      <strong>Lưu ý quan trọng:</strong>
+      <ul>
+        <li>Số liệu kỳ đã khóa <strong>KHÔNG THỂ</strong> sửa trực tiếp</li>
+        <li>Muốn điều chỉnh số liệu quá khứ, phải tạo <strong>bút toán điều chỉnh</strong> ở kỳ sau</li>
+        <li>Phải khóa kỳ trước mới được khóa kỳ sau (tuần tự)</li>
+        <li>Chỉ <strong>Admin</strong> mới có quyền mở khóa sổ</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       LOADING / ERROR
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <span>Đang xử lý...</span>
+  </div>
+
+  <div class="error-message" *ngIf="error">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    {{ error }}
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       PERIODS GRID
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="periods-grid" *ngIf="!isLoading && !error">
+    <div class="period-card"
+         *ngFor="let period of periods"
+         [class.locked]="period.status === 'LOCKED'"
+         [class.closed]="period.status === 'CLOSED'"
+         [class.current]="isCurrentPeriod(period)"
+         [class.next-lockable]="isNextLockable(period)">
+
+      <!-- Period Header -->
+      <div class="period-header">
+        <div class="period-month">
+          <span class="month-number">{{ period.month }}</span>
+          <span class="month-label">Tháng</span>
+        </div>
+        <div class="period-status" [style.background-color]="getStatusColor(period.status)">
+          <i class="fa-solid" [ngClass]="getStatusIcon(period.status)"></i>
+          {{ PERIOD_STATUS_LABELS[period.status] }}
+        </div>
+      </div>
+
+      <!-- Period Info -->
+      <div class="period-info">
+        <div class="info-row" *ngIf="period.status !== 'OPEN'">
+          <label>Khóa ngày:</label>
+          <span>{{ formatDate(period.lockedAt) }}</span>
+        </div>
+        <div class="info-row" *ngIf="period.lockedByName">
+          <label>Người khóa:</label>
+          <span>{{ period.lockedByName }}</span>
+        </div>
+        <div class="info-row warning" *ngIf="period.unlockedAt">
+          <label>Mở khóa:</label>
+          <span>{{ formatDate(period.unlockedAt) }} - {{ period.unlockedByName }}</span>
+        </div>
+        <div class="unlock-reason" *ngIf="period.unlockReason">
+          <i class="fa-solid fa-comment"></i>
+          {{ period.unlockReason }}
+        </div>
+      </div>
+
+      <!-- Period Actions -->
+      <div class="period-actions">
+        <!-- View Checklist -->
+        <button class="btn btn-sm btn-outline" (click)="viewChecklist(period)" title="Xem checklist">
+          <i class="fa-solid fa-clipboard-check"></i>
+        </button>
+
+        <!-- Lock Button -->
+        <button class="btn btn-sm btn-primary"
+                *ngIf="period.status === 'OPEN' && canLock"
+                [disabled]="!isNextLockable(period) && nextLockablePeriod !== ''"
+                (click)="openLockModal(period)"
+                title="Khóa kỳ">
+          <i class="fa-solid fa-lock"></i> Khóa
+        </button>
+
+        <!-- Unlock Button (Admin only) -->
+        <button class="btn btn-sm btn-danger"
+                *ngIf="period.status === 'LOCKED' && canUnlock"
+                (click)="openUnlockModal(period)"
+                title="Mở khóa kỳ">
+          <i class="fa-solid fa-lock-open"></i> Mở khóa
+        </button>
+      </div>
+
+      <!-- Current Period Badge -->
+      <div class="current-badge" *ngIf="isCurrentPeriod(period)">
+        <i class="fa-solid fa-star"></i> Kỳ hiện tại
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       CHECKLIST MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showChecklistModal" (click)="closeChecklistModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Checklist khóa sổ - {{ formatPeriod(selectedPeriodForAction?.period || '') }}</h2>
+        <button class="close-btn" (click)="closeChecklistModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="loading-spinner" *ngIf="isLoadingChecklist">
+          <div class="spinner"></div>
+          <span>Đang kiểm tra...</span>
+        </div>
+
+        <div class="checklist-content" *ngIf="!isLoadingChecklist && checklist">
+          <!-- Status Banner -->
+          <div class="status-banner" [class.success]="checklist.canLock" [class.error]="!checklist.canLock">
+            <i class="fa-solid" [ngClass]="checklist.canLock ? 'fa-check-circle' : 'fa-times-circle'"></i>
+            <span *ngIf="checklist.canLock">Đáp ứng đủ điều kiện để khóa sổ</span>
+            <span *ngIf="!checklist.canLock">Chưa đáp ứng đủ điều kiện khóa sổ</span>
+          </div>
+
+          <!-- Checklist Items -->
+          <div class="checklist-items">
+            <div class="checklist-item" *ngFor="let check of checklist.checks"
+                 [class.passed]="check.passed"
+                 [class.failed]="!check.passed">
+              <div class="check-icon" [style.color]="getCheckColor(check.passed)">
+                <i class="fa-solid" [ngClass]="getCheckIcon(check.passed)"></i>
+              </div>
+              <div class="check-content">
+                <div class="check-header">
+                  <span class="check-name">{{ check.name }}</span>
+                  <span class="check-severity" [class.required]="check.severity === 'REQUIRED'"
+                        [class.warning]="check.severity === 'WARNING'">
+                    {{ check.severity === 'REQUIRED' ? 'Bắt buộc' : 'Cảnh báo' }}
+                  </span>
+                </div>
+                <p class="check-description">{{ check.description }}</p>
+                <p class="check-details" *ngIf="check.details">{{ check.details }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Missing Checks -->
+          <div class="missing-checks" *ngIf="checklist.missingChecks.length > 0">
+            <h4><i class="fa-solid fa-exclamation-triangle"></i> Chưa đáp ứng:</h4>
+            <ul>
+              <li *ngFor="let missing of checklist.missingChecks">{{ missing }}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       LOCK CONFIRMATION MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showLockModal" (click)="closeLockModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Xác nhận khóa sổ</h2>
+        <button class="close-btn" (click)="closeLockModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="confirm-message">
+          <i class="fa-solid fa-lock confirm-icon"></i>
+          <p>Bạn có chắc chắn muốn khóa sổ kỳ <strong>{{ formatPeriod(selectedPeriodForAction?.period || '') }}</strong>?</p>
+        </div>
+
+        <div class="warning-box">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <div>
+            <strong>Lưu ý:</strong>
+            <p>Sau khi khóa, bạn sẽ không thể sửa trực tiếp số liệu của kỳ này. Mọi điều chỉnh phải thực hiện qua bút toán điều chỉnh ở kỳ sau.</p>
+          </div>
+        </div>
+
+        <!-- Quick Checklist -->
+        <div class="quick-checklist" *ngIf="checklist">
+          <h4>Kiểm tra nhanh:</h4>
+          <div class="check-row" *ngFor="let check of checklist.checks.slice(0, 5)">
+            <i class="fa-solid" [ngClass]="getCheckIcon(check.passed)" [style.color]="getCheckColor(check.passed)"></i>
+            <span>{{ check.name }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeLockModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="confirmLock()" [disabled]="!checklist?.canLock">
+          <i class="fa-solid fa-lock"></i> Xác nhận khóa
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       UNLOCK MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showUnlockModal" (click)="closeUnlockModal()">
+    <div class="modal-content unlock-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header danger">
+        <h2><i class="fa-solid fa-lock-open"></i> Mở khóa kỳ kế toán</h2>
+        <button class="close-btn" (click)="closeUnlockModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="danger-message">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <div>
+            <strong>CẢNH BÁO: Hành động này sẽ được ghi lại trong Audit Log!</strong>
+            <p>Bạn đang chuẩn bị mở khóa kỳ <strong>{{ formatPeriod(selectedPeriodForAction?.period || '') }}</strong>.</p>
+            <p>Thao tác này chỉ nên thực hiện khi có yêu cầu từ kiểm toán viên hoặc cơ quan thuế.</p>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Lý do mở khóa <span class="required">*</span></label>
+          <textarea [(ngModel)]="unlockReason"
+                    rows="4"
+                    placeholder="Nhập lý do mở khóa (tối thiểu 10 ký tự)..."
+                    [class.error]="unlockError"></textarea>
+          <span class="error-text" *ngIf="unlockError">{{ unlockError }}</span>
+          <span class="hint">Lý do này sẽ được ghi vào Audit Log và không thể chỉnh sửa.</span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeUnlockModal()">Hủy</button>
+        <button class="btn btn-danger" (click)="confirmUnlock()">
+          <i class="fa-solid fa-lock-open"></i> Xác nhận mở khóa
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,370 @@
+<div class="cash-flow-page">
+  <!-- ═══════════════════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">
+        <i class="fa-solid fa-money-bill-transfer"></i>
+        Báo cáo Lưu chuyển tiền tệ
+      </h1>
+      <p class="page-subtitle">Mẫu số B03-DNN - Phương pháp gián tiếp (Theo Thông tư 99/2025/TT-BTC)</p>
+    </div>
+
+    <div class="header-actions" *ngIf="report && canSubmit">
+      <button class="btn btn-outline" (click)="exportExcel()" title="Xuất Excel">
+        <i class="fa-solid fa-file-excel"></i> Excel
+      </button>
+      <button class="btn btn-outline" (click)="exportPDF()" title="In PDF">
+        <i class="fa-solid fa-file-pdf"></i> PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       FILTER BAR
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Kỳ báo cáo:</label>
+      <select [(ngModel)]="filter.periodType" (change)="onPeriodTypeChange()" class="form-select">
+        <option value="month">Theo tháng</option>
+        <option value="quarter">Theo quý</option>
+        <option value="year">Theo năm</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'month'">
+      <label>Tháng:</label>
+      <select [(ngModel)]="filter.month" (change)="onFilterChange()" class="form-select">
+        <option *ngFor="let m of months" [ngValue]="m.value">{{ m.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'quarter'">
+      <label>Quý:</label>
+      <select [(ngModel)]="filter.quarter" (change)="onFilterChange()" class="form-select">
+        <option *ngFor="let q of quarters" [ngValue]="q.value">{{ q.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Năm:</label>
+      <select [(ngModel)]="filter.year" (change)="onFilterChange()" class="form-select">
+        <option *ngFor="let y of years" [ngValue]="y">{{ y }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="filter.showPreviousPeriod" (change)="onFilterChange()">
+        So sánh với kỳ trước
+      </label>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       LOADING STATE
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="loading-spinner">
+      <i class="fa-solid fa-spinner fa-spin"></i>
+      <span>Đang tải dữ liệu...</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       CANNOT GENERATE WARNING
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="warning-panel" *ngIf="!canGenerate && !isLoading">
+    <div class="warning-icon">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+    <div class="warning-content">
+      <h3>Không thể lập Báo cáo lưu chuyển tiền tệ</h3>
+      <p class="warning-message">Số liệu kế toán chưa hợp lệ để lập báo cáo tài chính</p>
+      <ul class="warning-reasons">
+        <li *ngFor="let reason of cannotGenerateReasons">
+          <i class="fa-solid fa-xmark"></i> {{ reason }}
+        </li>
+      </ul>
+
+      <!-- Checklist prerequisites -->
+      <div class="prerequisites-checklist" *ngIf="prerequisites">
+        <div class="checklist-item" [class.checked]="prerequisites.trialBalanceOk">
+          <i [class]="prerequisites.trialBalanceOk ? 'fa-solid fa-check' : 'fa-solid fa-xmark'"></i>
+          Bảng cân đối tài khoản cân đối
+        </div>
+        <div class="checklist-item" [class.checked]="prerequisites.balanceSheetOk">
+          <i [class]="prerequisites.balanceSheetOk ? 'fa-solid fa-check' : 'fa-solid fa-xmark'"></i>
+          Bảng cân đối kế toán hợp lệ
+        </div>
+        <div class="checklist-item" [class.checked]="prerequisites.incomeStatementOk">
+          <i [class]="prerequisites.incomeStatementOk ? 'fa-solid fa-check' : 'fa-solid fa-xmark'"></i>
+          Báo cáo kết quả kinh doanh hợp lệ
+        </div>
+        <div class="checklist-item" [class.checked]="prerequisites.periodLocked">
+          <i [class]="prerequisites.periodLocked ? 'fa-solid fa-check' : 'fa-solid fa-xmark'"></i>
+          Kỳ kế toán đã khóa sổ
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       ERROR MESSAGE
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="error-panel" *ngIf="errorMessage">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <span>{{ errorMessage }}</span>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       CASH FLOW REPORT
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="report-container" *ngIf="report && !isLoading">
+
+    <!-- Report Header -->
+    <div class="report-header">
+      <div class="company-info">
+        <p class="company-name">CÔNG TY TNHH TẠP HÓA 39</p>
+        <p class="company-address">Địa chỉ: ...</p>
+      </div>
+      <div class="report-title-section">
+        <h2 class="report-title">BÁO CÁO LƯU CHUYỂN TIỀN TỆ</h2>
+        <p class="report-method">(Theo phương pháp gián tiếp)</p>
+        <p class="report-period">{{ periodLabel }}</p>
+        <p class="report-unit">Đơn vị tính: VNĐ</p>
+      </div>
+    </div>
+
+    <!-- Validation Panel -->
+    <div class="validation-panel" [class.valid]="isValid" [class.invalid]="!isValid">
+      <div class="validation-status">
+        <i [class]="isValid ? 'fa-solid fa-check-circle' : 'fa-solid fa-times-circle'"></i>
+        <span *ngIf="isValid && isCashBalanced">
+          HỢP LỆ: Tiền cuối kỳ = Tiền đầu kỳ + Lưu chuyển tiền thuần
+        </span>
+        <span *ngIf="!isValid || !isCashBalanced">
+          CHƯA HỢP LỆ: Cần kiểm tra lại số liệu
+        </span>
+      </div>
+
+      <!-- Errors -->
+      <div class="validation-errors" *ngIf="validationErrors.length > 0">
+        <div class="error-item" *ngFor="let error of validationErrors">
+          <i class="fa-solid fa-exclamation-triangle"></i> {{ error }}
+        </div>
+      </div>
+
+      <!-- Warnings -->
+      <div class="validation-warnings" *ngIf="validationWarnings.length > 0">
+        <div class="warning-item" *ngFor="let warning of validationWarnings">
+          <i class="fa-solid fa-info-circle"></i> {{ warning }}
+        </div>
+      </div>
+
+      <!-- Explanations (Lợi nhuận ≠ Tiền) -->
+      <div class="explanation-panel" *ngIf="explanations.length > 0">
+        <div class="explanation-header">
+          <i class="fa-solid fa-lightbulb"></i>
+          Giải thích: Lợi nhuận ≠ Dòng tiền
+        </div>
+        <ul class="explanation-list">
+          <li *ngFor="let explanation of explanations">{{ explanation }}</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Main Report Table -->
+    <div class="report-body">
+      <table class="cf-table">
+        <thead>
+          <tr>
+            <th class="col-code">Mã số</th>
+            <th class="col-name">CHỈ TIÊU</th>
+            <th class="col-amount">Kỳ này</th>
+            <th class="col-amount" *ngIf="filter.showPreviousPeriod">Kỳ trước</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- I. HOẠT ĐỘNG KINH DOANH -->
+          <tr class="section-header">
+            <td colspan="4">{{ operatingSection?.title }}</td>
+          </tr>
+          <ng-container *ngIf="operatingSection">
+            <tr *ngFor="let row of operatingSection.rows"
+                [class]="getRowClass(row)"
+                (click)="onRowClick(row)">
+              <td class="col-code">{{ row.code }}</td>
+              <td class="col-name">
+                <span [style.padding-left.px]="(row.level - 1) * 16">{{ row.name }}</span>
+                <span class="note-badge" *ngIf="row.note" [title]="row.note">
+                  <i class="fa-solid fa-info-circle"></i>
+                </span>
+              </td>
+              <td class="col-amount" [class]="getAmountClass(row.amount)">
+                {{ formatCurrency(row.amount) }}
+              </td>
+              <td class="col-amount" *ngIf="filter.showPreviousPeriod">
+                {{ formatCurrency(row.previousAmount) }}
+              </td>
+            </tr>
+          </ng-container>
+
+          <!-- II. HOẠT ĐỘNG ĐẦU TƯ -->
+          <tr class="section-header">
+            <td colspan="4">{{ investingSection?.title }}</td>
+          </tr>
+          <ng-container *ngIf="investingSection">
+            <tr *ngFor="let row of investingSection.rows"
+                [class]="getRowClass(row)"
+                (click)="onRowClick(row)">
+              <td class="col-code">{{ row.code }}</td>
+              <td class="col-name">
+                <span [style.padding-left.px]="(row.level - 1) * 16">{{ row.name }}</span>
+                <span class="note-badge" *ngIf="row.note" [title]="row.note">
+                  <i class="fa-solid fa-info-circle"></i>
+                </span>
+              </td>
+              <td class="col-amount" [class]="getAmountClass(row.amount)">
+                {{ formatCurrency(row.amount) }}
+              </td>
+              <td class="col-amount" *ngIf="filter.showPreviousPeriod">
+                {{ formatCurrency(row.previousAmount) }}
+              </td>
+            </tr>
+          </ng-container>
+
+          <!-- III. HOẠT ĐỘNG TÀI CHÍNH -->
+          <tr class="section-header">
+            <td colspan="4">{{ financingSection?.title }}</td>
+          </tr>
+          <ng-container *ngIf="financingSection">
+            <tr *ngFor="let row of financingSection.rows"
+                [class]="getRowClass(row)"
+                (click)="onRowClick(row)">
+              <td class="col-code">{{ row.code }}</td>
+              <td class="col-name">
+                <span [style.padding-left.px]="(row.level - 1) * 16">{{ row.name }}</span>
+                <span class="note-badge" *ngIf="row.note" [title]="row.note">
+                  <i class="fa-solid fa-info-circle"></i>
+                </span>
+              </td>
+              <td class="col-amount" [class]="getAmountClass(row.amount)">
+                {{ formatCurrency(row.amount) }}
+              </td>
+              <td class="col-amount" *ngIf="filter.showPreviousPeriod">
+                {{ formatCurrency(row.previousAmount) }}
+              </td>
+            </tr>
+          </ng-container>
+
+          <!-- TỔNG HỢP -->
+          <tr class="summary-header">
+            <td colspan="4">TỔNG HỢP LƯU CHUYỂN TIỀN</td>
+          </tr>
+          <tr class="summary-row">
+            <td class="col-code">50</td>
+            <td class="col-name">Lưu chuyển tiền thuần trong kỳ (20 + 30 + 40)</td>
+            <td class="col-amount summary-amount" [class]="getAmountClass(netCashFlow)">
+              <strong>{{ formatCurrency(netCashFlow) }}</strong>
+            </td>
+            <td class="col-amount" *ngIf="filter.showPreviousPeriod">-</td>
+          </tr>
+          <tr class="summary-row">
+            <td class="col-code">60</td>
+            <td class="col-name">Tiền và tương đương tiền đầu kỳ</td>
+            <td class="col-amount">
+              {{ formatCurrency(cashBeginning) }}
+            </td>
+            <td class="col-amount" *ngIf="filter.showPreviousPeriod">-</td>
+          </tr>
+          <tr class="summary-row grand-total">
+            <td class="col-code">70</td>
+            <td class="col-name"><strong>Tiền và tương đương tiền cuối kỳ (50 + 60)</strong></td>
+            <td class="col-amount summary-amount">
+              <strong>{{ formatCurrency(cashEnding) }}</strong>
+            </td>
+            <td class="col-amount" *ngIf="filter.showPreviousPeriod">-</td>
+          </tr>
+          <tr class="verification-row" *ngIf="!isCashBalanced">
+            <td class="col-code"></td>
+            <td class="col-name">(Kiểm tra: Tiền đầu + LC thuần)</td>
+            <td class="col-amount mismatch">
+              {{ formatCurrency(cashEndingCalculated) }}
+            </td>
+            <td class="col-amount" *ngIf="filter.showPreviousPeriod">-</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Report Footer -->
+    <div class="report-footer">
+      <div class="signature-section">
+        <div class="signature-block">
+          <p class="signature-title">Người lập biểu</p>
+          <p class="signature-note">(Ký, họ tên)</p>
+        </div>
+        <div class="signature-block">
+          <p class="signature-title">Kế toán trưởng</p>
+          <p class="signature-note">(Ký, họ tên)</p>
+        </div>
+        <div class="signature-block">
+          <p class="signature-title">Giám đốc</p>
+          <p class="signature-note">(Ký, họ tên, đóng dấu)</p>
+        </div>
+      </div>
+
+      <div class="report-meta">
+        <p>Ngày lập: {{ formatDateTime(report.generatedAt) }}</p>
+        <p *ngIf="isPeriodLocked" class="locked-badge">
+          <i class="fa-solid fa-lock"></i> Kỳ đã khóa sổ
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       DRILL-DOWN MODAL
+  ═══════════════════════════════════════════════════════════════════ -->
+  <div class="drill-down-modal" *ngIf="showDrillDown && selectedRow" (click)="closeDrillDown()">
+    <div class="drill-down-content" (click)="$event.stopPropagation()">
+      <div class="drill-down-header">
+        <h3>Chi tiết: {{ selectedRow.name }}</h3>
+        <button class="close-btn" (click)="closeDrillDown()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+      <div class="drill-down-body">
+        <div class="info-row">
+          <span class="info-label">Mã chỉ tiêu:</span>
+          <span class="info-value">{{ selectedRow.code }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Số tiền:</span>
+          <span class="info-value" [class]="getAmountClass(selectedRow.amount)">
+            {{ formatCurrency(selectedRow.amount) }} VNĐ
+          </span>
+        </div>
+        <div class="info-row" *ngIf="selectedRow.note">
+          <span class="info-label">Ghi chú:</span>
+          <span class="info-value">{{ selectedRow.note }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Tài khoản liên quan:</span>
+          <div class="account-list">
+            <span class="account-badge" *ngFor="let acc of selectedRow.accountMapping">
+              TK {{ acc }}
+            </span>
+          </div>
+        </div>
+        <div class="drill-down-hint">
+          <i class="fa-solid fa-info-circle"></i>
+          Xem Sổ cái theo TK để tra cứu chi tiết bút toán
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

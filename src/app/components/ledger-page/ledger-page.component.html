@@ -1,0 +1,425 @@
+<!-- SỔ CÁI THEO TÀI KHOẢN - GENERAL LEDGER BY ACCOUNT -->
+<div class="ledger-page">
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- HEADER -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">
+        <i class="fa-solid fa-book"></i>
+        Sổ cái theo tài khoản
+      </h1>
+      <span class="period-badge" [class.locked]="isPeriodLocked">
+        <i class="fa-solid" [ngClass]="isPeriodLocked ? 'fa-lock' : 'fa-lock-open'"></i>
+        {{ periodLabel }}
+        <span *ngIf="isPeriodLocked" class="lock-text">Đã khóa</span>
+      </span>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="exportAllExcel()" [disabled]="accounts.length === 0">
+        <i class="fa-solid fa-file-excel"></i>
+        Xuất tất cả
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- FILTER BAR -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Kỳ kế toán</label>
+      <select [(ngModel)]="filter.periodType" (change)="onPeriodTypeChange()">
+        <option value="month">Theo tháng</option>
+        <option value="quarter">Theo quý</option>
+        <option value="year">Theo năm</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'month'">
+      <label>Tháng</label>
+      <select [(ngModel)]="filter.month" (change)="onFilterChange()">
+        <option *ngFor="let m of months" [value]="m.value">{{ m.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'quarter'">
+      <label>Quý</label>
+      <select [(ngModel)]="filter.quarter" (change)="onFilterChange()">
+        <option *ngFor="let q of quarters" [value]="q.value">{{ q.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Năm</label>
+      <select [(ngModel)]="filter.year" (change)="onFilterChange()">
+        <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="filter.showZeroBalance" (change)="onFilterChange()">
+        <span>Hiển thị TK không phát sinh</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- SUMMARY CARDS -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="summary-cards">
+    <div class="summary-card">
+      <div class="card-icon blue">
+        <i class="fa-solid fa-list-ol"></i>
+      </div>
+      <div class="card-content">
+        <span class="card-label">Số tài khoản</span>
+        <span class="card-value">{{ summary.totalAccounts }}</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="card-icon green">
+        <i class="fa-solid fa-arrow-trend-up"></i>
+      </div>
+      <div class="card-content">
+        <span class="card-label">Tổng phát sinh Nợ</span>
+        <span class="card-value">{{ formatCurrency(summary.totalDebit) }}</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="card-icon orange">
+        <i class="fa-solid fa-arrow-trend-down"></i>
+      </div>
+      <div class="card-content">
+        <span class="card-label">Tổng phát sinh Có</span>
+        <span class="card-value">{{ formatCurrency(summary.totalCredit) }}</span>
+      </div>
+    </div>
+
+    <div class="summary-card" [class.balanced]="isLedgerBalanced" [class.unbalanced]="!isLedgerBalanced">
+      <div class="card-icon" [class.green]="isLedgerBalanced" [class.red]="!isLedgerBalanced">
+        <i class="fa-solid" [ngClass]="isLedgerBalanced ? 'fa-check-double' : 'fa-exclamation-triangle'"></i>
+      </div>
+      <div class="card-content">
+        <span class="card-label">Cân đối</span>
+        <span class="card-value" *ngIf="isLedgerBalanced">Cân đối</span>
+        <span class="card-value warning" *ngIf="!isLedgerBalanced">
+          Lệch {{ formatCurrency(summary.difference) }}
+        </span>
+      </div>
+    </div>
+
+    <div class="summary-card" *ngIf="hasAbnormalWarning" [class.warning]="true">
+      <div class="card-icon yellow">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <div class="card-content">
+        <span class="card-label">TK bất thường</span>
+        <span class="card-value warning">{{ summary.abnormalAccounts }} TK</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- MAIN CONTENT - MASTER-DETAIL LAYOUT -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="main-content">
+
+    <!-- MASTER PANEL - DANH SÁCH TÀI KHOẢN -->
+    <div class="master-panel">
+      <div class="panel-header">
+        <h3>Danh sách tài khoản</h3>
+        <span class="account-count">{{ accounts.length }} TK</span>
+      </div>
+
+      <div class="table-container" *ngIf="!isLoading">
+        <table class="data-table master-table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="sortAccountsBy('accountCode')">
+                TK <i class="fa-solid" [ngClass]="getAccountSortIcon('accountCode')"></i>
+              </th>
+              <th class="sortable" (click)="sortAccountsBy('accountName')">
+                Tên tài khoản <i class="fa-solid" [ngClass]="getAccountSortIcon('accountName')"></i>
+              </th>
+              <th class="text-right">Dư đầu</th>
+              <th class="text-right sortable" (click)="sortAccountsBy('totalDebit')">
+                PS Nợ <i class="fa-solid" [ngClass]="getAccountSortIcon('totalDebit')"></i>
+              </th>
+              <th class="text-right sortable" (click)="sortAccountsBy('totalCredit')">
+                PS Có <i class="fa-solid" [ngClass]="getAccountSortIcon('totalCredit')"></i>
+              </th>
+              <th class="text-right">Dư cuối</th>
+              <th class="text-center">TT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let account of accounts"
+                [class.selected]="selectedAccount?.accountCode === account.accountCode"
+                [class.level-2]="account.level === 2"
+                [class.level-3]="account.level === 3"
+                (click)="selectAccount(account)">
+              <td class="account-code">
+                <span class="level-indent" *ngIf="account.level > 1"></span>
+                {{ account.accountCode }}
+              </td>
+              <td class="account-name">{{ account.accountName }}</td>
+              <td class="text-right">
+                <span *ngIf="account.openingDebit > 0" class="debit">{{ formatCurrency(account.openingDebit) }}</span>
+                <span *ngIf="account.openingCredit > 0" class="credit">({{ formatCurrency(account.openingCredit) }})</span>
+                <span *ngIf="account.openingDebit === 0 && account.openingCredit === 0">-</span>
+              </td>
+              <td class="text-right debit">{{ formatCurrency(account.totalDebit) }}</td>
+              <td class="text-right credit">{{ formatCurrency(account.totalCredit) }}</td>
+              <td class="text-right">
+                <span *ngIf="account.closingDebit > 0" class="debit">{{ formatCurrency(account.closingDebit) }}</span>
+                <span *ngIf="account.closingCredit > 0" class="credit">({{ formatCurrency(account.closingCredit) }})</span>
+                <span *ngIf="account.closingDebit === 0 && account.closingCredit === 0">-</span>
+              </td>
+              <td class="text-center">
+                <span class="status-icon" [ngClass]="getBalanceStatusClass(account.balanceStatus)"
+                      [title]="getBalanceStatusLabel(account.balanceStatus)">
+                  <i class="fa-solid" [ngClass]="getBalanceStatusIcon(account.balanceStatus)"></i>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="loading-overlay" *ngIf="isLoading">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <span>Đang tải dữ liệu...</span>
+      </div>
+
+      <div class="empty-state" *ngIf="!isLoading && accounts.length === 0">
+        <i class="fa-solid fa-inbox"></i>
+        <p>Không có dữ liệu trong kỳ này</p>
+      </div>
+    </div>
+
+    <!-- DETAIL PANEL - CHI TIẾT SỔ CÁI THEO TK -->
+    <div class="detail-panel">
+      <div class="panel-header" *ngIf="selectedAccount">
+        <div class="account-info">
+          <h3>
+            <span class="tk-code">{{ selectedAccount.accountCode }}</span>
+            {{ selectedAccount.accountName }}
+          </h3>
+          <div class="account-meta">
+            <span class="meta-item">
+              <i class="fa-solid fa-tag"></i>
+              {{ getTypeLabel(selectedAccount.accountType) }}
+            </span>
+            <span class="meta-item">
+              <i class="fa-solid fa-balance-scale"></i>
+              {{ getNatureLabel(selectedAccount.nature) }}
+            </span>
+            <span class="meta-item">
+              <i class="fa-solid fa-hashtag"></i>
+              {{ accountEntries.length }} bút toán
+            </span>
+          </div>
+        </div>
+        <div class="panel-actions">
+          <button class="btn btn-sm btn-outline" (click)="exportExcel()" [disabled]="accountEntries.length === 0">
+            <i class="fa-solid fa-file-excel"></i>
+            Excel
+          </button>
+          <button class="btn btn-sm btn-outline" (click)="exportPDF()" [disabled]="accountEntries.length === 0">
+            <i class="fa-solid fa-file-pdf"></i>
+            PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Opening Balance -->
+      <div class="balance-row opening" *ngIf="selectedAccount">
+        <span class="balance-label">Số dư đầu kỳ:</span>
+        <span class="balance-debit" *ngIf="selectedAccount.openingDebit > 0">
+          Nợ: {{ formatCurrency(selectedAccount.openingDebit) }}
+        </span>
+        <span class="balance-credit" *ngIf="selectedAccount.openingCredit > 0">
+          Có: {{ formatCurrency(selectedAccount.openingCredit) }}
+        </span>
+        <span *ngIf="selectedAccount.openingDebit === 0 && selectedAccount.openingCredit === 0">0</span>
+      </div>
+
+      <!-- Detail Table -->
+      <div class="table-container detail-table-container" *ngIf="selectedAccount && !isLoadingDetail">
+        <table class="data-table detail-table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="sortEntriesBy('date')">
+                Ngày <i class="fa-solid" [ngClass]="getEntrySortIcon('date')"></i>
+              </th>
+              <th class="sortable" (click)="sortEntriesBy('voucherNo')">
+                Số CT <i class="fa-solid" [ngClass]="getEntrySortIcon('voucherNo')"></i>
+              </th>
+              <th>Diễn giải</th>
+              <th>TK đối ứng</th>
+              <th class="text-right sortable" (click)="sortEntriesBy('debit')">
+                Nợ <i class="fa-solid" [ngClass]="getEntrySortIcon('debit')"></i>
+              </th>
+              <th class="text-right sortable" (click)="sortEntriesBy('credit')">
+                Có <i class="fa-solid" [ngClass]="getEntrySortIcon('credit')"></i>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let entry of accountEntries"
+                class="entry-row"
+                [class.locked]="entry.isLocked"
+                (click)="onEntryClick(entry)">
+              <td class="date-cell">{{ formatDate(entry.date) }}</td>
+              <td class="voucher-cell">
+                <span class="voucher-tag" [style.background-color]="getSourceColor(entry.sourceType)">
+                  {{ entry.voucherNo }}
+                </span>
+              </td>
+              <td class="desc-cell">{{ entry.description }}</td>
+              <td class="counter-cell">
+                <span class="counter-account">{{ entry.counterpartAccount }}</span>
+                <span class="counter-name">{{ entry.counterpartName }}</span>
+              </td>
+              <td class="text-right debit">{{ formatCurrency(entry.debit) }}</td>
+              <td class="text-right credit">{{ formatCurrency(entry.credit) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="4" class="text-right"><strong>Cộng phát sinh:</strong></td>
+              <td class="text-right debit"><strong>{{ formatCurrency(totalDetailDebit) }}</strong></td>
+              <td class="text-right credit"><strong>{{ formatCurrency(totalDetailCredit) }}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Closing Balance -->
+      <div class="balance-row closing" *ngIf="selectedAccount">
+        <span class="balance-label">Số dư cuối kỳ:</span>
+        <span class="balance-debit" *ngIf="closingBalance.debit > 0">
+          Nợ: {{ formatCurrency(closingBalance.debit) }}
+        </span>
+        <span class="balance-credit" *ngIf="closingBalance.credit > 0">
+          Có: {{ formatCurrency(closingBalance.credit) }}
+        </span>
+        <span *ngIf="closingBalance.debit === 0 && closingBalance.credit === 0">0</span>
+      </div>
+
+      <div class="loading-overlay" *ngIf="isLoadingDetail">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <span>Đang tải chi tiết...</span>
+      </div>
+
+      <div class="empty-state" *ngIf="!selectedAccount">
+        <i class="fa-solid fa-hand-pointer"></i>
+        <p>Chọn tài khoản để xem chi tiết</p>
+      </div>
+
+      <div class="empty-state" *ngIf="selectedAccount && !isLoadingDetail && accountEntries.length === 0">
+        <i class="fa-solid fa-inbox"></i>
+        <p>Tài khoản không có phát sinh trong kỳ</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- DETAIL DRAWER - DRILL-DOWN CHỨNG TỪ GỐC -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="drawer-overlay" *ngIf="showDetailDrawer" (click)="closeDetailDrawer()"></div>
+  <div class="detail-drawer" [class.open]="showDetailDrawer">
+    <div class="drawer-header">
+      <h3>Chi tiết chứng từ</h3>
+      <button class="btn-close" (click)="closeDetailDrawer()">
+        <i class="fa-solid fa-times"></i>
+      </button>
+    </div>
+
+    <div class="drawer-content" *ngIf="selectedEntry && voucherDetail">
+      <!-- Voucher Info -->
+      <div class="voucher-info-section">
+        <div class="info-row">
+          <span class="info-label">Loại chứng từ:</span>
+          <span class="info-value">
+            <span class="voucher-type-tag" [style.background-color]="getSourceColor(selectedEntry.sourceType)">
+              {{ getSourceLabel(selectedEntry.sourceType) }}
+            </span>
+          </span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Số chứng từ:</span>
+          <span class="info-value">{{ voucherDetail.voucherNo }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Ngày chứng từ:</span>
+          <span class="info-value">{{ formatDate(voucherDetail.voucherDate) }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Diễn giải:</span>
+          <span class="info-value">{{ voucherDetail.description }}</span>
+        </div>
+        <div class="info-row" *ngIf="voucherDetail.partner">
+          <span class="info-label">Đối tượng:</span>
+          <span class="info-value">{{ voucherDetail.partner }}</span>
+        </div>
+        <div class="info-row" *ngIf="voucherDetail.taxCode">
+          <span class="info-label">Mã số thuế:</span>
+          <span class="info-value">{{ voucherDetail.taxCode }}</span>
+        </div>
+        <div class="info-row total">
+          <span class="info-label">Tổng tiền:</span>
+          <span class="info-value">{{ formatCurrency(voucherDetail.totalAmount) }} VNĐ</span>
+        </div>
+      </div>
+
+      <!-- Journal Entries -->
+      <div class="journal-entries-section" *ngIf="voucherDetail.journalEntries.length > 0">
+        <h4>Định khoản</h4>
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th>TK Nợ</th>
+              <th>TK Có</th>
+              <th class="text-right">Số tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let je of voucherDetail.journalEntries">
+              <td>{{ je.debitAccount }}</td>
+              <td>{{ je.creditAccount }}</td>
+              <td class="text-right">{{ formatCurrency(je.amount) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Related Documents -->
+      <div class="related-docs-section" *ngIf="voucherDetail.relatedDocuments && voucherDetail.relatedDocuments.length > 0">
+        <h4>Chứng từ liên quan</h4>
+        <ul class="related-list">
+          <li *ngFor="let doc of voucherDetail.relatedDocuments">
+            <i class="fa-solid fa-link"></i>
+            {{ doc.type }}: {{ doc.number }}
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="drawer-loading" *ngIf="selectedEntry && !voucherDetail">
+      <i class="fa-solid fa-spinner fa-spin"></i>
+      <span>Đang tải...</span>
+    </div>
+
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="closeDetailDrawer()">Đóng</button>
+    </div>
+  </div>
+
+</div>

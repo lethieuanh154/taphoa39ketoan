@@ -1,0 +1,276 @@
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH - MẪU B02-DNN
+     Theo Thông tư 133/2016/TT-BTC
+═══════════════════════════════════════════════════════════════════════════════ -->
+
+<div class="income-statement-page">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">
+        <i class="fa-solid fa-chart-line"></i>
+        Báo cáo Kết quả Hoạt động Kinh doanh
+      </h1>
+      <p class="page-subtitle">Mẫu B02-DNN theo Thông tư 133/2016/TT-BTC</p>
+    </div>
+
+    <div class="header-actions" *ngIf="report">
+      <button class="btn btn-outline" (click)="exportExcel()" title="Xuất Excel">
+        <i class="fa-solid fa-file-excel"></i>
+        Excel
+      </button>
+      <button class="btn btn-outline" (click)="exportPDF()" title="In PDF">
+        <i class="fa-solid fa-file-pdf"></i>
+        PDF
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       FILTER BAR
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="filter-bar">
+    <div class="filter-group">
+      <label>Kỳ báo cáo</label>
+      <select [(ngModel)]="filter.periodType" (change)="onPeriodTypeChange()" class="filter-select">
+        <option value="month">Theo tháng</option>
+        <option value="quarter">Theo quý</option>
+        <option value="year">Theo năm</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'month'">
+      <label>Tháng</label>
+      <select [(ngModel)]="filter.month" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let m of months" [ngValue]="m.value">{{ m.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'quarter'">
+      <label>Quý</label>
+      <select [(ngModel)]="filter.quarter" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let q of quarters" [ngValue]="q.value">{{ q.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Năm</label>
+      <select [(ngModel)]="filter.year" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let y of years" [ngValue]="y">{{ y }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>So sánh với</label>
+      <select [(ngModel)]="filter.compareType" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let ct of compareTypes" [ngValue]="ct.value">{{ ct.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-actions">
+      <button class="btn btn-primary" (click)="checkCanGenerate()" [disabled]="isLoading">
+        <i class="fa-solid fa-sync" [class.fa-spin]="isLoading"></i>
+        Lập báo cáo
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       LOADING STATE
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="loading-container" *ngIf="isLoading">
+    <div class="loading-spinner">
+      <i class="fa-solid fa-spinner fa-spin fa-3x"></i>
+      <p>Đang tạo báo cáo...</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       ERROR STATE
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="error-container" *ngIf="errorMessage && !isLoading">
+    <div class="error-message">
+      <i class="fa-solid fa-exclamation-triangle"></i>
+      <span>{{ errorMessage }}</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       CANNOT GENERATE STATE
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="cannot-generate-container" *ngIf="!canGenerate && !isLoading && cannotGenerateReasons.length > 0">
+    <div class="cannot-generate-card">
+      <div class="card-icon">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <h3>Chưa thể lập báo cáo</h3>
+      <ul class="reasons-list">
+        <li *ngFor="let reason of cannotGenerateReasons">
+          <i class="fa-solid fa-times-circle"></i>
+          {{ reason }}
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       REPORT CONTENT
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="report-content" *ngIf="report && !isLoading">
+
+    <!-- Summary Cards -->
+    <section class="summary-section">
+      <div class="summary-cards">
+        <!-- Doanh thu thuần -->
+        <div class="summary-card revenue">
+          <div class="card-icon">
+            <i class="fa-solid fa-coins"></i>
+          </div>
+          <div class="card-content">
+            <span class="card-label">Doanh thu thuần</span>
+            <span class="card-value">{{ formatCurrency(netRevenue) }}</span>
+          </div>
+        </div>
+
+        <!-- Lợi nhuận gộp -->
+        <div class="summary-card gross-profit">
+          <div class="card-icon">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
+          <div class="card-content">
+            <span class="card-label">Lợi nhuận gộp</span>
+            <span class="card-value">{{ formatCurrency(grossProfit) }}</span>
+            <span class="card-sub">Biên LN gộp: {{ grossMargin.toFixed(1) }}%</span>
+          </div>
+        </div>
+
+        <!-- Lợi nhuận từ HĐKD -->
+        <div class="summary-card operating-profit">
+          <div class="card-icon">
+            <i class="fa-solid fa-building"></i>
+          </div>
+          <div class="card-content">
+            <span class="card-label">LN từ HĐKD</span>
+            <span class="card-value" [class.negative]="operatingProfit < 0">
+              {{ formatCurrency(operatingProfit) }}
+            </span>
+            <span class="card-sub">Biên LN HĐKD: {{ operatingMargin.toFixed(1) }}%</span>
+          </div>
+        </div>
+
+        <!-- Lợi nhuận sau thuế -->
+        <div class="summary-card net-profit" [class.profit]="isProfitable" [class.loss]="!isProfitable">
+          <div class="card-icon">
+            <i class="fa-solid" [class.fa-arrow-trend-up]="isProfitable" [class.fa-arrow-trend-down]="!isProfitable"></i>
+          </div>
+          <div class="card-content">
+            <span class="card-label">Lợi nhuận sau thuế</span>
+            <span class="card-value">{{ formatCurrency(netProfit) }}</span>
+            <span class="card-sub">Biên LN ròng: {{ netProfitMargin.toFixed(1) }}%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Validation Messages -->
+    <section class="validation-section" *ngIf="validationWarnings.length > 0 || validationErrors.length > 0">
+      <div class="validation-errors" *ngIf="validationErrors.length > 0">
+        <div class="validation-item error" *ngFor="let error of validationErrors">
+          <i class="fa-solid fa-times-circle"></i>
+          {{ error }}
+        </div>
+      </div>
+      <div class="validation-warnings" *ngIf="validationWarnings.length > 0">
+        <div class="validation-item warning" *ngFor="let warning of validationWarnings">
+          <i class="fa-solid fa-exclamation-triangle"></i>
+          {{ warning }}
+        </div>
+      </div>
+    </section>
+
+    <!-- Report Header -->
+    <section class="report-header-section">
+      <div class="company-info">
+        <p class="company-name">{{ report.companyName }}</p>
+        <p class="tax-code">MST: {{ report.taxCode }}</p>
+      </div>
+      <div class="report-title-block">
+        <h2 class="report-title">BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH</h2>
+        <p class="report-period">{{ periodLabel }}</p>
+        <p class="report-form">Mẫu số B02-DNN</p>
+      </div>
+      <div class="report-meta">
+        <span class="period-status" [class.locked]="isPeriodLocked" [class.open]="!isPeriodLocked">
+          <i class="fa-solid" [class.fa-lock]="isPeriodLocked" [class.fa-lock-open]="!isPeriodLocked"></i>
+          {{ isPeriodLocked ? 'Đã khóa sổ' : 'Chưa khóa sổ' }}
+        </span>
+      </div>
+    </section>
+
+    <!-- Report Table -->
+    <section class="report-table-section">
+      <div class="table-wrapper">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th class="col-code">Mã số</th>
+              <th class="col-name">Chỉ tiêu</th>
+              <th class="col-note">TM</th>
+              <th class="col-amount">Kỳ này</th>
+              <th class="col-amount" *ngIf="showPreviousColumn">{{ previousColumnLabel }}</th>
+              <th class="col-change" *ngIf="showPreviousColumn">Tăng/Giảm</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of report.rows"
+                [class]="getRowClass(row)">
+              <td class="col-code">{{ row.code }}</td>
+              <td class="col-name">
+                <span [style.paddingLeft.px]="row.level * 16">{{ row.name }}</span>
+              </td>
+              <td class="col-note">{{ row.note ? 'V.' + row.code : '' }}</td>
+              <td class="col-amount" [class]="getAmountClass(row.amount)">
+                {{ formatCurrency(row.amount) }}
+              </td>
+              <td class="col-amount" *ngIf="showPreviousColumn" [class]="getAmountClass(row.previousAmount || 0)">
+                {{ formatCurrency(row.previousAmount) }}
+              </td>
+              <td class="col-change" *ngIf="showPreviousColumn" [class]="getChangeClass(row.amount, row.previousAmount)">
+                {{ formatPercent(row.amount, row.previousAmount) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Report Footer -->
+    <section class="report-footer-section">
+      <div class="footer-row">
+        <div class="footer-col">
+          <p class="footer-label">Người lập biểu</p>
+          <p class="footer-name">(Ký, họ tên)</p>
+        </div>
+        <div class="footer-col">
+          <p class="footer-label">Kế toán trưởng</p>
+          <p class="footer-name">(Ký, họ tên)</p>
+        </div>
+        <div class="footer-col">
+          <p class="footer-label">Giám đốc</p>
+          <p class="footer-name">(Ký, họ tên, đóng dấu)</p>
+        </div>
+      </div>
+      <div class="footer-info">
+        <p>Lập ngày: {{ formatDateTime(generatedAt) }}</p>
+        <p class="footer-note">
+          <i class="fa-solid fa-info-circle"></i>
+          Báo cáo này được tạo tự động từ số liệu Sổ cái. Số liệu chỉ mang tính tham khảo cho đến khi được kế toán trưởng duyệt.
+        </p>
+      </div>
+    </section>
+
+  </div>
+</div>

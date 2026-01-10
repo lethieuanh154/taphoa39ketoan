@@ -1,0 +1,479 @@
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     HỆ THỐNG TÀI KHOẢN KẾ TOÁN - CHART OF ACCOUNTS
+     Theo Thông tư 133/2016/TT-BTC
+═══════════════════════════════════════════════════════════════════════════════ -->
+
+<div class="coa-page">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">
+        <i class="fa-solid fa-sitemap"></i>
+        Hệ thống Tài khoản Kế toán
+      </h1>
+      <p class="page-subtitle">Theo Thông tư 133/2016/TT-BTC - Doanh nghiệp nhỏ & vừa</p>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="exportExcel()" title="Xuất Excel">
+        <i class="fa-solid fa-file-excel"></i>
+        Xuất Excel
+      </button>
+      <button class="btn btn-primary" (click)="openAddModal()">
+        <i class="fa-solid fa-plus"></i>
+        Thêm TK
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       STATS CARDS
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="stats-section">
+    <div class="stats-cards">
+      <div class="stat-card">
+        <div class="stat-icon blue">
+          <i class="fa-solid fa-list-ol"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{{ totalAccounts }}</span>
+          <span class="stat-label">Tổng số TK</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">
+          <i class="fa-solid fa-check-circle"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{{ activeAccounts }}</span>
+          <span class="stat-label">Đang hoạt động</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">
+          <i class="fa-solid fa-leaf"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{{ leafAccounts }}</span>
+          <span class="stat-label">TK chi tiết</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">8</span>
+          <span class="stat-label">Loại TK</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       FILTER & VIEW CONTROLS
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="filter-section">
+    <div class="filter-bar">
+      <div class="search-box">
+        <i class="fa-solid fa-search"></i>
+        <input
+          type="text"
+          [(ngModel)]="searchText"
+          (ngModelChange)="onSearchChange()"
+          placeholder="Tìm theo mã hoặc tên tài khoản..."
+        />
+        <button *ngIf="searchText" class="clear-btn" (click)="searchText = ''; onSearchChange()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="filter-group">
+        <select [(ngModel)]="selectedType" (change)="onTypeChange()" class="filter-select">
+          <option value="">Tất cả loại TK</option>
+          <option *ngFor="let type of accountTypes" [value]="type.value">{{ type.label }}</option>
+        </select>
+      </div>
+
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="showInactive" (change)="onShowInactiveChange()">
+        <span>Hiện TK ngừng sử dụng</span>
+      </label>
+
+      <button *ngIf="searchText || selectedType || showInactive" class="btn btn-text" (click)="clearFilters()">
+        <i class="fa-solid fa-filter-circle-xmark"></i>
+        Xóa bộ lọc
+      </button>
+    </div>
+
+    <div class="view-controls">
+      <div class="view-toggle">
+        <button [class.active]="viewMode === 'tree'" (click)="setViewMode('tree')" title="Dạng cây">
+          <i class="fa-solid fa-folder-tree"></i>
+        </button>
+        <button [class.active]="viewMode === 'list'" (click)="setViewMode('list')" title="Dạng danh sách">
+          <i class="fa-solid fa-list"></i>
+        </button>
+        <button [class.active]="viewMode === 'group'" (click)="setViewMode('group')" title="Theo nhóm">
+          <i class="fa-solid fa-layer-group"></i>
+        </button>
+      </div>
+
+      <div class="expand-controls" *ngIf="viewMode === 'tree'">
+        <button class="btn btn-text" (click)="expandAll()">
+          <i class="fa-solid fa-expand"></i> Mở rộng
+        </button>
+        <button class="btn btn-text" (click)="collapseAll()">
+          <i class="fa-solid fa-compress"></i> Thu gọn
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       LOADING STATE
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="loading-container" *ngIf="isLoading">
+    <div class="loading-spinner">
+      <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+      <p>Đang tải danh mục tài khoản...</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       TREE VIEW
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="content-section" *ngIf="!isLoading && viewMode === 'tree'">
+    <div class="tree-container">
+      <ng-container *ngFor="let account of getTopLevelAccounts()">
+        <ng-container *ngTemplateOutlet="treeNode; context: { account: account, level: 0 }"></ng-container>
+      </ng-container>
+    </div>
+  </section>
+
+  <!-- Tree Node Template -->
+  <ng-template #treeNode let-account="account" let-level="level">
+    <div class="tree-node" [style.paddingLeft.px]="level * 24">
+      <div class="node-content" [class.parent]="account.isParent" [class.inactive]="account.status === 'INACTIVE'">
+        <!-- Expand/Collapse Button -->
+        <button
+          class="expand-btn"
+          *ngIf="account.isParent"
+          (click)="toggleExpand(account.code)"
+        >
+          <i class="fa-solid" [class.fa-chevron-down]="isExpanded(account.code)" [class.fa-chevron-right]="!isExpanded(account.code)"></i>
+        </button>
+        <span class="expand-placeholder" *ngIf="!account.isParent"></span>
+
+        <!-- Account Info -->
+        <span class="account-code" (click)="openDetailModal(account)">{{ account.code }}</span>
+        <span class="account-name" (click)="openDetailModal(account)">{{ account.name }}</span>
+
+        <!-- Nature Badge -->
+        <span class="nature-badge" [class]="getNatureClass(account.nature)">
+          {{ getNatureName(account.nature) }}
+        </span>
+
+        <!-- Status Badge -->
+        <span class="status-badge" [class]="getStatusClass(account.status)" *ngIf="account.status !== 'ACTIVE'">
+          {{ getStatusLabel(account.status) }}
+        </span>
+
+        <!-- Detail Required -->
+        <span class="detail-badge" *ngIf="account.isDetailRequired" title="Theo dõi chi tiết">
+          <i class="fa-solid fa-user-tag"></i>
+        </span>
+
+        <!-- Actions -->
+        <div class="node-actions">
+          <button class="action-btn" (click)="openAddModal(account.code)" title="Thêm TK con" *ngIf="!account.isSystemAccount">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+          <button class="action-btn" (click)="openEditModal(account)" title="Sửa" *ngIf="!account.isSystemAccount">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+          <button class="action-btn danger" (click)="deleteAccount(account)" title="Xóa" *ngIf="!account.isSystemAccount && !account.isParent">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Children -->
+      <div class="tree-children" *ngIf="account.isParent && isExpanded(account.code)">
+        <ng-container *ngFor="let child of getChildAccounts(account.code)">
+          <ng-container *ngTemplateOutlet="treeNode; context: { account: child, level: level + 1 }"></ng-container>
+        </ng-container>
+      </div>
+    </div>
+  </ng-template>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       LIST VIEW
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="content-section" *ngIf="!isLoading && viewMode === 'list'">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-code">Mã TK</th>
+            <th class="col-name">Tên tài khoản</th>
+            <th class="col-nature">Tính chất</th>
+            <th class="col-type">Loại</th>
+            <th class="col-status">Trạng thái</th>
+            <th class="col-actions">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let account of filteredAccounts" [class.inactive]="account.status === 'INACTIVE'">
+            <td class="col-code">
+              <span class="code-link" (click)="openDetailModal(account)">{{ account.code }}</span>
+            </td>
+            <td class="col-name" [style.paddingLeft.px]="account.level * 16 + 8">
+              <span class="name-link" (click)="openDetailModal(account)">{{ account.name }}</span>
+              <span class="name-en" *ngIf="account.nameEn">{{ account.nameEn }}</span>
+            </td>
+            <td class="col-nature">
+              <span class="nature-badge" [class]="getNatureClass(account.nature)">
+                {{ getNatureName(account.nature) }}
+              </span>
+            </td>
+            <td class="col-type">{{ getTypeName(account.type).split(' - ')[0] }}</td>
+            <td class="col-status">
+              <span class="status-badge" [class]="getStatusClass(account.status)">
+                {{ getStatusLabel(account.status) }}
+              </span>
+            </td>
+            <td class="col-actions">
+              <button class="action-btn" (click)="openDetailModal(account)" title="Xem chi tiết">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+              <button class="action-btn" (click)="openEditModal(account)" title="Sửa" *ngIf="!account.isSystemAccount">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       GROUP VIEW
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="content-section" *ngIf="!isLoading && viewMode === 'group'">
+    <div class="groups-container">
+      <div class="account-group" *ngFor="let group of accountGroups">
+        <div class="group-header" (click)="toggleExpand('group_' + group.code)">
+          <div class="group-title">
+            <i class="fa-solid" [class.fa-chevron-down]="isExpanded('group_' + group.code)" [class.fa-chevron-right]="!isExpanded('group_' + group.code)"></i>
+            <span>{{ group.name }}</span>
+          </div>
+          <span class="group-count">{{ group.total }} tài khoản</span>
+        </div>
+        <div class="group-content" *ngIf="isExpanded('group_' + group.code)">
+          <div class="group-account" *ngFor="let account of group.accounts" (click)="openDetailModal(account)">
+            <span class="account-code">{{ account.code }}</span>
+            <span class="account-name">{{ account.name }}</span>
+            <span class="nature-badge sm" [class]="getNatureClass(account.nature)">{{ getNatureName(account.nature) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       ADD MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showAddModal" (click)="closeAddModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Thêm Tài khoản mới</h3>
+        <button class="close-btn" (click)="closeAddModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-errors" *ngIf="formErrors.length > 0">
+          <div class="error-item" *ngFor="let error of formErrors">
+            <i class="fa-solid fa-exclamation-circle"></i>
+            {{ error }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mã tài khoản <span class="required">*</span></label>
+          <input type="text" [(ngModel)]="newAccount.code" placeholder="VD: 1111, 33311...">
+          <small *ngIf="newAccount.parentCode">TK cha: {{ newAccount.parentCode }}</small>
+        </div>
+
+        <div class="form-group">
+          <label>Tên tài khoản <span class="required">*</span></label>
+          <input type="text" [(ngModel)]="newAccount.name" placeholder="Nhập tên tài khoản">
+        </div>
+
+        <div class="form-group">
+          <label>Tên tiếng Anh</label>
+          <input type="text" [(ngModel)]="newAccount.nameEn" placeholder="English name (optional)">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Loại tài khoản</label>
+            <select [(ngModel)]="newAccount.type">
+              <option *ngFor="let type of accountTypes" [ngValue]="type.value">{{ type.label }}</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Tính chất số dư</label>
+            <select [(ngModel)]="newAccount.nature">
+              <option *ngFor="let nature of accountNatures" [ngValue]="nature.value">{{ nature.label }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea [(ngModel)]="newAccount.description" rows="2" placeholder="Mô tả tài khoản (nếu có)"></textarea>
+        </div>
+
+        <div class="form-group checkbox">
+          <label>
+            <input type="checkbox" [(ngModel)]="newAccount.isDetailRequired">
+            <span>Theo dõi chi tiết (theo đối tượng)</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeAddModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="saveNewAccount()">
+          <i class="fa-solid fa-check"></i>
+          Thêm tài khoản
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       EDIT MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showEditModal" (click)="closeEditModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Sửa Tài khoản {{ editAccount.code }}</h3>
+        <button class="close-btn" (click)="closeEditModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-errors" *ngIf="formErrors.length > 0">
+          <div class="error-item" *ngFor="let error of formErrors">
+            <i class="fa-solid fa-exclamation-circle"></i>
+            {{ error }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mã tài khoản</label>
+          <input type="text" [value]="editAccount.code" disabled>
+        </div>
+
+        <div class="form-group">
+          <label>Tên tài khoản <span class="required">*</span></label>
+          <input type="text" [(ngModel)]="editAccount.name">
+        </div>
+
+        <div class="form-group">
+          <label>Tên tiếng Anh</label>
+          <input type="text" [(ngModel)]="editAccount.nameEn">
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea [(ngModel)]="editAccount.description" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeEditModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="saveEditAccount()">
+          <i class="fa-solid fa-check"></i>
+          Lưu thay đổi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       DETAIL MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showDetailModal" (click)="closeDetailModal()">
+    <div class="modal modal-detail" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Chi tiết Tài khoản</h3>
+        <button class="close-btn" (click)="closeDetailModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body" *ngIf="selectedAccount">
+        <div class="detail-header">
+          <span class="detail-code">{{ selectedAccount.code }}</span>
+          <span class="detail-name">{{ selectedAccount.name }}</span>
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Tên tiếng Anh</label>
+            <span>{{ selectedAccount.nameEn || '-' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Loại tài khoản</label>
+            <span>{{ getTypeName(selectedAccount.type) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Tính chất số dư</label>
+            <span class="nature-badge" [class]="getNatureClass(selectedAccount.nature)">
+              {{ getNatureName(selectedAccount.nature) }}
+            </span>
+          </div>
+          <div class="detail-item">
+            <label>Cấp độ</label>
+            <span>Bậc {{ selectedAccount.level }}</span>
+          </div>
+          <div class="detail-item">
+            <label>TK cha</label>
+            <span>{{ selectedAccount.parentCode || 'Không có (TK gốc)' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Trạng thái</label>
+            <span class="status-badge" [class]="getStatusClass(selectedAccount.status)">
+              {{ getStatusLabel(selectedAccount.status) }}
+            </span>
+          </div>
+          <div class="detail-item">
+            <label>Theo dõi chi tiết</label>
+            <span>{{ selectedAccount.isDetailRequired ? 'Có' : 'Không' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>TK hệ thống</label>
+            <span>{{ selectedAccount.isSystemAccount ? 'Có' : 'Không' }}</span>
+          </div>
+          <div class="detail-item full-width" *ngIf="selectedAccount.description">
+            <label>Mô tả</label>
+            <span>{{ selectedAccount.description }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDetailModal()">Đóng</button>
+        <button class="btn btn-primary" (click)="closeDetailModal(); openEditModal(selectedAccount!)" *ngIf="selectedAccount && !selectedAccount.isSystemAccount">
+          <i class="fa-solid fa-pen"></i>
+          Sửa
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

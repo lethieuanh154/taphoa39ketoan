@@ -1,0 +1,351 @@
+<div class="audit-trail-page">
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="header-content">
+      <div class="header-title">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <h1>Dấu vết kiểm toán (Audit Trail)</h1>
+      </div>
+      <p class="header-subtitle">
+        Theo dõi mọi thay đổi dữ liệu kế toán - Yêu cầu bắt buộc khi kiểm toán
+      </p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="exportAuditLog()">
+        <i class="fa-solid fa-file-export"></i> Xuất báo cáo
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SUMMARY CARDS
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="summary-cards">
+    <div class="summary-card">
+      <div class="summary-icon blue">
+        <i class="fa-solid fa-list-check"></i>
+      </div>
+      <div class="summary-info">
+        <span class="summary-value">{{ summary.totalActions }}</span>
+        <span class="summary-label">Tổng thay đổi</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-icon green">
+        <i class="fa-solid fa-plus-circle"></i>
+      </div>
+      <div class="summary-info">
+        <span class="summary-value">{{ summary.byAction['CREATE'] || 0 }}</span>
+        <span class="summary-label">Tạo mới</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-icon amber">
+        <i class="fa-solid fa-pen"></i>
+      </div>
+      <div class="summary-info">
+        <span class="summary-value">{{ summary.byAction['UPDATE'] || 0 }}</span>
+        <span class="summary-label">Cập nhật</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-icon purple">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <div class="summary-info">
+        <span class="summary-value">{{ summary.byAction['LOCK'] || 0 }}</span>
+        <span class="summary-label">Khóa sổ</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-icon gray">
+        <i class="fa-solid fa-users"></i>
+      </div>
+      <div class="summary-info">
+        <span class="summary-value">{{ summary.uniqueUsers }}</span>
+        <span class="summary-label">Người dùng</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       FILTER PANEL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="filter-panel">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Loại đối tượng</label>
+        <select [(ngModel)]="filter.entityType" (change)="onFilterChange()">
+          <option [ngValue]="undefined">Tất cả</option>
+          <option *ngFor="let type of entityTypes" [ngValue]="type[0]">
+            {{ type[1] }}
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Hành động</label>
+        <select [(ngModel)]="filter.action" (change)="onFilterChange()">
+          <option [ngValue]="undefined">Tất cả</option>
+          <option *ngFor="let action of actions" [ngValue]="action[0]">
+            {{ action[1] }}
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Người thực hiện</label>
+        <select [(ngModel)]="filter.userId" (change)="onFilterChange()">
+          <option [ngValue]="undefined">Tất cả</option>
+          <option *ngFor="let user of users" [ngValue]="user.id">
+            {{ user.name }}
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Từ ngày</label>
+        <input type="date" [(ngModel)]="filterFromDate" (change)="onFilterChange()">
+      </div>
+
+      <div class="filter-group">
+        <label>Đến ngày</label>
+        <input type="date" [(ngModel)]="filterToDate" (change)="onFilterChange()">
+      </div>
+
+      <div class="filter-group">
+        <label>Tìm kiếm</label>
+        <input type="text" [(ngModel)]="filter.searchText" placeholder="Lý do, tên..." (keyup.enter)="onFilterChange()">
+      </div>
+
+      <div class="filter-actions">
+        <button class="btn btn-sm btn-primary" (click)="applyFilter()">
+          <i class="fa-solid fa-filter"></i> Lọc
+        </button>
+        <button class="btn btn-sm btn-outline" (click)="clearFilter()">
+          <i class="fa-solid fa-times"></i> Xóa lọc
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       LOADING / ERROR
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <span>Đang tải dữ liệu...</span>
+  </div>
+
+  <div class="error-message" *ngIf="error">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    {{ error }}
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       TIMELINE VIEW
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="timeline-container" *ngIf="!isLoading && !error">
+    <div class="timeline" *ngFor="let group of groupedLogs | keyvalue">
+      <!-- Date Header -->
+      <div class="timeline-date">
+        <span class="date-badge">{{ group.key }}</span>
+      </div>
+
+      <!-- Timeline Items -->
+      <div class="timeline-item" *ngFor="let log of group.value" (click)="viewDetail(log)">
+        <div class="timeline-marker" [style.background-color]="getActionColor(log.action)">
+          <i class="fa-solid" [ngClass]="getActionIcon(log.action)"></i>
+        </div>
+
+        <div class="timeline-content">
+          <div class="timeline-header">
+            <span class="action-badge" [style.background-color]="getActionColor(log.action)">
+              {{ ACTION_LABELS[log.action] }}
+            </span>
+            <span class="entity-type">{{ ENTITY_TYPE_LABELS[log.entityType] }}</span>
+            <span class="entity-name" *ngIf="log.entityName">- {{ log.entityName }}</span>
+          </div>
+
+          <div class="timeline-meta">
+            <span class="meta-item">
+              <i class="fa-solid fa-user"></i> {{ log.userName }}
+            </span>
+            <span class="meta-item">
+              <i class="fa-solid fa-clock"></i> {{ formatTime(log.timestamp) }}
+            </span>
+            <span class="meta-item" *ngIf="log.period">
+              <i class="fa-solid fa-calendar"></i> Kỳ {{ log.period }}
+            </span>
+          </div>
+
+          <!-- Reason (if any) -->
+          <div class="timeline-reason" *ngIf="log.reason">
+            <i class="fa-solid fa-comment"></i>
+            <span>{{ log.reason }}</span>
+          </div>
+
+          <!-- Quick Changes Preview -->
+          <div class="timeline-changes" *ngIf="log.changes && log.changes.length > 0">
+            <div class="change-item" *ngFor="let change of log.changes.slice(0, 3)">
+              <span class="change-field">{{ change.fieldLabel }}:</span>
+              <span class="change-old">{{ formatValue(change.oldValue, change.dataType) }}</span>
+              <i class="fa-solid fa-arrow-right"></i>
+              <span class="change-new">{{ formatValue(change.newValue, change.dataType) }}</span>
+            </div>
+            <span class="more-changes" *ngIf="log.changes.length > 3">
+              +{{ log.changes.length - 3 }} thay đổi khác
+            </span>
+          </div>
+        </div>
+
+        <div class="timeline-time">
+          {{ getRelativeTime(log.timestamp) }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="auditLogs.length === 0">
+      <i class="fa-solid fa-inbox"></i>
+      <h3>Không có dữ liệu</h3>
+      <p>Không tìm thấy dấu vết kiểm toán nào phù hợp với bộ lọc</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       PAGINATION
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="pagination" *ngIf="totalPages > 1">
+    <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(1)">
+      <i class="fa-solid fa-angles-left"></i>
+    </button>
+    <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">
+      <i class="fa-solid fa-angle-left"></i>
+    </button>
+
+    <button class="page-btn" *ngFor="let page of visiblePages"
+            [class.active]="page === currentPage"
+            (click)="goToPage(page)">
+      {{ page }}
+    </button>
+
+    <button class="page-btn" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">
+      <i class="fa-solid fa-angle-right"></i>
+    </button>
+    <button class="page-btn" [disabled]="currentPage === totalPages" (click)="goToPage(totalPages)">
+      <i class="fa-solid fa-angles-right"></i>
+    </button>
+
+    <span class="page-info">
+      Trang {{ currentPage }} / {{ totalPages }} ({{ totalItems }} bản ghi)
+    </span>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       DETAIL MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showDetailModal" (click)="closeDetailModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Chi tiết thay đổi</h2>
+        <button class="close-btn" (click)="closeDetailModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" *ngIf="selectedLog">
+        <!-- Basic Info -->
+        <div class="detail-section">
+          <h3>Thông tin chung</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>ID:</label>
+              <span>{{ selectedLog.id }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Loại:</label>
+              <span>{{ ENTITY_TYPE_LABELS[selectedLog.entityType] }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Đối tượng:</label>
+              <span>{{ selectedLog.entityName || selectedLog.entityId }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Hành động:</label>
+              <span class="action-badge" [style.background-color]="getActionColor(selectedLog.action)">
+                {{ ACTION_LABELS[selectedLog.action] }}
+              </span>
+            </div>
+            <div class="detail-item">
+              <label>Thời gian:</label>
+              <span>{{ formatTimestamp(selectedLog.timestamp) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Người thực hiện:</label>
+              <span>{{ selectedLog.userName }} ({{ selectedLog.userRole }})</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedLog.period">
+              <label>Kỳ kế toán:</label>
+              <span>{{ selectedLog.period }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reason -->
+        <div class="detail-section" *ngIf="selectedLog.reason">
+          <h3>Lý do</h3>
+          <div class="reason-box">
+            {{ selectedLog.reason }}
+          </div>
+        </div>
+
+        <!-- Changes Diff -->
+        <div class="detail-section" *ngIf="selectedLog.changes && selectedLog.changes.length > 0">
+          <h3>Chi tiết thay đổi</h3>
+          <table class="diff-table">
+            <thead>
+              <tr>
+                <th>Trường</th>
+                <th>Giá trị cũ</th>
+                <th></th>
+                <th>Giá trị mới</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let change of selectedLog.changes">
+                <td class="field-name">{{ change.fieldLabel }}</td>
+                <td class="old-value">{{ formatValue(change.oldValue, change.dataType) }}</td>
+                <td class="arrow"><i class="fa-solid fa-arrow-right"></i></td>
+                <td class="new-value">{{ formatValue(change.newValue, change.dataType) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Raw Data -->
+        <div class="detail-section">
+          <h3>Dữ liệu gốc (JSON)</h3>
+          <div class="raw-data-tabs">
+            <button class="tab-btn active" onclick="this.parentElement.nextElementSibling.querySelector('.before-json').style.display='block';this.parentElement.nextElementSibling.querySelector('.after-json').style.display='none'">
+              Trước
+            </button>
+            <button class="tab-btn" onclick="this.parentElement.nextElementSibling.querySelector('.before-json').style.display='none';this.parentElement.nextElementSibling.querySelector('.after-json').style.display='block'">
+              Sau
+            </button>
+          </div>
+          <div class="raw-data-content">
+            <pre class="before-json">{{ selectedLog.before | json }}</pre>
+            <pre class="after-json" style="display:none">{{ selectedLog.after | json }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

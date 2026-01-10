@@ -1,0 +1,479 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACCOUNTANT DASHBOARD STYLES
+   Thiết kế theo chuẩn phần mềm kế toán Việt Nam
+═══════════════════════════════════════════════════════════════════════════ */
+
+.dashboard-container {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   HEADER: Chọn kỳ kế toán
+───────────────────────────────────────────────────────────────────────── */
+.period-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.period-selector {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.period-type-tabs {
+  display: flex;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.period-tab {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.period-tab:hover {
+  color: #374151;
+}
+
+.period-tab.active {
+  background: white;
+  color: #3b82f6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.period-dropdowns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.period-select {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: white;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.period-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.period-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-badge.open {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-badge.locked {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.btn-lock,
+.btn-unlock {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-lock {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-lock:hover {
+  background: #b91c1c;
+}
+
+.btn-unlock {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.btn-unlock:hover {
+  background: #e5e7eb;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SECTION TITLE
+───────────────────────────────────────────────────────────────────────── */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.section-title i {
+  color: #3b82f6;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SUMMARY SECTION: Dashboard cards
+───────────────────────────────────────────────────────────────────────── */
+.summary-section {
+  margin-bottom: 2rem;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.summary-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: white;
+  padding: 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.card-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.card-value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* Card color variants */
+.summary-card.revenue .card-icon {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.summary-card.expense .card-icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.summary-card.profit .card-icon {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.summary-card.profit.negative .card-icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.summary-card.profit.negative .card-value {
+  color: #dc2626;
+}
+
+.summary-card.vat-pay .card-icon {
+  background: #fce7f3;
+  color: #db2777;
+}
+
+.summary-card.vat-credit .card-icon {
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+
+.summary-card.cash .card-icon {
+  background: #cffafe;
+  color: #0891b2;
+}
+
+.summary-card.bank .card-icon {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   QUICK ACTIONS SECTION
+───────────────────────────────────────────────────────────────────────── */
+.quick-actions-section {
+  margin-bottom: 2rem;
+}
+
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.quick-action-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: white;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  text-decoration: none;
+  transition: all 0.2s;
+  border-left: 4px solid var(--accent-color, #3b82f6);
+}
+
+.quick-action-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.action-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--accent-color, #3b82f6);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+
+.action-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.action-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.action-desc {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.action-arrow {
+  color: #d1d5db;
+  font-size: 0.875rem;
+}
+
+.quick-action-card:hover .action-arrow {
+  color: var(--accent-color, #3b82f6);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   RECENT ACTIVITIES SECTION
+───────────────────────────────────────────────────────────────────────── */
+.recent-section {
+  margin-bottom: 2rem;
+}
+
+.recent-list {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.2s;
+}
+
+.recent-item:last-child {
+  border-bottom: none;
+}
+
+.recent-item:hover {
+  background: #f9fafb;
+}
+
+.activity-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.activity-content {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.activity-desc {
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.activity-date {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.no-activity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #9ca3af;
+  gap: 0.75rem;
+}
+
+.no-activity i {
+  font-size: 2rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   FOOTER
+───────────────────────────────────────────────────────────────────────── */
+.dashboard-footer {
+  text-align: center;
+  padding: 1.5rem;
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.dashboard-footer p {
+  margin: 0.25rem 0;
+}
+
+.dashboard-footer i {
+  margin-right: 0.5rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   RESPONSIVE
+───────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 1rem;
+  }
+
+  .period-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .period-status {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .quick-actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .period-type-tabs {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .period-dropdowns {
+    width: 100%;
+  }
+
+  .period-select {
+    flex: 1;
+  }
+}

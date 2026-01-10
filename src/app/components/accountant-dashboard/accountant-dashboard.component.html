@@ -1,0 +1,237 @@
+<div class="dashboard-container">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       HEADER: Chọn kỳ kế toán + Trạng thái khóa sổ
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <header class="period-header">
+    <div class="period-selector">
+      <div class="period-type-tabs">
+        <button
+          class="period-tab"
+          [class.active]="selectedPeriodType === 'month'"
+          (click)="selectedPeriodType = 'month'; onPeriodChange()">
+          Tháng
+        </button>
+        <button
+          class="period-tab"
+          [class.active]="selectedPeriodType === 'quarter'"
+          (click)="selectedPeriodType = 'quarter'; onPeriodChange()">
+          Quý
+        </button>
+        <button
+          class="period-tab"
+          [class.active]="selectedPeriodType === 'year'"
+          (click)="selectedPeriodType = 'year'; onPeriodChange()">
+          Năm
+        </button>
+      </div>
+
+      <div class="period-dropdowns">
+        <!-- Month selector -->
+        <select
+          *ngIf="selectedPeriodType === 'month'"
+          [(ngModel)]="selectedMonth"
+          (change)="onPeriodChange()"
+          class="period-select">
+          <option *ngFor="let m of months" [value]="m.value">{{ m.label }}</option>
+        </select>
+
+        <!-- Quarter selector -->
+        <select
+          *ngIf="selectedPeriodType === 'quarter'"
+          [(ngModel)]="selectedQuarter"
+          (change)="onPeriodChange()"
+          class="period-select">
+          <option *ngFor="let q of quarters" [value]="q.value">{{ q.label }}</option>
+        </select>
+
+        <!-- Year selector -->
+        <select
+          [(ngModel)]="selectedYear"
+          (change)="onPeriodChange()"
+          class="period-select">
+          <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="period-status">
+      <span class="status-badge" [class.locked]="isPeriodLocked" [class.open]="!isPeriodLocked">
+        <i class="fa-solid" [class.fa-lock]="isPeriodLocked" [class.fa-lock-open]="!isPeriodLocked"></i>
+        {{ isPeriodLocked ? 'Đã khóa sổ' : 'Đang mở' }}
+      </span>
+
+      <button
+        *ngIf="!isPeriodLocked"
+        class="btn-lock"
+        (click)="lockPeriod()">
+        <i class="fa-solid fa-lock"></i>
+        Khóa sổ kỳ
+      </button>
+
+      <button
+        *ngIf="isPeriodLocked"
+        class="btn-unlock"
+        (click)="unlockPeriod()">
+        <i class="fa-solid fa-lock-open"></i>
+        Mở khóa
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       DASHBOARD SUMMARY: Các chỉ số tài chính nhanh
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="summary-section">
+    <h2 class="section-title">
+      <i class="fa-solid fa-chart-line"></i>
+      Tổng quan kỳ {{ periodLabel }}
+    </h2>
+
+    <div class="summary-grid">
+      <!-- Doanh thu -->
+      <div class="summary-card revenue">
+        <div class="card-icon">
+          <i class="fa-solid fa-arrow-trend-up"></i>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Doanh thu</span>
+          <span class="card-value">{{ formatCurrency(summary.doanhThu) }} đ</span>
+        </div>
+      </div>
+
+      <!-- Chi phí -->
+      <div class="summary-card expense">
+        <div class="card-icon">
+          <i class="fa-solid fa-arrow-trend-down"></i>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Chi phí</span>
+          <span class="card-value">{{ formatCurrency(summary.chiPhi) }} đ</span>
+        </div>
+      </div>
+
+      <!-- Lợi nhuận -->
+      <div class="summary-card profit" [class.negative]="summary.loiNhuan < 0">
+        <div class="card-icon">
+          <i class="fa-solid fa-coins"></i>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Lợi nhuận tạm tính</span>
+          <span class="card-value">{{ formatCurrency(summary.loiNhuan) }} đ</span>
+        </div>
+      </div>
+
+      <!-- VAT phải nộp -->
+      <div class="summary-card vat-pay">
+        <div class="card-icon">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+        </div>
+        <div class="card-content">
+          <span class="card-label">VAT phải nộp</span>
+          <span class="card-value">{{ formatCurrency(summary.vatPhaiNop) }} đ</span>
+        </div>
+      </div>
+
+      <!-- VAT được khấu trừ -->
+      <div class="summary-card vat-credit">
+        <div class="card-icon">
+          <i class="fa-solid fa-receipt"></i>
+        </div>
+        <div class="card-content">
+          <span class="card-label">VAT được khấu trừ</span>
+          <span class="card-value">{{ formatCurrency(summary.vatDuocKhauTru) }} đ</span>
+        </div>
+      </div>
+
+      <!-- Tiền mặt (111) -->
+      <div class="summary-card cash">
+        <div class="card-icon">
+          <i class="fa-solid fa-wallet"></i>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Tiền mặt (111)</span>
+          <span class="card-value">{{ formatCurrency(summary.soDuTienMat) }} đ</span>
+        </div>
+      </div>
+
+      <!-- Tiền ngân hàng (112) -->
+      <div class="summary-card bank">
+        <div class="card-icon">
+          <i class="fa-solid fa-building-columns"></i>
+        </div>
+        <div class="card-content">
+          <span class="card-label">Ngân hàng (112)</span>
+          <span class="card-value">{{ formatCurrency(summary.soDuNganHang) }} đ</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       QUICK ACTIONS: Điều hướng nhanh theo luồng kế toán
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="quick-actions-section">
+    <h2 class="section-title">
+      <i class="fa-solid fa-bolt"></i>
+      Thao tác nhanh
+    </h2>
+
+    <div class="quick-actions-grid">
+      <a
+        *ngFor="let action of quickActions"
+        [routerLink]="action.route"
+        class="quick-action-card"
+        [style.--accent-color]="action.color">
+        <div class="action-icon">
+          <i class="fa-solid" [ngClass]="action.icon"></i>
+        </div>
+        <div class="action-content">
+          <span class="action-label">{{ action.label }}</span>
+          <span class="action-desc">{{ action.description }}</span>
+        </div>
+        <i class="fa-solid fa-chevron-right action-arrow"></i>
+      </a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       RECENT ACTIVITIES: Hoạt động gần đây
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="recent-section">
+    <h2 class="section-title">
+      <i class="fa-solid fa-clock-rotate-left"></i>
+      Hoạt động gần đây
+    </h2>
+
+    <div class="recent-list">
+      <div
+        *ngFor="let activity of recentActivities"
+        class="recent-item">
+        <div class="activity-icon" [style.background-color]="getActivityColor(activity.type)">
+          <i class="fa-solid" [ngClass]="getActivityIcon(activity.type)"></i>
+        </div>
+        <div class="activity-content">
+          <span class="activity-desc">{{ activity.description }}</span>
+          <span class="activity-date">{{ activity.date }}</span>
+        </div>
+      </div>
+
+      <div *ngIf="recentActivities.length === 0" class="no-activity">
+        <i class="fa-solid fa-inbox"></i>
+        <span>Chưa có hoạt động nào trong kỳ này</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       FOOTER INFO
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <footer class="dashboard-footer">
+    <p>
+      <i class="fa-solid fa-scale-balanced"></i>
+      Tuân thủ Thông tư 133/2016/TT-BTC | Định hướng Thông tư 99/2025/TT-BTC
+    </p>
+    <p>Dành cho Công ty TNHH 1 thành viên - Doanh nghiệp nhỏ & vừa</p>
+  </footer>
+</div>

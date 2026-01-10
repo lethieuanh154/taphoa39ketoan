@@ -1,0 +1,292 @@
+<!-- BẢNG CÂN ĐỐI TÀI KHOẢN - TRIAL BALANCE -->
+<div class="trial-balance-page">
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- HEADER -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">
+        <i class="fa-solid fa-scale-balanced"></i>
+        Bảng cân đối tài khoản
+      </h1>
+      <span class="period-badge" [class.locked]="isPeriodLocked">
+        <i class="fa-solid" [ngClass]="isPeriodLocked ? 'fa-lock' : 'fa-lock-open'"></i>
+        {{ periodLabel }}
+        <span *ngIf="isPeriodLocked" class="lock-text">Đã khóa</span>
+      </span>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="exportExcel()" [disabled]="rows.length === 0 || isLoading">
+        <i class="fa-solid fa-file-excel"></i>
+        Xuất Excel
+      </button>
+      <button class="btn btn-outline" (click)="exportPDF()" [disabled]="rows.length === 0 || isLoading">
+        <i class="fa-solid fa-file-pdf"></i>
+        In PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- FILTER BAR -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Kỳ kế toán</label>
+      <select [(ngModel)]="filter.periodType" (change)="onPeriodTypeChange()">
+        <option value="month">Theo tháng</option>
+        <option value="quarter">Theo quý</option>
+        <option value="year">Theo năm</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'month'">
+      <label>Tháng</label>
+      <select [(ngModel)]="filter.month" (change)="onFilterChange()">
+        <option *ngFor="let m of months" [value]="m.value">{{ m.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="filter.periodType === 'quarter'">
+      <label>Quý</label>
+      <select [(ngModel)]="filter.quarter" (change)="onFilterChange()">
+        <option *ngFor="let q of quarters" [value]="q.value">{{ q.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Năm</label>
+      <select [(ngModel)]="filter.year" (change)="onFilterChange()">
+        <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="filter.includeSubAccounts" (change)="onFilterChange()">
+        <span>Hiển thị TK chi tiết</span>
+      </label>
+    </div>
+
+    <div class="filter-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="filter.includeZeroBalance" (change)="onFilterChange()">
+        <span>Hiển thị TK số dư = 0</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- BALANCE CHECK SUMMARY -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="balance-summary" *ngIf="balanceCheck">
+    <!-- Main Status -->
+    <div class="status-card main-status" [class.balanced]="isBalanced" [class.unbalanced]="!isBalanced">
+      <div class="status-icon">
+        <i class="fa-solid" [ngClass]="isBalanced ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+      </div>
+      <div class="status-content">
+        <span class="status-label">Trạng thái</span>
+        <span class="status-value">{{ isBalanced ? 'CÂN ĐỐI' : 'LỆCH CÂN ĐỐI' }}</span>
+      </div>
+    </div>
+
+    <!-- Opening Balance -->
+    <div class="status-card" [class.balanced]="balanceCheck.openingBalanced" [class.unbalanced]="!balanceCheck.openingBalanced">
+      <div class="status-header">
+        <i class="fa-solid" [ngClass]="balanceCheck.openingBalanced ? 'fa-check' : 'fa-times'"></i>
+        <span>Số dư đầu kỳ</span>
+      </div>
+      <div class="status-detail">
+        <div class="detail-row">
+          <span class="label">Tổng Nợ:</span>
+          <span class="value debit">{{ formatCurrency(balanceCheck.openingDebitTotal) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Tổng Có:</span>
+          <span class="value credit">{{ formatCurrency(balanceCheck.openingCreditTotal) }}</span>
+        </div>
+        <div class="detail-row difference" *ngIf="!balanceCheck.openingBalanced">
+          <span class="label">Chênh lệch:</span>
+          <span class="value warning">{{ formatCurrency(balanceCheck.openingDifference) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Period Movement -->
+    <div class="status-card" [class.balanced]="balanceCheck.periodBalanced" [class.unbalanced]="!balanceCheck.periodBalanced">
+      <div class="status-header">
+        <i class="fa-solid" [ngClass]="balanceCheck.periodBalanced ? 'fa-check' : 'fa-times'"></i>
+        <span>Phát sinh trong kỳ</span>
+      </div>
+      <div class="status-detail">
+        <div class="detail-row">
+          <span class="label">Tổng Nợ:</span>
+          <span class="value debit">{{ formatCurrency(balanceCheck.periodDebitTotal) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Tổng Có:</span>
+          <span class="value credit">{{ formatCurrency(balanceCheck.periodCreditTotal) }}</span>
+        </div>
+        <div class="detail-row difference" *ngIf="!balanceCheck.periodBalanced">
+          <span class="label">Chênh lệch:</span>
+          <span class="value warning">{{ formatCurrency(balanceCheck.periodDifference) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Closing Balance -->
+    <div class="status-card" [class.balanced]="balanceCheck.closingBalanced" [class.unbalanced]="!balanceCheck.closingBalanced">
+      <div class="status-header">
+        <i class="fa-solid" [ngClass]="balanceCheck.closingBalanced ? 'fa-check' : 'fa-times'"></i>
+        <span>Số dư cuối kỳ</span>
+      </div>
+      <div class="status-detail">
+        <div class="detail-row">
+          <span class="label">Tổng Nợ:</span>
+          <span class="value debit">{{ formatCurrency(balanceCheck.closingDebitTotal) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Tổng Có:</span>
+          <span class="value credit">{{ formatCurrency(balanceCheck.closingCreditTotal) }}</span>
+        </div>
+        <div class="detail-row difference" *ngIf="!balanceCheck.closingBalanced">
+          <span class="label">Chênh lệch:</span>
+          <span class="value warning">{{ formatCurrency(balanceCheck.closingDifference) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Abnormal Warning -->
+    <div class="status-card warning-card" *ngIf="abnormalCount > 0">
+      <div class="status-header">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>TK bất thường</span>
+      </div>
+      <div class="status-detail">
+        <span class="abnormal-count">{{ abnormalCount }}</span>
+        <span class="abnormal-label">tài khoản</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warning Messages -->
+  <div class="warning-banner" *ngIf="balanceCheck && !canGenerateReport">
+    <i class="fa-solid fa-exclamation-circle"></i>
+    <div class="warning-content">
+      <strong>KHÔNG THỂ LẬP BÁO CÁO TÀI CHÍNH</strong>
+      <ul>
+        <li *ngFor="let msg of balanceCheck.warningMessages">{{ msg }}</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- MAIN TABLE -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="table-container" *ngIf="!isLoading">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th rowspan="2" class="sortable col-account" (click)="sortBy('accountCode')">
+            Mã TK <i class="fa-solid" [ngClass]="getSortIcon('accountCode')"></i>
+          </th>
+          <th rowspan="2" class="sortable col-name" (click)="sortBy('accountName')">
+            Tên tài khoản <i class="fa-solid" [ngClass]="getSortIcon('accountName')"></i>
+          </th>
+          <th colspan="2" class="col-group">Số dư đầu kỳ</th>
+          <th colspan="2" class="col-group">Phát sinh trong kỳ</th>
+          <th colspan="2" class="col-group">Số dư cuối kỳ</th>
+        </tr>
+        <tr>
+          <th class="text-right col-number">Nợ</th>
+          <th class="text-right col-number">Có</th>
+          <th class="text-right col-number">Nợ</th>
+          <th class="text-right col-number">Có</th>
+          <th class="text-right col-number">Nợ</th>
+          <th class="text-right col-number">Có</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of rows"
+            [ngClass]="getRowClass(row)"
+            (click)="onRowClick(row)"
+            [title]="row.isAbnormal ? row.abnormalReason : ''">
+          <td class="account-code">
+            <span class="level-indent" *ngIf="row.level > 1"></span>
+            {{ row.accountCode }}
+            <i class="fa-solid fa-exclamation-triangle abnormal-icon" *ngIf="row.isAbnormal"></i>
+          </td>
+          <td class="account-name">{{ row.accountName }}</td>
+          <td class="text-right debit">{{ formatCurrency(row.openingDebit) }}</td>
+          <td class="text-right credit">{{ formatCurrency(row.openingCredit) }}</td>
+          <td class="text-right debit">{{ formatCurrency(row.periodDebit) }}</td>
+          <td class="text-right credit">{{ formatCurrency(row.periodCredit) }}</td>
+          <td class="text-right debit">{{ formatCurrency(row.closingDebit) }}</td>
+          <td class="text-right credit">{{ formatCurrency(row.closingCredit) }}</td>
+        </tr>
+      </tbody>
+      <tfoot *ngIf="balanceCheck">
+        <tr class="total-row">
+          <td colspan="2" class="text-right"><strong>TỔNG CỘNG</strong></td>
+          <td class="text-right debit"><strong>{{ formatCurrency(balanceCheck.openingDebitTotal) }}</strong></td>
+          <td class="text-right credit"><strong>{{ formatCurrency(balanceCheck.openingCreditTotal) }}</strong></td>
+          <td class="text-right debit"><strong>{{ formatCurrency(balanceCheck.periodDebitTotal) }}</strong></td>
+          <td class="text-right credit"><strong>{{ formatCurrency(balanceCheck.periodCreditTotal) }}</strong></td>
+          <td class="text-right debit"><strong>{{ formatCurrency(balanceCheck.closingDebitTotal) }}</strong></td>
+          <td class="text-right credit"><strong>{{ formatCurrency(balanceCheck.closingCreditTotal) }}</strong></td>
+        </tr>
+        <tr class="check-row" [class.balanced]="isBalanced" [class.unbalanced]="!isBalanced">
+          <td colspan="2" class="text-right">
+            <strong>
+              <i class="fa-solid" [ngClass]="isBalanced ? 'fa-check-circle' : 'fa-times-circle'"></i>
+              KIỂM TRA CÂN ĐỐI
+            </strong>
+          </td>
+          <td colspan="2" class="text-center">
+            <span *ngIf="balanceCheck.openingBalanced" class="check-ok">✔ Cân đối</span>
+            <span *ngIf="!balanceCheck.openingBalanced" class="check-fail">✗ Lệch {{ formatCurrency(balanceCheck.openingDifference) }}</span>
+          </td>
+          <td colspan="2" class="text-center">
+            <span *ngIf="balanceCheck.periodBalanced" class="check-ok">✔ Cân đối</span>
+            <span *ngIf="!balanceCheck.periodBalanced" class="check-fail">✗ Lệch {{ formatCurrency(balanceCheck.periodDifference) }}</span>
+          </td>
+          <td colspan="2" class="text-center">
+            <span *ngIf="balanceCheck.closingBalanced" class="check-ok">✔ Cân đối</span>
+            <span *ngIf="!balanceCheck.closingBalanced" class="check-fail">✗ Lệch {{ formatCurrency(balanceCheck.closingDifference) }}</span>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <i class="fa-solid fa-spinner fa-spin"></i>
+    <span>Đang tải dữ liệu...</span>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!isLoading && rows.length === 0">
+    <i class="fa-solid fa-inbox"></i>
+    <p>Không có dữ liệu trong kỳ này</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- FOOTER INFO -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="page-footer" *ngIf="!isLoading && rows.length > 0">
+    <div class="footer-info">
+      <span><i class="fa-solid fa-list"></i> {{ totalAccounts }} tài khoản</span>
+      <span><i class="fa-solid fa-calendar"></i> Kỳ: {{ periodLabel }}</span>
+      <span><i class="fa-solid fa-clock"></i> Cập nhật: {{ formatDateTime(generatedAt) }}</span>
+    </div>
+    <div class="footer-note">
+      <i class="fa-solid fa-info-circle"></i>
+      Click vào tài khoản để xem chi tiết Sổ cái
+    </div>
+  </div>
+
+</div>
