@@ -13,6 +13,8 @@ import { AuditTrailPageComponent } from './components/audit-trail-page/audit-tra
 import { PeriodLockPageComponent } from './components/period-lock-page/period-lock-page.component';
 import { IncomeStatementPageComponent } from './components/income-statement-page/income-statement-page.component';
 import { ChartOfAccountsPageComponent } from './components/chart-of-accounts-page/chart-of-accounts-page.component';
+import { CashVoucherPageComponent } from './components/cash-voucher-page/cash-voucher-page.component';
+import { InvoicePageComponent } from './components/accountant-pages/invoice-page/invoice-page.component';
 
 /**
  * TAPHOA39KETOAN ROUTES
@@ -45,8 +47,8 @@ export const routes: Routes = [
       // ═══════════════════════════════════════════════════════════════════
       // 2. CHỨNG TỪ KẾ TOÁN
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'chung-tu/phieu-thu', component: PlaceholderComponent, data: { title: 'Phiếu thu' } },
-      { path: 'chung-tu/phieu-chi', component: PlaceholderComponent, data: { title: 'Phiếu chi' } },
+      { path: 'chung-tu/phieu-thu', component: CashVoucherPageComponent, data: { type: 'RECEIPT' } },
+      { path: 'chung-tu/phieu-chi', component: CashVoucherPageComponent, data: { type: 'PAYMENT' } },
       { path: 'chung-tu/phieu-nhap-kho', component: PlaceholderComponent, data: { title: 'Phiếu nhập kho' } },
       { path: 'chung-tu/phieu-xuat-kho', component: PlaceholderComponent, data: { title: 'Phiếu xuất kho' } },
       { path: 'chung-tu/chung-tu-khac', component: PlaceholderComponent, data: { title: 'Chứng từ khác' } },
@@ -54,13 +56,13 @@ export const routes: Routes = [
       // ═══════════════════════════════════════════════════════════════════
       // 3. BÁN HÀNG & CÔNG NỢ PHẢI THU
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'ban-hang/hoa-don-ban-ra', component: PlaceholderComponent, data: { title: 'Hóa đơn bán ra' } },
+      { path: 'ban-hang/hoa-don-ban-ra', component: InvoicePageComponent, data: { type: 'OUTPUT' } },
       { path: 'ban-hang/cong-no-131', component: PlaceholderComponent, data: { title: 'Sổ chi tiết TK 131' } },
 
       // ═══════════════════════════════════════════════════════════════════
       // 4. MUA HÀNG & CÔNG NỢ PHẢI TRẢ
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'mua-hang/hoa-don-mua-vao', component: PlaceholderComponent, data: { title: 'Hóa đơn mua vào' } },
+      { path: 'mua-hang/hoa-don-mua-vao', component: InvoicePageComponent, data: { type: 'INPUT' } },
       { path: 'mua-hang/cong-no-331', component: PlaceholderComponent, data: { title: 'Sổ chi tiết TK 331' } },
 
       // ═══════════════════════════════════════════════════════════════════

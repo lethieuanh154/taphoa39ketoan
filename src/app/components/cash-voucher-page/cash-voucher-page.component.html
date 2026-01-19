@@ -1,0 +1,541 @@
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     PHIẾU THU / PHIẾU CHI - CASH VOUCHER
+     Chứng từ kế toán gốc
+═══════════════════════════════════════════════════════════════════════════════ -->
+
+<div class="voucher-page">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">
+        <i class="fa-solid" [class.fa-arrow-down]="activeTab === 'RECEIPT'" [class.fa-arrow-up]="activeTab === 'PAYMENT'"></i>
+        {{ activeTab === 'RECEIPT' ? 'Phiếu thu' : 'Phiếu chi' }}
+      </h1>
+      <p class="page-subtitle">Chứng từ kế toán gốc - Thu chi tiền mặt</p>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        <i class="fa-solid fa-plus"></i>
+        Tạo {{ tabLabel }}
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       TABS
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="tabs-section">
+    <div class="tabs">
+      <button class="tab" [class.active]="activeTab === 'RECEIPT'" (click)="setActiveTab('RECEIPT')">
+        <i class="fa-solid fa-arrow-down"></i>
+        Phiếu thu
+        <span class="tab-badge green">{{ stats.totalReceipts }}</span>
+      </button>
+      <button class="tab" [class.active]="activeTab === 'PAYMENT'" (click)="setActiveTab('PAYMENT')">
+        <i class="fa-solid fa-arrow-up"></i>
+        Phiếu chi
+        <span class="tab-badge red">{{ stats.totalPayments }}</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       STATS CARDS
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="stats-section">
+    <div class="stats-cards">
+      <div class="stat-card green">
+        <div class="stat-icon">
+          <i class="fa-solid fa-arrow-down"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-label">Tổng thu</span>
+          <span class="stat-value">{{ formatCurrency(stats.receiptAmount) }}</span>
+        </div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-icon">
+          <i class="fa-solid fa-arrow-up"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-label">Tổng chi</span>
+          <span class="stat-value">{{ formatCurrency(stats.paymentAmount) }}</span>
+        </div>
+      </div>
+      <div class="stat-card" [class.blue]="stats.netCashFlow >= 0" [class.orange]="stats.netCashFlow < 0">
+        <div class="stat-icon">
+          <i class="fa-solid fa-scale-balanced"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-label">Dòng tiền ròng</span>
+          <span class="stat-value" [class.negative]="stats.netCashFlow < 0">
+            {{ stats.netCashFlow >= 0 ? '+' : '' }}{{ formatCurrency(stats.netCashFlow) }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       FILTER BAR
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="filter-section">
+    <div class="filter-bar">
+      <div class="search-box">
+        <i class="fa-solid fa-search"></i>
+        <input
+          type="text"
+          [(ngModel)]="searchText"
+          (ngModelChange)="onFilterChange()"
+          placeholder="Tìm theo số phiếu, tên đối tượng..."
+        />
+      </div>
+
+      <div class="filter-group">
+        <label>Trạng thái</label>
+        <select [(ngModel)]="statusFilter" (change)="onFilterChange()">
+          <option value="">Tất cả</option>
+          <option value="DRAFT">Nháp</option>
+          <option value="POSTED">Đã ghi sổ</option>
+          <option value="CANCELLED">Đã hủy</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Từ ngày</label>
+        <input type="date" [(ngModel)]="fromDate" (change)="onFilterChange()">
+      </div>
+
+      <div class="filter-group">
+        <label>Đến ngày</label>
+        <input type="date" [(ngModel)]="toDate" (change)="onFilterChange()">
+      </div>
+
+      <button class="btn btn-text" (click)="clearFilters()" *ngIf="searchText || statusFilter || fromDate || toDate">
+        <i class="fa-solid fa-times"></i>
+        Xóa lọc
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       LOADING
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="loading-container" *ngIf="isLoading">
+    <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+    <p>Đang tải...</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       VOUCHER LIST
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="list-section" *ngIf="!isLoading">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-no">Số phiếu</th>
+            <th class="col-date">Ngày</th>
+            <th class="col-object">Đối tượng</th>
+            <th class="col-reason">Lý do</th>
+            <th class="col-amount">Số tiền</th>
+            <th class="col-status">Trạng thái</th>
+            <th class="col-actions">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="vouchers.length === 0">
+            <td colspan="7" class="empty-row">
+              <i class="fa-solid fa-inbox"></i>
+              <span>Chưa có phiếu nào</span>
+            </td>
+          </tr>
+          <tr *ngFor="let voucher of vouchers" [class.cancelled]="voucher.status === 'CANCELLED'">
+            <td class="col-no">
+              <span class="voucher-no" (click)="openDetailModal(voucher)">{{ voucher.voucherNo }}</span>
+            </td>
+            <td class="col-date">{{ formatDate(voucher.voucherDate) }}</td>
+            <td class="col-object">
+              <span class="object-name">{{ voucher.relatedObjectName }}</span>
+              <span class="object-type">{{ getObjectTypeLabel(voucher.relatedObjectType) }}</span>
+            </td>
+            <td class="col-reason">{{ voucher.reason }}</td>
+            <td class="col-amount">
+              <span class="amount" [class.receipt]="voucher.voucherType === 'RECEIPT'" [class.payment]="voucher.voucherType === 'PAYMENT'">
+                {{ formatCurrency(voucher.grandTotal) }}
+              </span>
+            </td>
+            <td class="col-status">
+              <span class="status-badge" [class]="getStatusClass(voucher.status)">
+                {{ getStatusLabel(voucher.status) }}
+              </span>
+            </td>
+            <td class="col-actions">
+              <button class="action-btn" (click)="openDetailModal(voucher)" title="Xem chi tiết">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+              <button class="action-btn" (click)="openJournalModal(voucher)" title="Xem bút toán" *ngIf="voucher.status !== 'CANCELLED'">
+                <i class="fa-solid fa-book"></i>
+              </button>
+              <button class="action-btn success" (click)="postVoucher(voucher)" title="Ghi sổ" *ngIf="voucher.status === 'DRAFT'">
+                <i class="fa-solid fa-check"></i>
+              </button>
+              <button class="action-btn danger" (click)="openCancelModal(voucher)" title="Hủy" *ngIf="voucher.status !== 'CANCELLED'">
+                <i class="fa-solid fa-ban"></i>
+              </button>
+              <button class="action-btn" (click)="printVoucher(voucher)" title="In">
+                <i class="fa-solid fa-print"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       CREATE MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>
+          <i class="fa-solid" [class]="tabIcon"></i>
+          Tạo {{ tabLabel }} mới
+        </h3>
+        <button class="close-btn" (click)="closeCreateModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Errors -->
+        <div class="form-errors" *ngIf="formErrors.length > 0">
+          <div class="error-item" *ngFor="let error of formErrors">
+            <i class="fa-solid fa-exclamation-circle"></i> {{ error }}
+          </div>
+        </div>
+
+        <!-- Basic Info -->
+        <div class="form-section">
+          <h4>Thông tin chung</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Ngày phiếu <span class="required">*</span></label>
+              <input type="date" [(ngModel)]="newVoucher.voucherDate">
+            </div>
+            <div class="form-group">
+              <label>TK tiền</label>
+              <select [(ngModel)]="newVoucher.cashAccountCode">
+                <option *ngFor="let acc of cashAccounts" [value]="acc.code">{{ acc.code }} - {{ acc.name }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Object Info -->
+        <div class="form-section">
+          <h4>{{ activeTab === 'RECEIPT' ? 'Người nộp tiền' : 'Người nhận tiền' }}</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Loại đối tượng</label>
+              <select [(ngModel)]="newVoucher.relatedObjectType">
+                <option *ngFor="let type of objectTypes" [value]="type.value">{{ type.label }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tên đối tượng <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="newVoucher.relatedObjectName" placeholder="Nhập tên người nộp/nhận tiền">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Địa chỉ</label>
+              <input type="text" [(ngModel)]="newVoucher.address" placeholder="Địa chỉ (nếu có)">
+            </div>
+            <div class="form-group">
+              <label>CMND/CCCD</label>
+              <input type="text" [(ngModel)]="newVoucher.receiverId" placeholder="Số CMND/CCCD">
+            </div>
+          </div>
+        </div>
+
+        <!-- Reason -->
+        <div class="form-section">
+          <h4>Nội dung</h4>
+          <div class="form-group">
+            <label>Lý do {{ activeTab === 'RECEIPT' ? 'thu' : 'chi' }} <span class="required">*</span></label>
+            <select [(ngModel)]="newVoucher.reason">
+              <option value="">-- Chọn lý do --</option>
+              <option *ngFor="let r of reasons" [value]="r">{{ r }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Diễn giải thêm</label>
+            <textarea [(ngModel)]="newVoucher.description" rows="2" placeholder="Diễn giải chi tiết (nếu có)"></textarea>
+          </div>
+        </div>
+
+        <!-- Lines -->
+        <div class="form-section">
+          <div class="section-header">
+            <h4>Chi tiết hạch toán</h4>
+            <button class="btn btn-text btn-sm" (click)="addLine()">
+              <i class="fa-solid fa-plus"></i> Thêm dòng
+            </button>
+          </div>
+
+          <table class="lines-table">
+            <thead>
+              <tr>
+                <th class="col-no">#</th>
+                <th class="col-account">TK đối ứng</th>
+                <th class="col-desc">Diễn giải</th>
+                <th class="col-amount">Số tiền</th>
+                <th class="col-action"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let line of newLines; let i = index">
+                <td class="col-no">{{ i + 1 }}</td>
+                <td class="col-account">
+                  <select [(ngModel)]="line.accountCode">
+                    <option value="">-- Chọn TK --</option>
+                    <option *ngFor="let acc of contraAccounts" [value]="acc.code">
+                      {{ acc.code }} - {{ acc.name }}
+                    </option>
+                  </select>
+                </td>
+                <td class="col-desc">
+                  <input type="text" [(ngModel)]="line.description" placeholder="Diễn giải">
+                </td>
+                <td class="col-amount">
+                  <input type="number" [(ngModel)]="line.amount" min="0" placeholder="0">
+                </td>
+                <td class="col-action">
+                  <button class="remove-btn" (click)="removeLine(i)" *ngIf="newLines.length > 1">
+                    <i class="fa-solid fa-times"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3" class="total-label">Tổng cộng:</td>
+                <td class="total-amount">{{ formatCurrency(newTotalAmount) }}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="amount-words">
+            <strong>Bằng chữ:</strong> {{ newAmountInWords }}
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeCreateModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="saveNewVoucher()">
+          <i class="fa-solid fa-save"></i>
+          Lưu {{ tabLabel }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       DETAIL MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showDetailModal" (click)="closeDetailModal()">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()" *ngIf="selectedVoucher">
+      <div class="modal-header">
+        <h3>
+          <i class="fa-solid" [class.fa-arrow-down]="selectedVoucher.voucherType === 'RECEIPT'" [class.fa-arrow-up]="selectedVoucher.voucherType === 'PAYMENT'"></i>
+          {{ selectedVoucher.voucherType === 'RECEIPT' ? 'PHIẾU THU' : 'PHIẾU CHI' }}
+          <span class="voucher-no-header">{{ selectedVoucher.voucherNo }}</span>
+        </h3>
+        <button class="close-btn" (click)="closeDetailModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Status Banner -->
+        <div class="status-banner" [class]="getStatusClass(selectedVoucher.status)">
+          <i class="fa-solid"
+             [class.fa-file-pen]="selectedVoucher.status === 'DRAFT'"
+             [class.fa-check-circle]="selectedVoucher.status === 'POSTED'"
+             [class.fa-ban]="selectedVoucher.status === 'CANCELLED'"></i>
+          {{ getStatusLabel(selectedVoucher.status) }}
+          <span *ngIf="selectedVoucher.status === 'CANCELLED'" class="cancel-reason">
+            - {{ selectedVoucher.cancelReason }}
+          </span>
+        </div>
+
+        <!-- Info Grid -->
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Ngày phiếu</label>
+            <span>{{ formatDate(selectedVoucher.voucherDate) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Ngày ghi sổ</label>
+            <span>{{ selectedVoucher.postingDate ? formatDate(selectedVoucher.postingDate) : '-' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>{{ selectedVoucher.voucherType === 'RECEIPT' ? 'Người nộp tiền' : 'Người nhận tiền' }}</label>
+            <span>{{ selectedVoucher.relatedObjectName }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Loại đối tượng</label>
+            <span>{{ getObjectTypeLabel(selectedVoucher.relatedObjectType) }}</span>
+          </div>
+          <div class="detail-item full-width">
+            <label>Lý do</label>
+            <span>{{ selectedVoucher.reason }}</span>
+          </div>
+        </div>
+
+        <!-- Lines Table -->
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>TK đối ứng</th>
+              <th>Diễn giải</th>
+              <th class="text-right">Số tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let line of selectedVoucher.lines">
+              <td>{{ line.lineNo }}</td>
+              <td>{{ line.accountCode }}</td>
+              <td>{{ line.description }}</td>
+              <td class="text-right">{{ formatCurrency(line.amount) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="3">Tổng cộng</td>
+              <td class="text-right">{{ formatCurrency(selectedVoucher.grandTotal) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div class="amount-words-display">
+          <strong>Bằng chữ:</strong> {{ selectedVoucher.amountInWords }}
+        </div>
+
+        <!-- Signatures -->
+        <div class="signatures">
+          <div class="sig-item">
+            <label>Người lập phiếu</label>
+            <span>{{ selectedVoucher.preparedBy }}</span>
+            <small>{{ formatDateTime(selectedVoucher.preparedAt) }}</small>
+          </div>
+          <div class="sig-item" *ngIf="selectedVoucher.approvedBy">
+            <label>Kế toán trưởng</label>
+            <span>{{ selectedVoucher.approvedBy }}</span>
+            <small>{{ selectedVoucher.approvedAt ? formatDateTime(selectedVoucher.approvedAt) : '' }}</small>
+          </div>
+          <div class="sig-item" *ngIf="selectedVoucher.postedBy">
+            <label>Người ghi sổ</label>
+            <span>{{ selectedVoucher.postedBy }}</span>
+            <small>{{ selectedVoucher.postedAt ? formatDateTime(selectedVoucher.postedAt) : '' }}</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDetailModal()">Đóng</button>
+        <button class="btn btn-outline" (click)="openJournalModal(selectedVoucher)" *ngIf="selectedVoucher.status !== 'CANCELLED'">
+          <i class="fa-solid fa-book"></i> Xem bút toán
+        </button>
+        <button class="btn btn-success" (click)="postVoucher(selectedVoucher)" *ngIf="selectedVoucher.status === 'DRAFT'">
+          <i class="fa-solid fa-check"></i> Ghi sổ
+        </button>
+        <button class="btn btn-danger" (click)="openCancelModal(selectedVoucher)" *ngIf="selectedVoucher.status !== 'CANCELLED'">
+          <i class="fa-solid fa-ban"></i> Hủy phiếu
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       JOURNAL MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showJournalModal" (click)="closeJournalModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-book"></i> Bút toán định khoản</h3>
+        <button class="close-btn" (click)="closeJournalModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <table class="journal-table">
+          <thead>
+            <tr>
+              <th>TK</th>
+              <th>Diễn giải</th>
+              <th class="text-right">Nợ</th>
+              <th class="text-right">Có</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let entry of journalEntries">
+              <td class="account-code">{{ entry.accountCode }}</td>
+              <td>{{ entry.description }}</td>
+              <td class="text-right debit">{{ entry.debitAmount > 0 ? formatCurrency(entry.debitAmount) : '' }}</td>
+              <td class="text-right credit">{{ entry.creditAmount > 0 ? formatCurrency(entry.creditAmount) : '' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeJournalModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       CANCEL MODAL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showCancelModal" (click)="closeCancelModal()">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-ban"></i> Hủy phiếu</h3>
+        <button class="close-btn" (click)="closeCancelModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p class="cancel-warning">
+          <i class="fa-solid fa-exclamation-triangle"></i>
+          Bạn có chắc muốn hủy phiếu <strong>{{ selectedVoucher?.voucherNo }}</strong>?
+        </p>
+        <div class="form-group">
+          <label>Lý do hủy <span class="required">*</span></label>
+          <textarea [(ngModel)]="cancelReason" rows="3" placeholder="Nhập lý do hủy (tối thiểu 10 ký tự)"></textarea>
+          <small>{{ cancelReason.length }}/10 ký tự</small>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeCancelModal()">Không</button>
+        <button class="btn btn-danger" (click)="confirmCancel()" [disabled]="cancelReason.length < 10">
+          <i class="fa-solid fa-ban"></i> Xác nhận hủy
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

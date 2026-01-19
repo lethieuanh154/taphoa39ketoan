@@ -1,0 +1,679 @@
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     INVOICE PAGE - HÓA ĐƠN MUA VÀO / BÁN RA
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+
+<div class="invoice-page">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       HEADER
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">{{ getPageTitle() }}</h1>
+      <p class="page-subtitle">{{ getPageSubtitle() }}</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        <span class="icon">+</span>
+        Tạo hóa đơn mới
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SUMMARY CARDS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="summary-cards" *ngIf="summary">
+    <div class="summary-card card-total">
+      <div class="card-icon">📄</div>
+      <div class="card-content">
+        <span class="card-label">Tổng hóa đơn</span>
+        <span class="card-value">{{ summary.totalInvoices }}</span>
+      </div>
+    </div>
+
+    <div class="summary-card card-amount">
+      <div class="card-icon">💰</div>
+      <div class="card-content">
+        <span class="card-label">Tổng giá trị</span>
+        <span class="card-value">{{ formatCurrency(summary.totalAmount) }}</span>
+      </div>
+    </div>
+
+    <div class="summary-card card-vat">
+      <div class="card-icon">📊</div>
+      <div class="card-content">
+        <span class="card-label">Tổng VAT</span>
+        <span class="card-value">{{ formatCurrency(summary.totalVAT) }}</span>
+      </div>
+    </div>
+
+    <div class="summary-card card-paid">
+      <div class="card-icon">✅</div>
+      <div class="card-content">
+        <span class="card-label">Đã thanh toán</span>
+        <span class="card-value">{{ formatCurrency(summary.totalPaid) }}</span>
+      </div>
+    </div>
+
+    <div class="summary-card card-unpaid">
+      <div class="card-icon">⏳</div>
+      <div class="card-content">
+        <span class="card-label">Chưa thanh toán</span>
+        <span class="card-value">{{ formatCurrency(summary.totalUnpaid) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       FILTERS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="filter-section">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Từ ngày</label>
+        <input type="date" [(ngModel)]="filter.fromDate" (change)="onFilterChange()">
+      </div>
+
+      <div class="filter-group">
+        <label>Đến ngày</label>
+        <input type="date" [(ngModel)]="filter.toDate" (change)="onFilterChange()">
+      </div>
+
+      <div class="filter-group">
+        <label>Thanh toán</label>
+        <select [(ngModel)]="filter.paymentStatus" (change)="onFilterChange()">
+          <option value="">Tất cả</option>
+          <option value="UNPAID">Chưa thanh toán</option>
+          <option value="PARTIAL">Thanh toán một phần</option>
+          <option value="PAID">Đã thanh toán</option>
+        </select>
+      </div>
+
+      <div class="filter-group filter-search">
+        <label>Tìm kiếm</label>
+        <input type="text"
+               [(ngModel)]="filter.search"
+               (input)="onFilterChange()"
+               placeholder="Số HĐ, tên KH/NCC, MST...">
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       STATUS TABS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="status-tabs">
+    <button class="tab-btn"
+            [class.active]="activeStatusTab === 'all'"
+            (click)="onStatusTabChange('all')">
+      Tất cả ({{ invoices.length }})
+    </button>
+    <button class="tab-btn"
+            [class.active]="activeStatusTab === 'DRAFT'"
+            (click)="onStatusTabChange('DRAFT')">
+      Nháp ({{ getCountByStatus('DRAFT') }})
+    </button>
+    <button class="tab-btn"
+            [class.active]="activeStatusTab === 'POSTED'"
+            (click)="onStatusTabChange('POSTED')">
+      Đã ghi sổ ({{ getCountByStatus('POSTED') }})
+    </button>
+    <button class="tab-btn"
+            [class.active]="activeStatusTab === 'CANCELLED'"
+            (click)="onStatusTabChange('CANCELLED')">
+      Đã hủy ({{ getCountByStatus('CANCELLED') }})
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       INVOICE TABLE
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th class="col-no">STT</th>
+          <th class="col-invoice-no">Số hóa đơn</th>
+          <th class="col-date">Ngày HĐ</th>
+          <th class="col-partner">{{ invoiceType === 'OUTPUT' ? 'Khách hàng' : 'Nhà cung cấp' }}</th>
+          <th class="col-tax">MST</th>
+          <th class="col-amount">Tiền hàng</th>
+          <th class="col-vat">VAT</th>
+          <th class="col-total">Tổng cộng</th>
+          <th class="col-payment">Thanh toán</th>
+          <th class="col-status">Trạng thái</th>
+          <th class="col-actions">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let invoice of filteredInvoices; let i = index"
+            [class.overdue]="isOverdue(invoice)"
+            [class.cancelled]="invoice.status === 'CANCELLED'">
+          <td class="col-no">{{ i + 1 }}</td>
+          <td class="col-invoice-no">
+            <span class="invoice-series">{{ invoice.invoiceSeries }}</span>
+            <span class="invoice-number">{{ invoice.invoiceNo }}</span>
+          </td>
+          <td class="col-date">{{ formatDate(invoice.invoiceDate) }}</td>
+          <td class="col-partner">
+            <span class="partner-name">{{ invoice.partnerName }}</span>
+          </td>
+          <td class="col-tax">{{ invoice.partnerTaxCode }}</td>
+          <td class="col-amount text-right">{{ formatNumber(invoice.subTotal) }}</td>
+          <td class="col-vat text-right">{{ formatNumber(invoice.totalVAT) }}</td>
+          <td class="col-total text-right">{{ formatNumber(invoice.grandTotal) }}</td>
+          <td class="col-payment">
+            <span class="payment-badge" [class]="getPaymentStatusClass(invoice.paymentStatus)">
+              {{ getPaymentStatusLabel(invoice.paymentStatus) }}
+            </span>
+            <div class="payment-info" *ngIf="invoice.paymentStatus !== 'PAID' && invoice.status !== 'CANCELLED'">
+              Còn lại: {{ formatNumber(getRemainingAmount(invoice)) }}
+            </div>
+          </td>
+          <td class="col-status">
+            <span class="status-badge" [class]="getStatusClass(invoice.status)">
+              {{ getStatusLabel(invoice.status) }}
+            </span>
+          </td>
+          <td class="col-actions">
+            <div class="action-buttons">
+              <button class="btn-icon btn-view" title="Xem chi tiết" (click)="viewDetail(invoice)">👁️</button>
+
+              <button class="btn-icon btn-post" title="Ghi sổ"
+                      *ngIf="invoice.status === 'DRAFT'"
+                      (click)="postInvoice(invoice)">📝</button>
+
+              <button class="btn-icon btn-payment" title="Thanh toán"
+                      *ngIf="invoice.status === 'POSTED' && invoice.paymentStatus !== 'PAID'"
+                      (click)="openPaymentModal(invoice)">💳</button>
+
+              <button class="btn-icon btn-journal" title="Xem bút toán"
+                      *ngIf="invoice.status === 'POSTED'"
+                      (click)="viewJournalEntries(invoice)">📋</button>
+
+              <button class="btn-icon btn-cancel" title="Hủy"
+                      *ngIf="invoice.status !== 'CANCELLED'"
+                      (click)="openCancelModal(invoice)">✕</button>
+
+              <button class="btn-icon btn-delete" title="Xóa"
+                      *ngIf="invoice.status === 'DRAFT'"
+                      (click)="deleteInvoice(invoice)">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="empty-state" *ngIf="filteredInvoices.length === 0">
+      <div class="empty-icon">📄</div>
+      <p>Không có hóa đơn nào</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     CREATE INVOICE MODAL
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showCreateModal" (click)="showCreateModal = false">
+  <div class="modal modal-large" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Tạo {{ getPageTitle() }} mới</h2>
+      <button class="btn-close" (click)="showCreateModal = false">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Invoice Info -->
+      <div class="form-section">
+        <h3 class="section-title">Thông tin hóa đơn</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Ký hiệu <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="formData.invoiceSeries" placeholder="1C25TTT">
+          </div>
+          <div class="form-group">
+            <label>Ngày hóa đơn <span class="required">*</span></label>
+            <input type="date" [(ngModel)]="formData.invoiceDate">
+          </div>
+          <div class="form-group">
+            <label>Hình thức TT</label>
+            <select [(ngModel)]="formData.paymentMethod">
+              <option value="CASH">Tiền mặt</option>
+              <option value="BANK">Chuyển khoản</option>
+              <option value="CREDIT">Công nợ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Hạn thanh toán</label>
+            <input type="date" [(ngModel)]="formData.dueDate">
+          </div>
+        </div>
+      </div>
+
+      <!-- Partner Info -->
+      <div class="form-section">
+        <h3 class="section-title">{{ invoiceType === 'OUTPUT' ? 'Thông tin khách hàng' : 'Thông tin nhà cung cấp' }}</h3>
+        <div class="form-grid">
+          <div class="form-group col-span-2">
+            <label>{{ invoiceType === 'OUTPUT' ? 'Tên khách hàng' : 'Tên nhà cung cấp' }} <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="formData.partnerName" [placeholder]="invoiceType === 'OUTPUT' ? 'Nhập tên khách hàng' : 'Nhập tên nhà cung cấp'">
+          </div>
+          <div class="form-group">
+            <label>Mã số thuế</label>
+            <input type="text" [(ngModel)]="formData.partnerTaxCode" placeholder="0123456789">
+          </div>
+          <div class="form-group col-span-2">
+            <label>Địa chỉ</label>
+            <input type="text" [(ngModel)]="formData.partnerAddress" placeholder="Địa chỉ">
+          </div>
+        </div>
+      </div>
+
+      <!-- Invoice Lines -->
+      <div class="form-section">
+        <div class="section-header">
+          <h3 class="section-title">Chi tiết hàng hóa/dịch vụ</h3>
+          <button class="btn btn-secondary btn-sm" (click)="addLine()">+ Thêm dòng</button>
+        </div>
+
+        <div class="lines-table-container">
+          <table class="lines-table">
+            <thead>
+              <tr>
+                <th class="col-line-no">#</th>
+                <th class="col-item-code">Mã</th>
+                <th class="col-item-name">Tên hàng hóa/dịch vụ</th>
+                <th class="col-unit">ĐVT</th>
+                <th class="col-qty">SL</th>
+                <th class="col-price">Đơn giá</th>
+                <th class="col-line-amount">Thành tiền</th>
+                <th class="col-vat-rate">VAT</th>
+                <th class="col-vat-amount">Tiền VAT</th>
+                <th class="col-account">TK</th>
+                <th class="col-line-action"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let line of formLines; let i = index">
+                <td class="col-line-no">{{ line.lineNo }}</td>
+                <td class="col-item-code">
+                  <input type="text" [(ngModel)]="line.productCode" placeholder="Mã">
+                </td>
+                <td class="col-item-name">
+                  <input type="text" [(ngModel)]="line.productName" placeholder="Tên hàng hóa/dịch vụ">
+                </td>
+                <td class="col-unit">
+                  <select [(ngModel)]="line.unit">
+                    <option *ngFor="let u of units" [value]="u">{{ u }}</option>
+                  </select>
+                </td>
+                <td class="col-qty">
+                  <input type="number" [(ngModel)]="line.quantity" (change)="onLineChange(i)" min="0">
+                </td>
+                <td class="col-price">
+                  <input type="number" [(ngModel)]="line.unitPrice" (change)="onLineChange(i)" min="0">
+                </td>
+                <td class="col-line-amount text-right">{{ formatNumber(line.amount) }}</td>
+                <td class="col-vat-rate">
+                  <select [(ngModel)]="line.vatRate" (change)="onLineChange(i)">
+                    <option *ngFor="let vat of vatRates" [value]="vat.value">{{ vat.label }}</option>
+                  </select>
+                </td>
+                <td class="col-vat-amount text-right">{{ formatNumber(line.vatAmount) }}</td>
+                <td class="col-account">
+                  <select [(ngModel)]="line.accountCode" (change)="onAccountChange(i)">
+                    <option *ngFor="let acc of getAccounts()" [value]="acc.code">{{ acc.code }} - {{ acc.name }}</option>
+                  </select>
+                </td>
+                <td class="col-line-action">
+                  <button class="btn-icon btn-remove" (click)="removeLine(i)" *ngIf="formLines.length > 1">✕</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Totals -->
+        <div class="invoice-totals">
+          <div class="total-row">
+            <span class="total-label">Cộng tiền hàng:</span>
+            <span class="total-value">{{ formatCurrency(getFormTotals().subTotal) }}</span>
+          </div>
+          <div class="total-row">
+            <span class="total-label">Tiền thuế GTGT:</span>
+            <span class="total-value">{{ formatCurrency(getFormTotals().totalVAT) }}</span>
+          </div>
+          <div class="total-row total-grand">
+            <span class="total-label">Tổng cộng tiền thanh toán:</span>
+            <span class="total-value">{{ formatCurrency(getFormTotals().grandTotal) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-section">
+        <div class="form-group">
+          <label>Ghi chú</label>
+          <textarea [(ngModel)]="formData.note" rows="2" placeholder="Ghi chú thêm..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="showCreateModal = false">Hủy</button>
+      <button class="btn btn-primary" (click)="saveInvoice()" [disabled]="loading">
+        {{ loading ? 'Đang lưu...' : 'Lưu hóa đơn' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     DETAIL MODAL
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showDetailModal && selectedInvoice" (click)="closeDetailModal()">
+  <div class="modal modal-large" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Chi tiết hóa đơn {{ selectedInvoice.invoiceSeries }} - {{ selectedInvoice.invoiceNo }}</h2>
+      <button class="btn-close" (click)="closeDetailModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Status Banner -->
+      <div class="status-banner" [class]="getStatusClass(selectedInvoice.status)">
+        <span class="status-icon">
+          {{ selectedInvoice.status === 'DRAFT' ? '📝' :
+             selectedInvoice.status === 'POSTED' ? '📋' : '✕' }}
+        </span>
+        <span class="status-text">{{ getStatusLabel(selectedInvoice.status) }}</span>
+        <span class="journal-no" *ngIf="selectedInvoice.taxAuthCode">
+          Mã CQT: {{ selectedInvoice.taxAuthCode }}
+        </span>
+      </div>
+
+      <!-- Invoice Info Grid -->
+      <div class="detail-grid">
+        <div class="detail-section">
+          <h4>Thông tin hóa đơn</h4>
+          <div class="detail-item">
+            <label>Ký hiệu - Số:</label>
+            <span>{{ selectedInvoice.invoiceSeries }} - {{ selectedInvoice.invoiceNo }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Ngày hóa đơn:</label>
+            <span>{{ formatDate(selectedInvoice.invoiceDate) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Hình thức TT:</label>
+            <span>{{ getPaymentMethodLabel(selectedInvoice.paymentMethod) }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedInvoice.dueDate">
+            <label>Hạn thanh toán:</label>
+            <span [class.overdue-text]="isOverdue(selectedInvoice)">
+              {{ formatDate(selectedInvoice.dueDate) }}
+              <span *ngIf="isOverdue(selectedInvoice)">(Quá hạn)</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h4>{{ invoiceType === 'OUTPUT' ? 'Khách hàng' : 'Nhà cung cấp' }}</h4>
+          <div class="detail-item">
+            <label>Tên:</label>
+            <span>{{ selectedInvoice.partnerName }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedInvoice.partnerTaxCode">
+            <label>MST:</label>
+            <span>{{ selectedInvoice.partnerTaxCode }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedInvoice.partnerAddress">
+            <label>Địa chỉ:</label>
+            <span>{{ selectedInvoice.partnerAddress }}</span>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h4>Thanh toán</h4>
+          <div class="detail-item">
+            <label>Tổng tiền:</label>
+            <span class="amount-large">{{ formatCurrency(selectedInvoice.grandTotal) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Đã thanh toán:</label>
+            <span class="amount-paid">{{ formatCurrency(selectedInvoice.paidAmount || 0) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Còn lại:</label>
+            <span class="amount-remaining">{{ formatCurrency(getRemainingAmount(selectedInvoice)) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Trạng thái:</label>
+            <span class="payment-badge" [class]="getPaymentStatusClass(selectedInvoice.paymentStatus)">
+              {{ getPaymentStatusLabel(selectedInvoice.paymentStatus) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Invoice Lines -->
+      <div class="detail-lines">
+        <h4>Chi tiết hàng hóa/dịch vụ</h4>
+        <table class="lines-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Mã</th>
+              <th>Tên hàng hóa/dịch vụ</th>
+              <th>ĐVT</th>
+              <th class="text-right">SL</th>
+              <th class="text-right">Đơn giá</th>
+              <th class="text-right">Thành tiền</th>
+              <th class="text-right">VAT</th>
+              <th class="text-right">Tiền VAT</th>
+              <th>TK</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let line of selectedInvoice.lines">
+              <td>{{ line.lineNo }}</td>
+              <td>{{ line.productCode }}</td>
+              <td>{{ line.productName }}</td>
+              <td>{{ line.unit }}</td>
+              <td class="text-right">{{ formatNumber(line.quantity) }}</td>
+              <td class="text-right">{{ formatNumber(line.unitPrice) }}</td>
+              <td class="text-right">{{ formatNumber(line.amount) }}</td>
+              <td class="text-right">{{ line.vatRate }}%</td>
+              <td class="text-right">{{ formatNumber(line.vatAmount) }}</td>
+              <td>{{ line.accountCode }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6" class="text-right"><strong>Cộng:</strong></td>
+              <td class="text-right"><strong>{{ formatNumber(selectedInvoice.subTotal) }}</strong></td>
+              <td></td>
+              <td class="text-right"><strong>{{ formatNumber(selectedInvoice.totalVAT) }}</strong></td>
+              <td></td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="6" class="text-right"><strong>Tổng cộng:</strong></td>
+              <td colspan="4" class="text-right"><strong>{{ formatCurrency(selectedInvoice.grandTotal) }}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Audit Info -->
+      <div class="audit-info">
+        <div class="audit-item" *ngIf="selectedInvoice.preparedBy">
+          <span class="audit-label">Người lập:</span>
+          <span>{{ selectedInvoice.preparedBy }}</span>
+          <small>{{ formatDateTime(selectedInvoice.preparedAt) }}</small>
+        </div>
+        <div class="audit-item" *ngIf="selectedInvoice.postedBy">
+          <span class="audit-label">Người ghi sổ:</span>
+          <span>{{ selectedInvoice.postedBy }}</span>
+          <small>{{ formatDateTime(selectedInvoice.postedAt) }}</small>
+        </div>
+        <div class="audit-item cancelled-info" *ngIf="selectedInvoice.cancelledBy">
+          <span class="audit-label">Người hủy:</span>
+          <span>{{ selectedInvoice.cancelledBy }}</span>
+          <small>{{ formatDateTime(selectedInvoice.cancelledAt) }}</small>
+          <div class="cancel-reason" *ngIf="selectedInvoice.cancelReason">
+            Lý do: {{ selectedInvoice.cancelReason }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="detail-notes" *ngIf="selectedInvoice.note">
+        <h4>Ghi chú</h4>
+        <p>{{ selectedInvoice.note }}</p>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+
+      <button class="btn btn-primary" *ngIf="selectedInvoice.status === 'DRAFT'"
+              (click)="postInvoice(selectedInvoice)">
+        Ghi sổ
+      </button>
+
+      <button class="btn btn-info" *ngIf="selectedInvoice.status === 'POSTED' && selectedInvoice.paymentStatus !== 'PAID'"
+              (click)="openPaymentModal(selectedInvoice)">
+        Thanh toán
+      </button>
+
+      <button class="btn btn-warning" *ngIf="selectedInvoice.status === 'POSTED'"
+              (click)="viewJournalEntries(selectedInvoice)">
+        Xem bút toán
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     JOURNAL ENTRIES MODAL
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showJournalModal && selectedInvoice" (click)="showJournalModal = false">
+  <div class="modal modal-medium" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Bút toán hạch toán</h2>
+      <button class="btn-close" (click)="showJournalModal = false">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="journal-info">
+        <p><strong>Hóa đơn:</strong> {{ selectedInvoice.invoiceSeries }} - {{ selectedInvoice.invoiceNo }}</p>
+        <p><strong>Mã CQT:</strong> {{ selectedInvoice.taxAuthCode }}</p>
+        <p><strong>Ngày ghi sổ:</strong> {{ formatDateTime(selectedInvoice.postedAt) }}</p>
+      </div>
+
+      <table class="journal-table">
+        <thead>
+          <tr>
+            <th>TK</th>
+            <th>Diễn giải</th>
+            <th class="text-right">Nợ</th>
+            <th class="text-right">Có</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let entry of getJournalEntries()">
+            <td>{{ entry.accountCode }}</td>
+            <td>{{ entry.description }}</td>
+            <td class="text-right">{{ entry.debitAmount > 0 ? formatNumber(entry.debitAmount) : '' }}</td>
+            <td class="text-right">{{ entry.creditAmount > 0 ? formatNumber(entry.creditAmount) : '' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="showJournalModal = false">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     CANCEL MODAL
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showCancelModal && selectedInvoice" (click)="showCancelModal = false">
+  <div class="modal modal-small" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Hủy hóa đơn</h2>
+      <button class="btn-close" (click)="showCancelModal = false">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="warning-message">
+        <span class="warning-icon">⚠️</span>
+        <p>Bạn có chắc muốn hủy hóa đơn <strong>{{ selectedInvoice.invoiceSeries }} - {{ selectedInvoice.invoiceNo }}</strong>?</p>
+      </div>
+
+      <div class="form-group">
+        <label>Lý do hủy <span class="required">*</span></label>
+        <textarea [(ngModel)]="cancelReason" rows="3" placeholder="Nhập lý do hủy hóa đơn..."></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="showCancelModal = false">Đóng</button>
+      <button class="btn btn-danger" (click)="confirmCancel()" [disabled]="loading">
+        Xác nhận hủy
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     PAYMENT MODAL
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showPaymentModal && selectedInvoice" (click)="showPaymentModal = false">
+  <div class="modal modal-small" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Cập nhật thanh toán</h2>
+      <button class="btn-close" (click)="showPaymentModal = false">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="payment-summary">
+        <div class="payment-row">
+          <span>Tổng tiền hóa đơn:</span>
+          <span class="amount">{{ formatCurrency(selectedInvoice.grandTotal) }}</span>
+        </div>
+        <div class="payment-row">
+          <span>Đã thanh toán:</span>
+          <span class="amount paid">{{ formatCurrency(selectedInvoice.paidAmount || 0) }}</span>
+        </div>
+        <div class="payment-row remaining">
+          <span>Còn lại:</span>
+          <span class="amount">{{ formatCurrency(getRemainingAmount(selectedInvoice)) }}</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Số tiền thanh toán <span class="required">*</span></label>
+        <input type="number" [(ngModel)]="paymentAmount" [max]="getRemainingAmount(selectedInvoice)" min="0">
+      </div>
+
+      <div class="form-group">
+        <label>Ngày thanh toán <span class="required">*</span></label>
+        <input type="date" [(ngModel)]="paymentDate">
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="showPaymentModal = false">Đóng</button>
+      <button class="btn btn-primary" (click)="confirmPayment()" [disabled]="loading">
+        Xác nhận
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" *ngIf="loading">
+  <div class="spinner"></div>
+</div>
