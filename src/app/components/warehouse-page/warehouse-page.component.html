@@ -1,0 +1,554 @@
+<div class="warehouse-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{{ pageTitle }}</h1>
+      <p class="page-subtitle">{{ pageSubtitle }}</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreateModal()">
+      <span class="icon">+</span>
+      {{ voucherType === 'RECEIPT' ? 'Tạo phiếu nhập' : 'Tạo phiếu xuất' }}
+    </button>
+  </div>
+
+  <!-- STATS CARDS -->
+  <div class="stats-cards">
+    <div class="stat-card card-total">
+      <span class="stat-icon">📦</span>
+      <div class="stat-content">
+        <span class="stat-label">Tổng phiếu</span>
+        <span class="stat-value">{{ summary.totalVouchers }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-draft">
+      <span class="stat-icon">📝</span>
+      <div class="stat-content">
+        <span class="stat-label">Nháp</span>
+        <span class="stat-value">{{ summary.draftCount }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-posted">
+      <span class="stat-icon">✅</span>
+      <div class="stat-content">
+        <span class="stat-label">Đã ghi sổ</span>
+        <span class="stat-value">{{ summary.postedCount }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-quantity">
+      <span class="stat-icon">📊</span>
+      <div class="stat-content">
+        <span class="stat-label">Tổng SL</span>
+        <span class="stat-value">{{ formatCurrency(summary.totalQuantity) }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-amount">
+      <span class="stat-icon">💰</span>
+      <div class="stat-content">
+        <span class="stat-label">Tổng giá trị</span>
+        <span class="stat-value">{{ formatCurrency(summary.totalAmount) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filter-section">
+    <div class="filter-row">
+      <div class="filter-group filter-search">
+        <label>Tìm kiếm</label>
+        <input type="text" [(ngModel)]="searchText" (input)="onSearch()"
+               placeholder="Số phiếu, đối tác, mã hàng...">
+      </div>
+      <div class="filter-group">
+        <label>Trạng thái</label>
+        <select [(ngModel)]="statusFilter" (change)="onStatusFilterChange()">
+          <option value="">Tất cả</option>
+          <option value="DRAFT">Nháp</option>
+          <option value="POSTED">Đã ghi sổ</option>
+          <option value="CANCELLED">Đã hủy</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Kho</label>
+        <select [(ngModel)]="filter.warehouseCode" (change)="applyFilter()">
+          <option value="">Tất cả kho</option>
+          <option *ngFor="let wh of warehouses" [value]="wh.code">{{ wh.name }}</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary btn-sm" (click)="clearFilters()">Xóa lọc</button>
+    </div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th class="col-no">STT</th>
+          <th class="col-voucher-no">Số phiếu</th>
+          <th class="col-date">Ngày</th>
+          <th class="col-type">Loại</th>
+          <th class="col-partner">Đối tác</th>
+          <th class="col-warehouse">Kho</th>
+          <th class="col-quantity text-right">Số lượng</th>
+          <th class="col-amount text-right">Giá trị</th>
+          <th class="col-status">Trạng thái</th>
+          <th class="col-actions">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let voucher of filteredVouchers; let i = index"
+            [class.cancelled]="voucher.status === 'CANCELLED'">
+          <td>{{ i + 1 }}</td>
+          <td>
+            <span class="voucher-no">{{ voucher.voucherNo }}</span>
+          </td>
+          <td>{{ formatDate(voucher.voucherDate) }}</td>
+          <td>
+            <span class="type-badge" [class.type-receipt]="voucherType === 'RECEIPT'"
+                  [class.type-issue]="voucherType === 'ISSUE'">
+              {{ getSubTypeLabel(voucher) }}
+            </span>
+          </td>
+          <td>
+            <div class="partner-info">
+              <span class="partner-name">{{ voucher.partnerName || '-' }}</span>
+              <span class="partner-code" *ngIf="voucher.partnerCode">{{ voucher.partnerCode }}</span>
+            </div>
+          </td>
+          <td>{{ voucher.warehouseName }}</td>
+          <td class="text-right">{{ formatCurrency(voucher.totalQuantity) }}</td>
+          <td class="text-right">{{ formatCurrency(voucher.totalAmount) }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(voucher.status)">
+              {{ statusLabels[voucher.status] }}
+            </span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-icon btn-view" title="Xem chi tiết" (click)="viewDetail(voucher)">👁</button>
+              <button class="btn-icon btn-journal" title="Xem bút toán" (click)="viewJournal(voucher)"
+                      *ngIf="voucher.status === 'POSTED'">📒</button>
+              <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(voucher)"
+                      *ngIf="voucher.status === 'DRAFT'">✏️</button>
+              <button class="btn-icon btn-delete" title="Xóa" (click)="deleteVoucher(voucher)"
+                      *ngIf="voucher.status === 'DRAFT'">🗑</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="filteredVouchers.length === 0 && !isLoading">
+      <div class="empty-icon">📦</div>
+      <p>Chưa có phiếu {{ voucherType === 'RECEIPT' ? 'nhập' : 'xuất' }} kho nào</p>
+      <p class="empty-text">Nhấn nút "Tạo phiếu" để bắt đầu</p>
+    </div>
+  </div>
+
+  <!-- CREATE/EDIT MODAL -->
+  <div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ editingVoucher.id ? 'Sửa' : 'Tạo' }} {{ voucherType === 'RECEIPT' ? 'Phiếu Nhập Kho' : 'Phiếu Xuất Kho' }}</h2>
+        <button class="btn-close" (click)="closeCreateModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Basic Info -->
+        <div class="form-section">
+          <h3 class="section-title">Thông tin chung</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Số phiếu</label>
+              <input type="text" [(ngModel)]="editingVoucher.voucherNo" disabled>
+            </div>
+            <div class="form-group">
+              <label>Ngày phiếu <span class="required">*</span></label>
+              <input type="date" [ngModel]="editingVoucher.voucherDate | date:'yyyy-MM-dd'"
+                     (ngModelChange)="onVoucherDateChange($event)">
+            </div>
+            <div class="form-group">
+              <label>Loại {{ voucherType === 'RECEIPT' ? 'nhập' : 'xuất' }} <span class="required">*</span></label>
+              <select *ngIf="voucherType === 'RECEIPT'" [(ngModel)]="editingVoucher.receiptType"
+                      (change)="onReceiptTypeChange()">
+                <option *ngFor="let type of receiptTypes" [value]="type">{{ receiptTypeLabels[type] }}</option>
+              </select>
+              <select *ngIf="voucherType === 'ISSUE'" [(ngModel)]="editingVoucher.issueType"
+                      (change)="onIssueTypeChange()">
+                <option *ngFor="let type of issueTypes" [value]="type">{{ issueTypeLabels[type] }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Kho <span class="required">*</span></label>
+              <select [(ngModel)]="editingVoucher.warehouseCode" (change)="onWarehouseChange()">
+                <option value="">-- Chọn kho --</option>
+                <option *ngFor="let wh of warehouses" [value]="wh.code">{{ wh.name }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Partner Info -->
+        <div class="form-section">
+          <h3 class="section-title">{{ voucherType === 'RECEIPT' ? 'Nhà cung cấp' : 'Khách hàng' }}</h3>
+          <div class="form-grid">
+            <div class="form-group col-span-2">
+              <label>{{ voucherType === 'RECEIPT' ? 'Nhà cung cấp' : 'Khách hàng' }}</label>
+              <select [(ngModel)]="editingVoucher.partnerId" (change)="onPartnerChange()">
+                <option value="">-- Chọn đối tác --</option>
+                <option *ngFor="let p of partners" [value]="p.id">{{ p.code }} - {{ p.name }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Thủ kho</label>
+              <input type="text" [(ngModel)]="editingVoucher.keeper">
+            </div>
+            <div class="form-group">
+              <label>Người {{ voucherType === 'RECEIPT' ? 'giao' : 'nhận' }}</label>
+              <input type="text" [(ngModel)]="editingVoucher.receiver">
+            </div>
+          </div>
+        </div>
+
+        <!-- Reference Voucher -->
+        <div class="form-section">
+          <h3 class="section-title">Chứng từ gốc</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Số chứng từ gốc</label>
+              <input type="text" [(ngModel)]="editingVoucher.refVoucherNo" placeholder="Số HĐ, ĐH...">
+            </div>
+            <div class="form-group">
+              <label>Ngày CT gốc</label>
+              <input type="date" [ngModel]="editingVoucher.refVoucherDate | date:'yyyy-MM-dd'"
+                     (ngModelChange)="onRefVoucherDateChange($event)">
+            </div>
+            <div class="form-group col-span-2">
+              <label>Diễn giải</label>
+              <input type="text" [(ngModel)]="editingVoucher.description">
+            </div>
+          </div>
+        </div>
+
+        <!-- Lines -->
+        <div class="form-section">
+          <div class="section-header">
+            <h3 class="section-title">Chi tiết hàng hóa</h3>
+          </div>
+
+          <!-- Add Line Form -->
+          <div class="add-line-form">
+            <div class="form-grid">
+              <div class="form-group col-span-2">
+                <label>Hàng hóa <span class="required">*</span></label>
+                <select [(ngModel)]="selectedProductId" (change)="onProductSelect()">
+                  <option value="">-- Chọn hàng hóa --</option>
+                  <option *ngFor="let p of products" [value]="p.id">{{ p.code }} - {{ p.name }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>ĐVT</label>
+                <input type="text" [(ngModel)]="newLine.unit" disabled>
+              </div>
+              <div class="form-group">
+                <label>TK kho</label>
+                <input type="text" [(ngModel)]="newLine.inventoryAccount" placeholder="156">
+              </div>
+              <div class="form-group">
+                <label>Số lượng <span class="required">*</span></label>
+                <input type="number" [(ngModel)]="newLine.quantity" (input)="calculateLineAmount()" min="0">
+              </div>
+              <div class="form-group">
+                <label>Đơn giá</label>
+                <input type="number" [(ngModel)]="newLine.unitPrice" (input)="calculateLineAmount()" min="0">
+              </div>
+              <div class="form-group">
+                <label>Thành tiền</label>
+                <input type="text" [value]="formatCurrency(newLine.amount || 0)" disabled>
+              </div>
+              <div class="form-group">
+                <button class="btn btn-primary btn-sm" (click)="addLineToVoucher()"
+                        [disabled]="!selectedProductId || !newLine.quantity">
+                  + Thêm dòng
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lines Table -->
+          <table class="lines-table" *ngIf="editingVoucher.lines && editingVoucher.lines.length > 0">
+            <thead>
+              <tr>
+                <th class="col-no">STT</th>
+                <th>Mã hàng</th>
+                <th>Tên hàng hóa</th>
+                <th>ĐVT</th>
+                <th>TK kho</th>
+                <th class="text-right">SL</th>
+                <th class="text-right">Đơn giá</th>
+                <th class="text-right">Thành tiền</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let line of editingVoucher.lines; let i = index">
+                <td>{{ line.lineNo }}</td>
+                <td>{{ line.productCode }}</td>
+                <td>{{ line.productName }}</td>
+                <td>{{ line.unit }}</td>
+                <td>{{ line.inventoryAccount }}</td>
+                <td class="text-right">{{ formatCurrency(line.quantity) }}</td>
+                <td class="text-right">{{ formatCurrency(line.unitPrice) }}</td>
+                <td class="text-right">{{ formatCurrency(line.amount) }}</td>
+                <td>
+                  <button class="btn-icon btn-remove" (click)="removeLine(i)">×</button>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5" class="text-right"><strong>Tổng cộng:</strong></td>
+                <td class="text-right"><strong>{{ formatCurrency(editingVoucher.totalQuantity || 0) }}</strong></td>
+                <td></td>
+                <td class="text-right"><strong>{{ formatCurrency(editingVoucher.totalAmount || 0) }}</strong></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="empty-lines" *ngIf="!editingVoucher.lines || editingVoucher.lines.length === 0">
+            <p>Chưa có hàng hóa. Vui lòng thêm chi tiết hàng hóa.</p>
+          </div>
+        </div>
+
+        <!-- Note -->
+        <div class="form-section">
+          <div class="form-group">
+            <label>Ghi chú</label>
+            <textarea [(ngModel)]="editingVoucher.note" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeCreateModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="saveVoucher()" [disabled]="isSaving">
+          {{ isSaving ? 'Đang lưu...' : 'Lưu phiếu' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" *ngIf="showDetailModal && selectedVoucher" (click)="closeDetailModal()">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Chi tiết {{ voucherType === 'RECEIPT' ? 'Phiếu Nhập Kho' : 'Phiếu Xuất Kho' }}</h2>
+        <button class="btn-close" (click)="closeDetailModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h4>Thông tin phiếu</h4>
+            <div class="detail-item">
+              <label>Số phiếu:</label>
+              <span class="voucher-no">{{ selectedVoucher.voucherNo }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Ngày phiếu:</label>
+              <span>{{ formatDate(selectedVoucher.voucherDate) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Loại:</label>
+              <span>{{ getSubTypeLabel(selectedVoucher) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Trạng thái:</label>
+              <span class="status-badge" [ngClass]="getStatusClass(selectedVoucher.status)">
+                {{ statusLabels[selectedVoucher.status] }}
+              </span>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h4>Kho & Đối tác</h4>
+            <div class="detail-item">
+              <label>Kho:</label>
+              <span>{{ selectedVoucher.warehouseName }}</span>
+            </div>
+            <div class="detail-item">
+              <label>{{ voucherType === 'RECEIPT' ? 'NCC' : 'Khách hàng' }}:</label>
+              <span>{{ selectedVoucher.partnerName || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Thủ kho:</label>
+              <span>{{ selectedVoucher.keeper || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Người {{ voucherType === 'RECEIPT' ? 'giao' : 'nhận' }}:</label>
+              <span>{{ selectedVoucher.receiver || '-' }}</span>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h4>Tổng hợp</h4>
+            <div class="detail-item">
+              <label>Tổng số lượng:</label>
+              <span>{{ formatCurrency(selectedVoucher.totalQuantity) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Tổng giá trị:</label>
+              <span class="amount-value">{{ formatCurrency(selectedVoucher.totalAmount) }} ₫</span>
+            </div>
+            <div class="detail-item">
+              <label>CT gốc:</label>
+              <span>{{ selectedVoucher.refVoucherNo || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lines Detail -->
+        <div class="detail-list">
+          <h4>Chi tiết hàng hóa</h4>
+          <table class="sub-table">
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Mã hàng</th>
+                <th>Tên hàng hóa</th>
+                <th>ĐVT</th>
+                <th>TK kho</th>
+                <th class="text-right">Số lượng</th>
+                <th class="text-right">Đơn giá</th>
+                <th class="text-right">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let line of selectedVoucher.lines">
+                <td>{{ line.lineNo }}</td>
+                <td>{{ line.productCode }}</td>
+                <td>{{ line.productName }}</td>
+                <td>{{ line.unit }}</td>
+                <td>{{ line.inventoryAccount }}</td>
+                <td class="text-right">{{ formatCurrency(line.quantity) }}</td>
+                <td class="text-right">{{ formatCurrency(line.unitPrice) }}</td>
+                <td class="text-right">{{ formatCurrency(line.amount) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Description -->
+        <div class="detail-note" *ngIf="selectedVoucher.description">
+          <h4>Diễn giải</h4>
+          <p>{{ selectedVoucher.description }}</p>
+        </div>
+
+        <!-- Cancel Info -->
+        <div class="cancel-info" *ngIf="selectedVoucher.status === 'CANCELLED'">
+          <h4>Thông tin hủy</h4>
+          <p><strong>Ngày hủy:</strong> {{ formatDateTime(selectedVoucher.cancelledAt) }}</p>
+          <p><strong>Người hủy:</strong> {{ selectedVoucher.cancelledBy }}</p>
+          <p><strong>Lý do:</strong> {{ selectedVoucher.cancelReason }}</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+        <button class="btn btn-danger" (click)="openCancelModal(selectedVoucher)"
+                *ngIf="selectedVoucher.status !== 'CANCELLED'">
+          Hủy phiếu
+        </button>
+        <button class="btn btn-primary" (click)="postVoucher(selectedVoucher)"
+                *ngIf="selectedVoucher.status === 'DRAFT'">
+          Ghi sổ
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JOURNAL MODAL -->
+  <div class="modal-overlay" *ngIf="showJournalModal && selectedVoucher" (click)="closeJournalModal()">
+    <div class="modal modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Bút toán kế toán</h2>
+        <button class="btn-close" (click)="closeJournalModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="journal-info">
+          <p><strong>Số phiếu:</strong> {{ selectedVoucher.voucherNo }}</p>
+          <p><strong>Ngày:</strong> {{ formatDate(selectedVoucher.voucherDate) }}</p>
+          <p><strong>Diễn giải:</strong> {{ selectedVoucher.description }}</p>
+        </div>
+
+        <table class="journal-table">
+          <thead>
+            <tr>
+              <th>TK Nợ</th>
+              <th>TK Có</th>
+              <th class="text-right">Số tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>{{ selectedVoucher.debitAccount }}</strong></td>
+              <td><strong>{{ selectedVoucher.creditAccount }}</strong></td>
+              <td class="text-right"><strong>{{ formatCurrency(selectedVoucher.totalAmount) }}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="journal-note">
+          <p *ngIf="voucherType === 'RECEIPT'">
+            Nợ TK {{ selectedVoucher.debitAccount }} (Hàng hóa/NVL) / Có TK {{ selectedVoucher.creditAccount }} (Phải trả NCC)
+          </p>
+          <p *ngIf="voucherType === 'ISSUE'">
+            Nợ TK {{ selectedVoucher.debitAccount }} (Giá vốn) / Có TK {{ selectedVoucher.creditAccount }} (Hàng hóa)
+          </p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeJournalModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CANCEL MODAL -->
+  <div class="modal-overlay" *ngIf="showCancelModal" (click)="closeCancelModal()">
+    <div class="modal modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Hủy phiếu kho</h2>
+        <button class="btn-close" (click)="closeCancelModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="warning-message">
+          <span class="warning-icon">⚠️</span>
+          <p>Bạn có chắc muốn hủy phiếu <strong>{{ selectedVoucher?.voucherNo }}</strong>?
+            Thao tác này không thể hoàn tác.</p>
+        </div>
+
+        <div class="form-group" style="margin-top: 16px;">
+          <label>Lý do hủy <span class="required">*</span></label>
+          <textarea [(ngModel)]="cancelReason" rows="3" placeholder="Nhập lý do hủy phiếu..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeCancelModal()">Không</button>
+        <button class="btn btn-danger" (click)="confirmCancel()" [disabled]="!cancelReason">
+          Xác nhận hủy
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+  </div>
+</div>

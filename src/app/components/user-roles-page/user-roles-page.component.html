@@ -1,0 +1,166 @@
+<div class="user-roles-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>👥 Phân Quyền Người Dùng</h1>
+      <p class="subtitle">Quản lý người dùng và phân quyền truy cập</p>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab" [class.active]="activeTab === 'users'" (click)="activeTab = 'users'">
+      👤 Người dùng ({{ users.length }})
+    </button>
+    <button class="tab" [class.active]="activeTab === 'roles'" (click)="activeTab = 'roles'">
+      🔐 Vai trò ({{ roles.length }})
+    </button>
+  </div>
+
+  <!-- USERS TAB -->
+  <div class="tab-content" *ngIf="activeTab === 'users'">
+    <div class="content-header">
+      <h2>Danh sách người dùng</h2>
+      <button class="btn btn-primary" (click)="openUserModal()">+ Thêm người dùng</button>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Họ tên</th>
+            <th>Email</th>
+            <th>Vai trò</th>
+            <th>Đăng nhập lần cuối</th>
+            <th>Trạng thái</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of users">
+            <td><strong>{{ user.username }}</strong></td>
+            <td>{{ user.fullName }}</td>
+            <td>{{ user.email }}</td>
+            <td>
+              <span class="role-badge">{{ user.role }}</span>
+            </td>
+            <td>{{ formatDate(user.lastLogin) }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="getStatusClass(user.status)">
+                {{ getStatusLabel(user.status) }}
+              </span>
+            </td>
+            <td>
+              <button class="btn-icon" title="Sửa" (click)="openUserModal(user)">✏️</button>
+              <button class="btn-icon" title="Đổi mật khẩu">🔑</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ROLES TAB -->
+  <div class="tab-content" *ngIf="activeTab === 'roles'">
+    <div class="content-header">
+      <h2>Danh sách vai trò</h2>
+      <button class="btn btn-primary" (click)="openRoleModal()">+ Thêm vai trò</button>
+    </div>
+
+    <div class="roles-grid">
+      <div *ngFor="let role of roles" class="role-card" (click)="openRoleModal(role)">
+        <div class="role-header">
+          <h3>{{ role.name }}</h3>
+          <span class="user-count">{{ role.userCount }} người dùng</span>
+        </div>
+        <p class="role-description">{{ role.description }}</p>
+        <div class="role-permissions">
+          <span *ngFor="let perm of role.permissions.slice(0, 3)" class="permission-tag">
+            {{ perm }}
+          </span>
+          <span *ngIf="role.permissions.length > 3" class="permission-more">
+            +{{ role.permissions.length - 3 }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- USER MODAL -->
+  <div class="modal-overlay" *ngIf="showUserModal" (click)="closeUserModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ editingUser.id ? 'Sửa' : 'Thêm' }} người dùng</h2>
+        <button class="btn-close" (click)="closeUserModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" [(ngModel)]="editingUser.username" [disabled]="!!editingUser.id">
+        </div>
+        <div class="form-group">
+          <label>Họ tên</label>
+          <input type="text" [(ngModel)]="editingUser.fullName">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" [(ngModel)]="editingUser.email">
+        </div>
+        <div class="form-group">
+          <label>Vai trò</label>
+          <select [(ngModel)]="editingUser.role">
+            <option *ngFor="let role of roles" [value]="role.name">{{ role.name }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Trạng thái</label>
+          <select [(ngModel)]="editingUser.status">
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="INACTIVE">Ngừng hoạt động</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeUserModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="saveUser()">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROLE MODAL -->
+  <div class="modal-overlay" *ngIf="showRoleModal" (click)="closeRoleModal()">
+    <div class="modal role-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ editingRole.id ? 'Sửa' : 'Thêm' }} vai trò</h2>
+        <button class="btn-close" (click)="closeRoleModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Tên vai trò</label>
+          <input type="text" [(ngModel)]="editingRole.name">
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea [(ngModel)]="editingRole.description" rows="2"></textarea>
+        </div>
+        <div class="permissions-section">
+          <label>Phân quyền</label>
+          <div *ngFor="let group of permissionGroups" class="permission-group">
+            <h4>{{ group.name }}</h4>
+            <div class="permission-list">
+              <label *ngFor="let perm of group.permissions" class="checkbox-label">
+                <input type="checkbox">
+                {{ perm }}
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeRoleModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="saveRole()">Lưu</button>
+      </div>
+    </div>
+  </div>
+</div>

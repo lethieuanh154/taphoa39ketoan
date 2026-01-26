@@ -1,0 +1,365 @@
+<div class="insurance-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>🏥 Bảo Hiểm Xã Hội</h1>
+      <p class="subtitle">TK 3383 (BHXH) | TK 3384 (BHYT) | TK 3386 (BHTN)</p>
+    </div>
+    <div class="header-actions">
+      <select [(ngModel)]="filterYear" (change)="onYearChange()" class="year-select">
+        <option *ngFor="let y of years" [value]="y">Năm {{ y }}</option>
+      </select>
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        + Tạo báo cáo BH
+      </button>
+    </div>
+  </div>
+
+  <!-- INSURANCE RATES INFO -->
+  <div class="rates-info">
+    <div class="rates-title">Tỷ lệ đóng BH năm 2024</div>
+    <div class="rates-grid">
+      <div class="rate-item">
+        <span class="rate-label">BHXH</span>
+        <span class="rate-value">NLĐ: 8% | DN: 17.5%</span>
+      </div>
+      <div class="rate-item">
+        <span class="rate-label">BHYT</span>
+        <span class="rate-value">NLĐ: 1.5% | DN: 3%</span>
+      </div>
+      <div class="rate-item">
+        <span class="rate-label">BHTN</span>
+        <span class="rate-value">NLĐ: 1% | DN: 1%</span>
+      </div>
+      <div class="rate-item">
+        <span class="rate-label">BHTNLĐ</span>
+        <span class="rate-value">DN: 0.5%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-cards">
+    <div class="card total-bhxh">
+      <div class="card-icon">📋</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(yearStats.totalSocial) }}</span>
+        <span class="card-label">BHXH (TK 3383)</span>
+      </div>
+    </div>
+    <div class="card total-bhyt">
+      <div class="card-icon">💊</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(yearStats.totalHealth) }}</span>
+        <span class="card-label">BHYT (TK 3384)</span>
+      </div>
+    </div>
+    <div class="card total-bhtn">
+      <div class="card-icon">🛡️</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(yearStats.totalUnemployment) }}</span>
+        <span class="card-label">BHTN (TK 3386)</span>
+      </div>
+    </div>
+    <div class="card total-paid">
+      <div class="card-icon">✅</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(yearStats.paidTotal) }}</span>
+        <span class="card-label">Đã đóng</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORT LIST -->
+  <div class="report-list">
+    <div class="list-header">
+      <h2>Báo cáo đóng BH năm {{ filterYear }}</h2>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-month">Tháng</th>
+            <th class="col-no">Số báo cáo</th>
+            <th class="col-count">Số NV</th>
+            <th class="col-salary">Lương đóng BH</th>
+            <th class="col-employee">NLĐ đóng</th>
+            <th class="col-company">DN đóng</th>
+            <th class="col-total">Tổng cộng</th>
+            <th class="col-deadline">Hạn nộp</th>
+            <th class="col-status">Trạng thái</th>
+            <th class="col-actions">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let report of reports"
+              [class.overdue]="isOverdue(report)"
+              (click)="viewReport(report)">
+            <td class="col-month">
+              <strong>{{ getMonthLabel(report.month) }}</strong>
+            </td>
+            <td class="col-no">{{ report.reportNo }}</td>
+            <td class="col-count center">{{ report.summary.employeeCount }}</td>
+            <td class="col-salary amount">{{ formatCurrency(report.summary.totalInsuranceSalary) }}</td>
+            <td class="col-employee amount">{{ formatCurrency(report.summary.totalEmployeeContribution) }}</td>
+            <td class="col-company amount">{{ formatCurrency(report.summary.totalCompanyContribution) }}</td>
+            <td class="col-total amount highlight">{{ formatCurrency(report.summary.grandTotal) }}</td>
+            <td class="col-deadline">
+              {{ formatDate(report.submissionDeadline) }}
+              <span class="overdue-badge" *ngIf="isOverdue(report)">Quá hạn</span>
+            </td>
+            <td class="col-status">
+              <span class="status-badge" [ngClass]="getStatusClass(report.status)">
+                {{ getStatusLabel(report.status) }}
+              </span>
+            </td>
+            <td class="col-actions" (click)="$event.stopPropagation()">
+              <button class="btn-icon" title="Xem chi tiết" (click)="viewReport(report)">👁️</button>
+              <button class="btn-icon" title="Xóa"
+                      *ngIf="report.status === 'DRAFT'"
+                      (click)="deleteReport(report.id)">🗑️</button>
+            </td>
+          </tr>
+          <tr *ngIf="reports.length === 0">
+            <td colspan="10" class="empty-row">
+              Chưa có báo cáo BH nào trong năm {{ filterYear }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CREATE MODAL -->
+  <div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
+    <div class="modal create-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Tạo báo cáo BH mới</h2>
+        <button class="btn-close" (click)="closeCreateModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tháng</label>
+            <select [(ngModel)]="newMonth">
+              <option *ngFor="let m of getMonths()" [value]="m">{{ getMonthLabel(m) }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Năm</label>
+            <select [(ngModel)]="newYear">
+              <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <p><strong>Số nhân viên:</strong> {{ employees.length }} người</p>
+          <p><strong>Hạn nộp:</strong> Ngày 20 tháng {{ newMonth === 12 ? 1 : newMonth + 1 }}/{{ newMonth === 12 ? newYear + 1 : newYear }}</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeCreateModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="createReport()"
+                [disabled]="employees.length === 0">
+          Tạo báo cáo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" *ngIf="showDetailModal" (click)="closeDetailModal()">
+    <div class="modal detail-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>{{ editingReport?.reportNo }} - Tháng {{ editingReport?.month }}/{{ editingReport?.year }}</h2>
+          <span class="status-badge" [ngClass]="getStatusClass(editingReport?.status || 'DRAFT')">
+            {{ getStatusLabel(editingReport?.status || 'DRAFT') }}
+          </span>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary" (click)="print()">🖨️ In</button>
+          <button class="btn btn-secondary" (click)="exportToExcel()">📊 Excel</button>
+          <button class="btn-close" (click)="closeDetailModal()">×</button>
+        </div>
+      </div>
+
+      <div class="modal-body" *ngIf="editingReport">
+        <!-- Summary by Type -->
+        <div class="type-summary">
+          <div class="type-card bhxh">
+            <div class="type-header">BHXH (TK 3383)</div>
+            <div class="type-row">
+              <span>NLĐ đóng (8%):</span>
+              <span>{{ formatCurrency(editingReport.summary.totalEmployeeSocial) }}</span>
+            </div>
+            <div class="type-row">
+              <span>DN đóng (17.5%):</span>
+              <span>{{ formatCurrency(editingReport.summary.totalCompanySocial) }}</span>
+            </div>
+            <div class="type-total">
+              <span>Tổng:</span>
+              <span>{{ formatCurrency(editingReport.summary.bySocialInsurance) }}</span>
+            </div>
+          </div>
+
+          <div class="type-card bhyt">
+            <div class="type-header">BHYT (TK 3384)</div>
+            <div class="type-row">
+              <span>NLĐ đóng (1.5%):</span>
+              <span>{{ formatCurrency(editingReport.summary.totalEmployeeHealth) }}</span>
+            </div>
+            <div class="type-row">
+              <span>DN đóng (3%):</span>
+              <span>{{ formatCurrency(editingReport.summary.totalCompanyHealth) }}</span>
+            </div>
+            <div class="type-total">
+              <span>Tổng:</span>
+              <span>{{ formatCurrency(editingReport.summary.byHealthInsurance) }}</span>
+            </div>
+          </div>
+
+          <div class="type-card bhtn">
+            <div class="type-header">BHTN (TK 3386)</div>
+            <div class="type-row">
+              <span>NLĐ đóng (1%):</span>
+              <span>{{ formatCurrency(editingReport.summary.totalEmployeeUnemployment) }}</span>
+            </div>
+            <div class="type-row">
+              <span>DN đóng (1%):</span>
+              <span>{{ formatCurrency(editingReport.summary.totalCompanyUnemployment) }}</span>
+            </div>
+            <div class="type-total">
+              <span>Tổng:</span>
+              <span>{{ formatCurrency(editingReport.summary.byUnemploymentInsurance) }}</span>
+            </div>
+          </div>
+
+          <div class="type-card bhtnld">
+            <div class="type-header">BHTNLĐ (TK 3385)</div>
+            <div class="type-row">
+              <span>DN đóng (0.5%):</span>
+              <span>{{ formatCurrency(editingReport.summary.byAccidentInsurance) }}</span>
+            </div>
+            <div class="type-total">
+              <span>Tổng:</span>
+              <span>{{ formatCurrency(editingReport.summary.byAccidentInsurance) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grand Total -->
+        <div class="grand-total">
+          <div class="total-item">
+            <span class="label">Tổng NLĐ đóng (10.5%):</span>
+            <span class="value">{{ formatCurrency(editingReport.summary.totalEmployeeContribution) }}</span>
+          </div>
+          <div class="total-item">
+            <span class="label">Tổng DN đóng (22%):</span>
+            <span class="value">{{ formatCurrency(editingReport.summary.totalCompanyContribution) }}</span>
+          </div>
+          <div class="total-item main">
+            <span class="label">TỔNG CỘNG (32.5%):</span>
+            <span class="value">{{ formatCurrency(editingReport.summary.grandTotal) }}</span>
+          </div>
+        </div>
+
+        <!-- Detail Table -->
+        <div class="detail-table-container">
+          <table class="data-table detail-table">
+            <thead>
+              <tr>
+                <th rowspan="2">STT</th>
+                <th rowspan="2">Mã NV</th>
+                <th rowspan="2">Họ và tên</th>
+                <th rowspan="2">Số sổ BHXH</th>
+                <th rowspan="2">Lương đóng BH</th>
+                <th colspan="4" class="group-header employee-group">NLĐ đóng</th>
+                <th colspan="5" class="group-header company-group">DN đóng</th>
+                <th rowspan="2" class="total-col">Tổng</th>
+              </tr>
+              <tr>
+                <th>BHXH</th>
+                <th>BHYT</th>
+                <th>BHTN</th>
+                <th>Cộng</th>
+                <th>BHXH</th>
+                <th>BHYT</th>
+                <th>BHTN</th>
+                <th>BHTNLĐ</th>
+                <th>Cộng</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let detail of editingReport.details; let i = index">
+                <td class="center">{{ i + 1 }}</td>
+                <td>{{ detail.employeeCode }}</td>
+                <td class="name">{{ detail.employeeName }}</td>
+                <td>{{ detail.socialInsuranceNo }}</td>
+                <td class="amount">{{ formatCurrency(detail.insuranceSalary) }}</td>
+                <td class="amount">{{ formatCurrency(detail.employeeSocial) }}</td>
+                <td class="amount">{{ formatCurrency(detail.employeeHealth) }}</td>
+                <td class="amount">{{ formatCurrency(detail.employeeUnemployment) }}</td>
+                <td class="amount subtotal">{{ formatCurrency(detail.totalEmployeeContribution) }}</td>
+                <td class="amount">{{ formatCurrency(detail.companySocial) }}</td>
+                <td class="amount">{{ formatCurrency(detail.companyHealth) }}</td>
+                <td class="amount">{{ formatCurrency(detail.companyUnemployment) }}</td>
+                <td class="amount">{{ formatCurrency(detail.companyAccident) }}</td>
+                <td class="amount subtotal">{{ formatCurrency(detail.totalCompanyContribution) }}</td>
+                <td class="amount highlight">{{ formatCurrency(detail.totalContribution) }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="4"><strong>TỔNG CỘNG</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingReport.summary.totalInsuranceSalary) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingReport.summary.totalEmployeeSocial) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingReport.summary.totalEmployeeHealth) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingReport.summary.totalEmployeeUnemployment) }}</strong></td>
+                <td class="amount subtotal"><strong>{{ formatCurrency(editingReport.summary.totalEmployeeContribution) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingReport.summary.totalCompanySocial) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingReport.summary.totalCompanyHealth) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingReport.summary.totalCompanyUnemployment) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingReport.summary.totalCompanyAccident) }}</strong></td>
+                <td class="amount subtotal"><strong>{{ formatCurrency(editingReport.summary.totalCompanyContribution) }}</strong></td>
+                <td class="amount highlight"><strong>{{ formatCurrency(editingReport.summary.grandTotal) }}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="footer-left">
+          <span>Hạn nộp: {{ formatDate(editingReport?.submissionDeadline) }}</span>
+          <span *ngIf="editingReport?.submittedAt">| Đã nộp: {{ formatDate(editingReport?.submittedAt) }}</span>
+          <span *ngIf="editingReport?.paidAt">| Đã đóng: {{ formatDate(editingReport?.paidAt) }}</span>
+        </div>
+        <div class="footer-right">
+          <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+
+          <ng-container *ngIf="editingReport?.status === 'DRAFT'">
+            <button class="btn btn-primary" (click)="submitReport(editingReport!.id)">📤 Nộp báo cáo</button>
+          </ng-container>
+
+          <ng-container *ngIf="editingReport?.status === 'SUBMITTED'">
+            <button class="btn btn-success" (click)="approveReport(editingReport!.id)">✅ Xác nhận duyệt</button>
+          </ng-container>
+
+          <ng-container *ngIf="editingReport?.status === 'APPROVED'">
+            <button class="btn btn-success" (click)="markAsPaid(editingReport!.id)">💰 Xác nhận đã đóng</button>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+  </div>
+</div>

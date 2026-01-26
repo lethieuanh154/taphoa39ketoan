@@ -1,0 +1,242 @@
+<div class="stock-card-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Thẻ Kho</h1>
+      <p class="page-subtitle">Theo dõi biến động nhập xuất tồn theo từng sản phẩm</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="print()" [disabled]="!stockCard">
+        <span class="icon">🖨</span> In
+      </button>
+      <button class="btn btn-primary" (click)="exportToExcel()" [disabled]="!stockCard">
+        <span class="icon">📥</span> Xuất Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- STATS CARDS -->
+  <div class="stats-cards">
+    <div class="stat-card card-total">
+      <span class="stat-icon">📦</span>
+      <div class="stat-content">
+        <span class="stat-label">Tổng sản phẩm</span>
+        <span class="stat-value">{{ totalProducts }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-value">
+      <span class="stat-icon">💰</span>
+      <div class="stat-content">
+        <span class="stat-label">Tổng giá trị tồn</span>
+        <span class="stat-value">{{ formatCurrency(totalStockValue) }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-warning">
+      <span class="stat-icon">⚠️</span>
+      <div class="stat-content">
+        <span class="stat-label">Tồn thấp</span>
+        <span class="stat-value">{{ lowStockCount }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTER SECTION -->
+  <div class="filter-section">
+    <div class="filter-row">
+      <div class="filter-group filter-product">
+        <label>Sản phẩm <span class="required">*</span></label>
+        <select [(ngModel)]="selectedProductId" (change)="onProductChange()">
+          <option value="">-- Chọn sản phẩm --</option>
+          <option *ngFor="let p of products" [value]="p.id">{{ p.code }} - {{ p.name }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Kho</label>
+        <select [(ngModel)]="selectedWarehouseCode" (change)="onWarehouseChange()">
+          <option value="">Tất cả kho</option>
+          <option *ngFor="let wh of warehouses" [value]="wh.code">{{ wh.name }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Từ ngày</label>
+        <input type="date" [ngModel]="fromDate | date:'yyyy-MM-dd'"
+               (ngModelChange)="onFromDateChange($event)">
+      </div>
+      <div class="filter-group">
+        <label>Đến ngày</label>
+        <input type="date" [ngModel]="toDate | date:'yyyy-MM-dd'"
+               (ngModelChange)="onToDateChange($event)">
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="date-shortcuts">
+        <button class="btn-chip" (click)="setDateRange('thisMonth')">Tháng này</button>
+        <button class="btn-chip" (click)="setDateRange('lastMonth')">Tháng trước</button>
+        <button class="btn-chip" (click)="setDateRange('thisQuarter')">Quý này</button>
+        <button class="btn-chip" (click)="setDateRange('thisYear')">Năm nay</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCT INFO -->
+  <div class="product-info-card" *ngIf="getSelectedProduct() as product">
+    <div class="product-header">
+      <div class="product-main">
+        <span class="product-code">{{ product.code }}</span>
+        <span class="product-name">{{ product.name }}</span>
+      </div>
+      <div class="product-meta">
+        <span class="meta-item"><strong>ĐVT:</strong> {{ product.unit }}</span>
+        <span class="meta-item"><strong>Giá vốn:</strong> {{ formatCurrency(product.costPrice) }} ₫</span>
+        <span class="meta-item"><strong>Tồn hiện tại:</strong> {{ formatCurrency(product.currentStock) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STOCK CARD REPORT -->
+  <div class="report-container" *ngIf="stockCard">
+    <!-- Summary -->
+    <div class="summary-section">
+      <div class="summary-grid">
+        <div class="summary-box opening">
+          <h4>Tồn đầu kỳ</h4>
+          <div class="summary-row">
+            <span>Số lượng:</span>
+            <span>{{ formatCurrency(stockCard.openingQty) }}</span>
+          </div>
+          <div class="summary-row">
+            <span>Giá trị:</span>
+            <span>{{ formatCurrency(stockCard.openingAmount) }} ₫</span>
+          </div>
+        </div>
+
+        <div class="summary-box receipt">
+          <h4>Nhập trong kỳ</h4>
+          <div class="summary-row">
+            <span>Số lượng:</span>
+            <span class="text-blue">+{{ formatCurrency(stockCard.receiptQty) }}</span>
+          </div>
+          <div class="summary-row">
+            <span>Giá trị:</span>
+            <span class="text-blue">{{ formatCurrency(stockCard.receiptAmount) }} ₫</span>
+          </div>
+        </div>
+
+        <div class="summary-box issue">
+          <h4>Xuất trong kỳ</h4>
+          <div class="summary-row">
+            <span>Số lượng:</span>
+            <span class="text-red">-{{ formatCurrency(stockCard.issueQty) }}</span>
+          </div>
+          <div class="summary-row">
+            <span>Giá trị:</span>
+            <span class="text-red">{{ formatCurrency(stockCard.issueAmount) }} ₫</span>
+          </div>
+        </div>
+
+        <div class="summary-box closing">
+          <h4>Tồn cuối kỳ</h4>
+          <div class="summary-row">
+            <span>Số lượng:</span>
+            <span class="text-green">{{ formatCurrency(stockCard.closingQty) }}</span>
+          </div>
+          <div class="summary-row">
+            <span>Giá trị:</span>
+            <span class="text-green">{{ formatCurrency(stockCard.closingAmount) }} ₫</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Movements Table -->
+    <div class="table-section">
+      <h3 class="section-title">Chi tiết biến động</h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="col-date">Ngày</th>
+              <th class="col-voucher">Số chứng từ</th>
+              <th class="col-type">Loại</th>
+              <th class="col-desc">Diễn giải</th>
+              <th class="col-qty text-right">Nhập SL</th>
+              <th class="col-amount text-right">Nhập TT</th>
+              <th class="col-qty text-right">Xuất SL</th>
+              <th class="col-amount text-right">Xuất TT</th>
+              <th class="col-qty text-right">Tồn SL</th>
+              <th class="col-amount text-right">Tồn TT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Opening row -->
+            <tr class="opening-row">
+              <td>{{ formatDate(fromDate) }}</td>
+              <td></td>
+              <td></td>
+              <td><strong>Tồn đầu kỳ</strong></td>
+              <td class="text-right"></td>
+              <td class="text-right"></td>
+              <td class="text-right"></td>
+              <td class="text-right"></td>
+              <td class="text-right">{{ formatCurrency(stockCard.openingQty) }}</td>
+              <td class="text-right">{{ formatCurrency(stockCard.openingAmount) }}</td>
+            </tr>
+
+            <!-- Movement rows -->
+            <tr *ngFor="let movement of stockCard.movements">
+              <td>{{ formatDate(movement.date) }}</td>
+              <td><span class="voucher-no">{{ movement.voucherNo }}</span></td>
+              <td>
+                <span class="type-badge" [ngClass]="getMovementTypeClass(movement.voucherType)">
+                  {{ getMovementTypeLabel(movement.voucherType) }}
+                </span>
+              </td>
+              <td>{{ movement.description }}</td>
+              <td class="text-right text-blue" *ngIf="movement.receiptQty">{{ formatCurrency(movement.receiptQty) }}</td>
+              <td class="text-right" *ngIf="!movement.receiptQty"></td>
+              <td class="text-right text-blue" *ngIf="movement.receiptAmount">{{ formatCurrency(movement.receiptAmount) }}</td>
+              <td class="text-right" *ngIf="!movement.receiptAmount"></td>
+              <td class="text-right text-red" *ngIf="movement.issueQty">{{ formatCurrency(movement.issueQty) }}</td>
+              <td class="text-right" *ngIf="!movement.issueQty"></td>
+              <td class="text-right text-red" *ngIf="movement.issueAmount">{{ formatCurrency(movement.issueAmount) }}</td>
+              <td class="text-right" *ngIf="!movement.issueAmount"></td>
+              <td class="text-right">{{ formatCurrency(movement.balanceQty) }}</td>
+              <td class="text-right">{{ formatCurrency(movement.balanceAmount) }}</td>
+            </tr>
+
+            <!-- Closing row -->
+            <tr class="closing-row">
+              <td>{{ formatDate(toDate) }}</td>
+              <td></td>
+              <td></td>
+              <td><strong>Tồn cuối kỳ</strong></td>
+              <td class="text-right text-blue"><strong>{{ formatCurrency(stockCard.receiptQty) }}</strong></td>
+              <td class="text-right text-blue"><strong>{{ formatCurrency(stockCard.receiptAmount) }}</strong></td>
+              <td class="text-right text-red"><strong>{{ formatCurrency(stockCard.issueQty) }}</strong></td>
+              <td class="text-right text-red"><strong>{{ formatCurrency(stockCard.issueAmount) }}</strong></td>
+              <td class="text-right text-green"><strong>{{ formatCurrency(stockCard.closingQty) }}</strong></td>
+              <td class="text-right text-green"><strong>{{ formatCurrency(stockCard.closingAmount) }}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty movements -->
+      <div class="empty-movements" *ngIf="stockCard.movements.length === 0">
+        <p>Không có biến động trong kỳ này</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- No product selected -->
+  <div class="empty-state" *ngIf="!selectedProductId && !isLoading">
+    <div class="empty-icon">📋</div>
+    <p>Chọn sản phẩm để xem thẻ kho</p>
+    <p class="empty-text">Thẻ kho theo dõi chi tiết nhập - xuất - tồn của từng sản phẩm</p>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+  </div>
+</div>

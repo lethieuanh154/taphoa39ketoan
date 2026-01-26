@@ -1,0 +1,390 @@
+<div class="cogs-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>Gia Von Hang Ban</h1>
+      <p class="subtitle">TK 632 - Bao cao gia von theo Thong tu 133/2016/TT-BTC</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="print()">In bao cao</button>
+      <button class="btn btn-outline" (click)="exportToExcel()">Xuat Excel</button>
+    </div>
+  </div>
+
+  <!-- View Tabs -->
+  <div class="view-tabs">
+    <button class="tab-btn" [class.active]="viewMode === 'summary'" (click)="setViewMode('summary')">
+      Tong hop
+    </button>
+    <button class="tab-btn" [class.active]="viewMode === 'entries'" (click)="setViewMode('entries')">
+      Chi tiet but toan
+    </button>
+    <button class="tab-btn" [class.active]="viewMode === 'byProduct'" (click)="setViewMode('byProduct')">
+      Theo san pham
+    </button>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-section">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Tu ngay</label>
+        <input type="date"
+               [value]="formatDateInput(fromDate)"
+               (change)="onFromDateChange($any($event.target).value)">
+      </div>
+      <div class="filter-group">
+        <label>Den ngay</label>
+        <input type="date"
+               [value]="formatDateInput(toDate)"
+               (change)="onToDateChange($any($event.target).value)">
+      </div>
+
+      <div class="filter-group" *ngIf="viewMode === 'entries'">
+        <label>Loai giao dich</label>
+        <select [(ngModel)]="filterType" (change)="onFilterChange()">
+          <option value="">Tat ca</option>
+          <option *ngFor="let type of transactionTypes" [value]="type.value">
+            {{ type.label }}
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group" *ngIf="viewMode === 'entries'">
+        <label>Trang thai</label>
+        <select [(ngModel)]="filterStatus" (change)="onFilterChange()">
+          <option value="">Tat ca</option>
+          <option value="DRAFT">Nhap</option>
+          <option value="POSTED">Da ghi so</option>
+          <option value="CANCELLED">Da huy</option>
+        </select>
+      </div>
+
+      <div class="filter-group search-group" *ngIf="viewMode === 'entries'">
+        <label>Tim kiem</label>
+        <input type="text"
+               [(ngModel)]="searchText"
+               (input)="onFilterChange()"
+               placeholder="So CT, khach hang...">
+      </div>
+    </div>
+
+    <div class="quick-dates">
+      <button class="date-btn active" (click)="setDateRange('thisMonth')">Thang nay</button>
+      <button class="date-btn" (click)="setDateRange('lastMonth')">Thang truoc</button>
+      <button class="date-btn" (click)="setDateRange('thisQuarter')">Quy nay</button>
+      <button class="date-btn" (click)="setDateRange('thisYear')">Nam nay</button>
+    </div>
+  </div>
+
+  <!-- SUMMARY VIEW -->
+  <div class="summary-view" *ngIf="viewMode === 'summary' && summary">
+    <!-- KPI Cards -->
+    <div class="kpi-cards">
+      <div class="kpi-card cogs">
+        <div class="kpi-icon">632</div>
+        <div class="kpi-content">
+          <span class="kpi-label">Tong gia von</span>
+          <span class="kpi-value">{{ formatCurrency(summary.totalCOGS) }}</span>
+        </div>
+      </div>
+      <div class="kpi-card revenue">
+        <div class="kpi-icon">511</div>
+        <div class="kpi-content">
+          <span class="kpi-label">Doanh thu</span>
+          <span class="kpi-value">{{ formatCurrency(summary.totalRevenue) }}</span>
+        </div>
+      </div>
+      <div class="kpi-card profit">
+        <div class="kpi-icon">LG</div>
+        <div class="kpi-content">
+          <span class="kpi-label">Lai gop</span>
+          <span class="kpi-value" [class]="getProfitClass(summary.totalGrossProfit)">
+            {{ formatCurrency(summary.totalGrossProfit) }}
+          </span>
+        </div>
+      </div>
+      <div class="kpi-card margin">
+        <div class="kpi-icon">%</div>
+        <div class="kpi-content">
+          <span class="kpi-label">Ty suat lai gop</span>
+          <span class="kpi-value" [class]="getMarginClass(summary.avgGrossMargin)">
+            {{ formatPercent(summary.avgGrossMargin) }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-row">
+      <!-- By Type -->
+      <div class="chart-card">
+        <h3>Gia von theo loai giao dich</h3>
+        <div class="chart-bars">
+          <div class="chart-bar" *ngFor="let item of summary.byType">
+            <div class="bar-label">{{ item.label }}</div>
+            <div class="bar-track">
+              <div class="bar-fill" [style.width]="getChartWidth(item.percentage)"></div>
+            </div>
+            <div class="bar-value">{{ formatCurrency(item.cost) }}</div>
+            <div class="bar-percent">{{ formatPercent(item.percentage) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Products -->
+      <div class="chart-card">
+        <h3>Top 10 san pham theo gia von</h3>
+        <div class="top-products">
+          <div class="product-item" *ngFor="let p of summary.topProducts; let i = index">
+            <span class="product-rank">#{{ i + 1 }}</span>
+            <div class="product-info">
+              <span class="product-code">{{ p.productCode }}</span>
+              <span class="product-name">{{ p.productName }}</span>
+            </div>
+            <div class="product-values">
+              <span class="product-cost">{{ formatCurrency(p.cost) }}</span>
+              <span class="product-margin" [class]="getMarginClass(p.margin)">
+                {{ formatPercent(p.margin) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-item">
+        <span class="stat-label">So but toan</span>
+        <span class="stat-value">{{ summary.entryCount }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">So dong chi tiet</span>
+        <span class="stat-value">{{ summary.lineCount }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Phuong phap tinh gia</span>
+        <span class="stat-value">{{ currentCostingMethod === 'WEIGHTED_AVERAGE' ? 'Binh quan gia quyen' : currentCostingMethod }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENTRIES VIEW -->
+  <div class="entries-view" *ngIf="viewMode === 'entries'">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-no">So CT</th>
+            <th class="col-date">Ngay</th>
+            <th class="col-type">Loai GD</th>
+            <th class="col-source">CT goc</th>
+            <th class="col-customer">Khach hang</th>
+            <th class="col-qty">SL</th>
+            <th class="col-cost">Gia von</th>
+            <th class="col-revenue">Doanh thu</th>
+            <th class="col-profit">Lai gop</th>
+            <th class="col-margin">%</th>
+            <th class="col-status">Trang thai</th>
+            <th class="col-actions">Thao tac</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let entry of entries" [class.row-draft]="entry.status === 'DRAFT'">
+            <td class="entry-no">{{ entry.entryNo }}</td>
+            <td>{{ formatDate(entry.entryDate) }}</td>
+            <td>
+              <span class="type-badge" [class]="getTypeClass(entry.transactionType)">
+                {{ getTypeLabel(entry.transactionType) }}
+              </span>
+            </td>
+            <td class="source-no">{{ entry.sourceVoucherNo }}</td>
+            <td class="customer">{{ entry.customerName || '-' }}</td>
+            <td class="text-right">{{ entry.totalQuantity }}</td>
+            <td class="text-right cost">{{ formatCurrency(entry.totalCost) }}</td>
+            <td class="text-right revenue">{{ formatCurrency(entry.totalRevenue) }}</td>
+            <td class="text-right" [class]="getProfitClass(entry.grossProfit)">
+              {{ formatCurrency(entry.grossProfit) }}
+            </td>
+            <td class="text-right" [class]="getMarginClass(entry.grossProfitMargin)">
+              {{ formatPercent(entry.grossProfitMargin) }}
+            </td>
+            <td>
+              <span class="status-badge" [class]="getStatusClass(entry.status)">
+                {{ getStatusLabel(entry.status) }}
+              </span>
+            </td>
+            <td class="actions">
+              <button class="btn-sm btn-view" (click)="viewEntry(entry)">Xem</button>
+              <button class="btn-sm btn-post" *ngIf="entry.status === 'DRAFT'"
+                      (click)="postEntry(entry.id)">Ghi so</button>
+              <button class="btn-sm btn-cancel" *ngIf="entry.status === 'POSTED'"
+                      (click)="cancelEntry(entry.id)">Huy</button>
+            </td>
+          </tr>
+          <tr *ngIf="entries.length === 0">
+            <td colspan="12" class="empty-row">Khong co du lieu</td>
+          </tr>
+        </tbody>
+        <tfoot *ngIf="entries.length > 0">
+          <tr class="totals-row">
+            <td colspan="6" class="text-right">Tong cong</td>
+            <td class="text-right total-cost">{{ formatCurrency(getTotalCOGS()) }}</td>
+            <td class="text-right total-revenue">{{ formatCurrency(getTotalRevenue()) }}</td>
+            <td class="text-right" [class]="getProfitClass(getTotalProfit())">
+              {{ formatCurrency(getTotalProfit()) }}
+            </td>
+            <td colspan="3"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- BY PRODUCT VIEW -->
+  <div class="by-product-view" *ngIf="viewMode === 'byProduct'">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-code">Ma SP</th>
+            <th class="col-name">Ten san pham</th>
+            <th class="col-unit">DVT</th>
+            <th class="col-qty">SL ban</th>
+            <th class="col-cost">Gia von</th>
+            <th class="col-revenue">Doanh thu</th>
+            <th class="col-profit">Lai gop</th>
+            <th class="col-margin">Ty suat %</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let product of byProductData">
+            <td class="product-code">{{ product.productCode }}</td>
+            <td class="product-name">{{ product.productName }}</td>
+            <td>{{ product.unit }}</td>
+            <td class="text-right">{{ product.soldQuantity }}</td>
+            <td class="text-right cost">{{ formatCurrency(product.soldCost) }}</td>
+            <td class="text-right revenue">{{ formatCurrency(product.revenue) }}</td>
+            <td class="text-right" [class]="getProfitClass(product.grossProfit)">
+              {{ formatCurrency(product.grossProfit) }}
+            </td>
+            <td class="text-right">
+              <span class="margin-badge" [class]="getMarginClass(product.grossProfitMargin)">
+                {{ formatPercent(product.grossProfitMargin) }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="byProductData.length === 0">
+            <td colspan="8" class="empty-row">Khong co du lieu</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" *ngIf="showDetailModal && selectedEntry" (click)="closeDetailModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Chi tiet gia von - {{ selectedEntry.entryNo }}</h2>
+      <button class="btn-close" (click)="closeDetailModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Entry Info -->
+      <div class="entry-info-grid">
+        <div class="info-item">
+          <label>So chung tu</label>
+          <span>{{ selectedEntry.entryNo }}</span>
+        </div>
+        <div class="info-item">
+          <label>Ngay</label>
+          <span>{{ formatDate(selectedEntry.entryDate) }}</span>
+        </div>
+        <div class="info-item">
+          <label>Loai giao dich</label>
+          <span class="type-badge" [class]="getTypeClass(selectedEntry.transactionType)">
+            {{ getTypeLabel(selectedEntry.transactionType) }}
+          </span>
+        </div>
+        <div class="info-item">
+          <label>Chung tu goc</label>
+          <span>{{ selectedEntry.sourceVoucherNo }}</span>
+        </div>
+        <div class="info-item" *ngIf="selectedEntry.customerName">
+          <label>Khach hang</label>
+          <span>{{ selectedEntry.customerName }}</span>
+        </div>
+        <div class="info-item">
+          <label>Trang thai</label>
+          <span class="status-badge" [class]="getStatusClass(selectedEntry.status)">
+            {{ getStatusLabel(selectedEntry.status) }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Lines Table -->
+      <h4>Chi tiet san pham</h4>
+      <table class="lines-table">
+        <thead>
+          <tr>
+            <th>Ma SP</th>
+            <th>Ten san pham</th>
+            <th>DVT</th>
+            <th class="text-right">SL</th>
+            <th class="text-right">Don gia von</th>
+            <th class="text-right">Thanh tien</th>
+            <th class="text-right">Gia ban</th>
+            <th class="text-right">Doanh thu</th>
+            <th class="text-right">Lai gop</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let line of selectedEntry.lines">
+            <td>{{ line.productCode }}</td>
+            <td>{{ line.productName }}</td>
+            <td>{{ line.unit }}</td>
+            <td class="text-right">{{ line.quantity }}</td>
+            <td class="text-right">{{ formatCurrency(line.unitCost) }}</td>
+            <td class="text-right">{{ formatCurrency(line.totalCost) }}</td>
+            <td class="text-right">{{ formatCurrency(line.sellingPrice || 0) }}</td>
+            <td class="text-right">{{ formatCurrency(line.revenue || 0) }}</td>
+            <td class="text-right" [class]="getProfitClass(line.grossProfit || 0)">
+              {{ formatCurrency(line.grossProfit || 0) }}
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3"><strong>Tong cong</strong></td>
+            <td class="text-right"><strong>{{ selectedEntry.totalQuantity }}</strong></td>
+            <td></td>
+            <td class="text-right"><strong>{{ formatCurrency(selectedEntry.totalCost) }}</strong></td>
+            <td></td>
+            <td class="text-right"><strong>{{ formatCurrency(selectedEntry.totalRevenue) }}</strong></td>
+            <td class="text-right" [class]="getProfitClass(selectedEntry.grossProfit)">
+              <strong>{{ formatCurrency(selectedEntry.grossProfit) }}</strong>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <!-- Accounting -->
+      <div class="accounting-info">
+        <span>Dinh khoan: No {{ selectedEntry.debitAccount }} / Co {{ selectedEntry.creditAccount }}</span>
+        <span>Ty suat lai gop: <strong [class]="getMarginClass(selectedEntry.grossProfitMargin)">{{ formatPercent(selectedEntry.grossProfitMargin) }}</strong></span>
+      </div>
+
+      <div class="notes" *ngIf="selectedEntry.notes">
+        <label>Ghi chu:</label>
+        <p>{{ selectedEntry.notes }}</p>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" (click)="closeDetailModal()">Dong</button>
+    </div>
+  </div>
+</div>

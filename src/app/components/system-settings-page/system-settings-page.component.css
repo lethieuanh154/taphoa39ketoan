@@ -1,0 +1,105 @@
+:host {
+  --primary: #475569;
+  --primary-dark: #334155;
+  --success: #10b981;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --border-color: #e2e8f0;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+.settings-page { padding: 24px; background: var(--bg-secondary); min-height: 100vh; }
+
+.page-header { margin-bottom: 24px; }
+.page-header h1 { font-size: 28px; font-weight: 700; color: var(--primary-dark); margin: 0 0 4px 0; }
+.subtitle { color: var(--text-secondary); font-size: 14px; margin: 0; }
+
+.settings-layout { display: flex; gap: 24px; }
+
+.settings-sidebar {
+  width: 260px; flex-shrink: 0;
+  background: white; border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color); padding: 8px;
+}
+
+.sidebar-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: var(--radius-md);
+  cursor: pointer; transition: all 0.2s;
+}
+
+.sidebar-item:hover { background: var(--bg-secondary); }
+.sidebar-item.active { background: var(--primary); color: white; }
+.sidebar-item .icon { font-size: 18px; }
+.sidebar-item .name { font-size: 14px; font-weight: 500; }
+
+.settings-content { flex: 1; }
+
+.section-content {
+  background: white; border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color); padding: 24px;
+}
+
+.section-content h2 { font-size: 18px; font-weight: 600; margin: 0 0 20px 0; }
+.section-desc { color: var(--text-secondary); font-size: 14px; margin: -12px 0 20px 0; }
+
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-group label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+.form-group input, .form-group select {
+  padding: 10px 12px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); font-size: 14px;
+}
+.form-group input:focus, .form-group select:focus {
+  outline: none; border-color: var(--primary);
+}
+
+.input-small { width: 100px; text-align: center; }
+
+.toggle-options { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+.toggle-item {
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer; font-size: 14px; color: var(--text-secondary);
+}
+.toggle-item input { width: 18px; height: 18px; cursor: pointer; }
+
+.notification-options { display: flex; flex-direction: column; gap: 16px; }
+
+.form-actions { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color); }
+
+.btn { padding: 10px 20px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
+
+.data-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+.data-table th, .data-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border-color); }
+.data-table th { background: var(--bg-tertiary); font-weight: 600; font-size: 12px; color: var(--text-secondary); text-transform: uppercase; }
+
+.backup-section { display: flex; flex-direction: column; gap: 16px; }
+.backup-card {
+  display: flex; align-items: center; gap: 20px;
+  padding: 20px; border: 1px solid var(--border-color); border-radius: var(--radius-md);
+}
+.backup-icon { font-size: 40px; }
+.backup-info { flex: 1; }
+.backup-info h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px 0; }
+.backup-info p { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.backup-note { font-size: 12px; color: var(--success); display: block; margin-top: 4px; }
+.backup-warning { font-size: 12px; color: #f59e0b; display: block; margin-top: 4px; }
+
+@media (max-width: 1024px) {
+  .settings-layout { flex-direction: column; }
+  .settings-sidebar { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+  .sidebar-item { padding: 8px 12px; }
+}
+
+@media (max-width: 768px) {
+  .settings-page { padding: 16px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .backup-card { flex-direction: column; text-align: center; }
+}

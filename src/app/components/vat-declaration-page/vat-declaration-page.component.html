@@ -1,0 +1,445 @@
+<div class="vat-declaration-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>To Khai Thue GTGT</h1>
+      <p class="subtitle">Mau 01/GTGT - Theo Thong tu 80/2021/TT-BTC</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        + Lap to khai moi
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-section">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Nam</label>
+        <select [(ngModel)]="filterYear" (change)="onYearChange()">
+          <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Trang thai</label>
+        <select [(ngModel)]="filterStatus" (change)="onStatusChange()">
+          <option value="">Tat ca</option>
+          <option *ngFor="let s of statuses" [value]="s.value">{{ s.label }}</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Declarations List -->
+  <div class="declarations-list">
+    <div class="declaration-card" *ngFor="let dec of declarations"
+         [class.overdue]="isOverdue(dec)"
+         (click)="viewDeclaration(dec)">
+      <div class="card-header">
+        <span class="period-badge">{{ dec.taxPeriod }}</span>
+        <span class="status-badge" [class]="getStatusClass(dec.status)">
+          {{ getStatusLabel(dec.status) }}
+        </span>
+      </div>
+
+      <div class="card-body">
+        <div class="card-row">
+          <span class="row-label">So to khai:</span>
+          <span class="row-value">{{ dec.declarationNo }}</span>
+        </div>
+        <div class="card-row">
+          <span class="row-label">Doanh thu:</span>
+          <span class="row-value">{{ formatCurrency(dec.line26_totalRevenue) }}</span>
+        </div>
+        <div class="card-row">
+          <span class="row-label">Thue dau ra:</span>
+          <span class="row-value text-danger">{{ formatCurrency(dec.line27_totalOutputVAT) }}</span>
+        </div>
+        <div class="card-row">
+          <span class="row-label">Thue dau vao KT:</span>
+          <span class="row-value text-success">{{ formatCurrency(dec.line34_totalDeductibleVAT) }}</span>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="result-box" [class]="getVATResult(dec).class">
+          <span class="result-label">{{ getVATResult(dec).label }}</span>
+          <span class="result-amount">{{ formatCurrency(getVATResult(dec).amount) }}</span>
+        </div>
+        <div class="deadline" *ngIf="dec.status === 'DRAFT'">
+          <span class="deadline-label">Han nop:</span>
+          <span class="deadline-date" [class.overdue]="isOverdue(dec)">
+            {{ formatDate(getDeadline(dec)) }}
+          </span>
+        </div>
+      </div>
+
+      <div class="card-actions" (click)="$event.stopPropagation()">
+        <button class="btn-sm btn-view">Xem</button>
+        <button class="btn-sm btn-delete" *ngIf="dec.status === 'DRAFT'"
+                (click)="deleteDeclaration(dec.id)">Xoa</button>
+      </div>
+    </div>
+
+    <div class="empty-state" *ngIf="declarations.length === 0">
+      <p>Chua co to khai thue GTGT trong ky nay</p>
+      <button class="btn btn-primary" (click)="openCreateModal()">Lap to khai moi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Lap to khai thue GTGT moi</h2>
+      <button class="btn-close" (click)="closeCreateModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Ky khai thue</label>
+          <select [(ngModel)]="newPeriod" (change)="onPeriodTypeChange()">
+            <option *ngFor="let p of periods" [value]="p.value">{{ p.label }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nam</label>
+          <select [(ngModel)]="newYear">
+            <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>{{ newPeriod === 'MONTHLY' ? 'Thang' : 'Quy' }}</label>
+          <select [(ngModel)]="newPeriodNo">
+            <option *ngFor="let no of getAvailablePeriodNos()" [value]="no">
+              {{ getPeriodNoLabel(no) }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button class="btn btn-outline" (click)="generateData()">Lay du lieu</button>
+        </div>
+      </div>
+
+      <!-- Preview Data -->
+      <div class="preview-data" *ngIf="declarationData">
+        <h4>Du lieu to khai - {{ declarationData.period }}</h4>
+
+        <div class="preview-section">
+          <h5>I. Hang hoa dich vu ban ra</h5>
+          <div class="preview-row">
+            <span>Doanh thu chiu thue 8%:</span>
+            <span>{{ formatCurrency(declarationData.outputSummary.eightPercentRevenue) }}</span>
+          </div>
+          <div class="preview-row">
+            <span>Thue GTGT 8%:</span>
+            <span>{{ formatCurrency(declarationData.outputSummary.eightPercentVAT) }}</span>
+          </div>
+          <div class="preview-row">
+            <span>Doanh thu chiu thue 10%:</span>
+            <span>{{ formatCurrency(declarationData.outputSummary.tenPercentRevenue) }}</span>
+          </div>
+          <div class="preview-row">
+            <span>Thue GTGT 10%:</span>
+            <span>{{ formatCurrency(declarationData.outputSummary.tenPercentVAT) }}</span>
+          </div>
+          <div class="preview-row total">
+            <span>Tong doanh thu:</span>
+            <span>{{ formatCurrency(declarationData.outputSummary.totalRevenue) }}</span>
+          </div>
+          <div class="preview-row total highlight-danger">
+            <span>Tong thue dau ra:</span>
+            <span>{{ formatCurrency(declarationData.outputSummary.totalOutputVAT) }}</span>
+          </div>
+        </div>
+
+        <div class="preview-section">
+          <h5>II. Hang hoa dich vu mua vao</h5>
+          <div class="preview-row">
+            <span>Tong gia tri mua vao:</span>
+            <span>{{ formatCurrency(declarationData.inputSummary.totalPurchase) }}</span>
+          </div>
+          <div class="preview-row total highlight-success">
+            <span>Thue dau vao duoc khau tru:</span>
+            <span>{{ formatCurrency(declarationData.inputSummary.deductibleInputVAT) }}</span>
+          </div>
+          <div class="preview-row" *ngIf="declarationData.carryForwardFromPrevious > 0">
+            <span>Chuyen ky truoc:</span>
+            <span>{{ formatCurrency(declarationData.carryForwardFromPrevious) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" (click)="closeCreateModal()">Huy</button>
+      <button class="btn btn-primary" [disabled]="!declarationData" (click)="createDeclaration()">
+        Tao to khai
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay large" *ngIf="showDetailModal && editingDeclaration" (click)="closeDetailModal()">
+  <div class="modal-content large" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>To khai thue GTGT - {{ editingDeclaration.taxPeriod }}</h2>
+      <div class="header-actions">
+        <button class="btn btn-outline btn-sm" (click)="print()">In</button>
+        <button class="btn btn-outline btn-sm" (click)="exportToXML()">Xuat XML</button>
+        <button class="btn-close" (click)="closeDetailModal()">&times;</button>
+      </div>
+    </div>
+
+    <div class="modal-body declaration-form">
+      <!-- Header Info -->
+      <div class="declaration-header">
+        <div class="header-row">
+          <span class="dec-no">So: {{ editingDeclaration.declarationNo }}</span>
+          <span class="status-badge" [class]="getStatusClass(editingDeclaration.status)">
+            {{ getStatusLabel(editingDeclaration.status) }}
+          </span>
+        </div>
+        <h3>TO KHAI THUE GIA TRI GIA TANG</h3>
+        <p>(Ap dung cho nguoi nop thue tinh thue theo phuong phap khau tru)</p>
+        <p class="period-text">Ky tinh thue: {{ editingDeclaration.taxPeriod }}</p>
+      </div>
+
+      <!-- Company Info -->
+      <div class="company-info">
+        <div class="info-row">
+          <label>Ten nguoi nop thue:</label>
+          <span>{{ editingDeclaration.companyName }}</span>
+        </div>
+        <div class="info-row">
+          <label>Ma so thue:</label>
+          <span>{{ editingDeclaration.taxCode }}</span>
+        </div>
+        <div class="info-row">
+          <label>Dia chi:</label>
+          <span>{{ editingDeclaration.address }}</span>
+        </div>
+      </div>
+
+      <!-- Validation Errors -->
+      <div class="validation-errors" *ngIf="validationErrors.length > 0">
+        <div class="error-item" *ngFor="let err of validationErrors">{{ err }}</div>
+      </div>
+
+      <!-- Part I -->
+      <div class="declaration-section">
+        <h4>I. HANG HOA, DICH VU BAN RA TRONG KY</h4>
+        <table class="declaration-table">
+          <thead>
+            <tr>
+              <th class="col-line">Chi tieu</th>
+              <th class="col-desc">Dien giai</th>
+              <th class="col-revenue">Doanh thu (dong)</th>
+              <th class="col-vat">Thue GTGT (dong)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>[21]</td>
+              <td>Hang hoa, DV khong chiu thue GTGT</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line21_noTaxRevenue">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line21_noTaxRevenue) }}</span>
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>[22]</td>
+              <td>Hang hoa, DV chiu thue suat 0%</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line22_zeroRateRevenue">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line22_zeroRateRevenue) }}</span>
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>[23]</td>
+              <td>Hang hoa, DV chiu thue suat 5%</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line23_fivePercentRevenue">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line23_fivePercentRevenue) }}</span>
+              </td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line23_fivePercentVAT">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line23_fivePercentVAT) }}</span>
+              </td>
+            </tr>
+            <tr>
+              <td>[24]</td>
+              <td>Hang hoa, DV chiu thue suat 8%</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line24_eightPercentRevenue">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line24_eightPercentRevenue) }}</span>
+              </td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line24_eightPercentVAT">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line24_eightPercentVAT) }}</span>
+              </td>
+            </tr>
+            <tr>
+              <td>[25]</td>
+              <td>Hang hoa, DV chiu thue suat 10%</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line25_tenPercentRevenue">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line25_tenPercentRevenue) }}</span>
+              </td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line25_tenPercentVAT">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line25_tenPercentVAT) }}</span>
+              </td>
+            </tr>
+            <tr class="total-row">
+              <td>[26]</td>
+              <td><strong>Tong doanh thu HHDV ban ra</strong></td>
+              <td class="text-right"><strong>{{ formatCurrency(editingDeclaration.line26_totalRevenue) }}</strong></td>
+              <td></td>
+            </tr>
+            <tr class="total-row highlight">
+              <td>[27]</td>
+              <td><strong>Tong thue GTGT cua HHDV ban ra</strong></td>
+              <td></td>
+              <td class="text-right text-danger"><strong>{{ formatCurrency(editingDeclaration.line27_totalOutputVAT) }}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Part II -->
+      <div class="declaration-section">
+        <h4>II. HANG HOA, DICH VU MUA VAO TRONG KY</h4>
+        <table class="declaration-table">
+          <tbody>
+            <tr>
+              <td class="col-line">[28]</td>
+              <td>Tong gia tri HHDV mua vao</td>
+              <td class="text-right col-amount">{{ formatCurrency(editingDeclaration.line28_totalPurchase) }}</td>
+            </tr>
+            <tr>
+              <td>[29]</td>
+              <td>Tong thue GTGT cua HHDV mua vao</td>
+              <td class="text-right">{{ formatCurrency(editingDeclaration.line29_totalInputVAT) }}</td>
+            </tr>
+            <tr>
+              <td>[30]</td>
+              <td>Thue GTGT cua HHDV mua vao duoc khau tru</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line30_deductibleInputVAT">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line30_deductibleInputVAT) }}</span>
+              </td>
+            </tr>
+            <tr>
+              <td>[31]</td>
+              <td>Dieu chinh tang thue GTGT duoc khau tru</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line31_increaseAdjustment">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line31_increaseAdjustment) }}</span>
+              </td>
+            </tr>
+            <tr>
+              <td>[32]</td>
+              <td>Dieu chinh giam thue GTGT duoc khau tru</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line32_decreaseAdjustment">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line32_decreaseAdjustment) }}</span>
+              </td>
+            </tr>
+            <tr>
+              <td>[33]</td>
+              <td>Thue GTGT con duoc khau tru chuyen ky truoc</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line33_carryForwardFromPrevious">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line33_carryForwardFromPrevious) }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Part III -->
+      <div class="declaration-section">
+        <h4>III. XAC DINH NGHIA VU THUE GTGT PHAI NOP TRONG KY</h4>
+        <table class="declaration-table">
+          <tbody>
+            <tr class="total-row">
+              <td class="col-line">[34]</td>
+              <td><strong>Tong so thue GTGT duoc khau tru ([30]+[31]-[32]+[33])</strong></td>
+              <td class="text-right col-amount text-success">
+                <strong>{{ formatCurrency(editingDeclaration.line34_totalDeductibleVAT) }}</strong>
+              </td>
+            </tr>
+            <tr class="total-row highlight" *ngIf="editingDeclaration.line35_vatPayable > 0">
+              <td>[35]</td>
+              <td><strong>Thue GTGT phai nop trong ky ([27]-[34])</strong></td>
+              <td class="text-right text-danger">
+                <strong>{{ formatCurrency(editingDeclaration.line35_vatPayable) }}</strong>
+              </td>
+            </tr>
+            <tr class="total-row" *ngIf="editingDeclaration.line36_vatNotDeducted > 0">
+              <td>[36]</td>
+              <td>Thue GTGT chua khau tru het trong ky ([34]-[27])</td>
+              <td class="text-right">{{ formatCurrency(editingDeclaration.line36_vatNotDeducted) }}</td>
+            </tr>
+            <tr *ngIf="editingDeclaration.line36_vatNotDeducted > 0">
+              <td>[37]</td>
+              <td>Thue GTGT de nghi hoan</td>
+              <td class="text-right">
+                <input *ngIf="isEditing" type="number" [(ngModel)]="editingDeclaration.line37_vatRefundRequest">
+                <span *ngIf="!isEditing">{{ formatCurrency(editingDeclaration.line37_vatRefundRequest) }}</span>
+              </td>
+            </tr>
+            <tr class="total-row" *ngIf="editingDeclaration.line38_carryForwardToNext > 0">
+              <td>[38]</td>
+              <td><strong>Thue GTGT con duoc khau tru chuyen ky sau ([36]-[37])</strong></td>
+              <td class="text-right text-info">
+                <strong>{{ formatCurrency(editingDeclaration.line38_carryForwardToNext) }}</strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Signature -->
+      <div class="signature-section">
+        <div class="signature-box">
+          <p class="signature-title">NGUOI LAP BIEU</p>
+          <p class="signature-note">(Ky, ghi ro ho ten)</p>
+          <p class="signature-name">{{ editingDeclaration.accountant }}</p>
+        </div>
+        <div class="signature-box">
+          <p class="signature-date">Ngay {{ formatDate(editingDeclaration.createdAt) }}</p>
+          <p class="signature-title">NGUOI DAI DIEN PHAP LUAT</p>
+          <p class="signature-note">(Ky, ghi ro ho ten, dong dau)</p>
+          <p class="signature-name">{{ editingDeclaration.representative }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <div class="footer-left">
+        <button class="btn btn-edit" *ngIf="editingDeclaration.status === 'DRAFT' && !isEditing"
+                (click)="editDeclaration()">Sua</button>
+        <button class="btn btn-save" *ngIf="isEditing" (click)="saveDeclaration()">Luu</button>
+        <button class="btn btn-cancel" *ngIf="isEditing" (click)="isEditing = false">Huy sua</button>
+      </div>
+      <div class="footer-right">
+        <button class="btn btn-outline" (click)="closeDetailModal()">Dong</button>
+        <button class="btn btn-primary" *ngIf="editingDeclaration.status === 'DRAFT'"
+                (click)="submitDeclaration(editingDeclaration.id)">Nop to khai</button>
+        <button class="btn btn-success" *ngIf="editingDeclaration.status === 'SUBMITTED'"
+                (click)="acceptDeclaration(editingDeclaration.id)">Chap nhan</button>
+        <button class="btn btn-danger" *ngIf="editingDeclaration.status === 'SUBMITTED'"
+                (click)="rejectDeclaration(editingDeclaration.id)">Tu choi</button>
+      </div>
+    </div>
+  </div>
+</div>

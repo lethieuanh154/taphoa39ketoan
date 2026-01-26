@@ -1,0 +1,103 @@
+/**
+ * INVENTORY REPORT PAGE STYLES - Báo cáo Nhập Xuất Tồn
+ * Indigo/Purple theme for reports
+ */
+
+.inventory-report-page { padding: 24px; background-color: #f8fafc; min-height: 100vh; }
+
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+.page-title { font-size: 28px; font-weight: 700; color: #1e293b; margin: 0 0 4px 0; }
+.page-subtitle { color: #64748b; margin: 0; font-size: 14px; }
+.header-actions { display: flex; gap: 12px; }
+
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; }
+.btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #4f46e5, #4338ca); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
+.btn-secondary { background: #e2e8f0; color: #475569; }
+.btn-secondary:hover:not(:disabled) { background: #cbd5e1; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn .icon { font-size: 16px; }
+
+/* SUMMARY CARDS */
+.summary-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+.summary-card { background: white; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+.card-icon { font-size: 28px; }
+.card-content { display: flex; flex-direction: column; }
+.card-label { font-size: 11px; color: #64748b; text-transform: uppercase; }
+.card-value { font-size: 20px; font-weight: 700; color: #1e293b; }
+.card-products { border-left: 4px solid #6366f1; }
+.card-opening { border-left: 4px solid #94a3b8; }
+.card-receipt { border-left: 4px solid #3b82f6; }
+.card-issue { border-left: 4px solid #ef4444; }
+.card-closing { border-left: 4px solid #22c55e; }
+
+.text-blue { color: #3b82f6; }
+.text-red { color: #ef4444; }
+.text-green { color: #22c55e; }
+
+/* FILTER */
+.filter-section { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+.filter-row { display: flex; gap: 16px; align-items: flex-end; margin-bottom: 12px; }
+.filter-row:last-child { margin-bottom: 0; justify-content: space-between; }
+.filter-group { display: flex; flex-direction: column; gap: 6px; }
+.filter-group label { font-size: 12px; font-weight: 500; color: #64748b; }
+.filter-group input, .filter-group select { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; min-width: 140px; }
+.filter-group input:focus, .filter-group select:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+.filter-search { flex: 1; }
+.filter-search input { width: 100%; }
+
+.date-shortcuts { display: flex; gap: 8px; }
+.btn-chip { padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 20px; background: white; font-size: 12px; color: #64748b; cursor: pointer; transition: all 0.2s; }
+.btn-chip:hover { background: #6366f1; color: white; border-color: #6366f1; }
+
+/* TABLE */
+.table-container { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden; }
+.report-title { padding: 20px; text-align: center; border-bottom: 1px solid #e2e8f0; }
+.report-title h2 { margin: 0; font-size: 18px; font-weight: 700; color: #1e293b; }
+.report-title p { margin: 8px 0 0 0; font-size: 14px; color: #64748b; }
+
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th { padding: 12px 10px; text-align: left; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+.data-table th.group-header { text-align: center; background: #f8fafc; }
+.data-table th.group-header.opening { background: #f1f5f9; }
+.data-table th.group-header.receipt { background: #eff6ff; color: #2563eb; }
+.data-table th.group-header.issue { background: #fef2f2; color: #dc2626; }
+.data-table th.group-header.closing { background: #f0fdf4; color: #16a34a; }
+.data-table th.sub-header { background: #fafafa; font-size: 10px; }
+.data-table td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #334155; }
+.data-table tr:hover { background: #f8fafc; }
+.text-right { text-align: right; }
+
+.col-no { width: 50px; }
+.col-code { width: 100px; }
+.col-name { min-width: 180px; }
+.col-unit { width: 60px; }
+.col-qty { width: 70px; }
+.col-amount { width: 100px; }
+
+.product-code { font-weight: 600; color: #6366f1; }
+
+.total-row { background: #f8fafc; }
+.total-row td { border-top: 2px solid #e2e8f0; font-weight: 600; }
+
+/* EMPTY STATE */
+.empty-state { padding: 60px; text-align: center; color: #94a3b8; }
+.empty-icon { font-size: 48px; margin-bottom: 16px; }
+
+/* LOADING */
+.loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+.spinner { width: 48px; height: 48px; border: 4px solid #e2e8f0; border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* PRINT */
+@media print {
+  .page-header, .summary-cards, .filter-section, .header-actions { display: none; }
+  .inventory-report-page { padding: 0; }
+  .table-container { box-shadow: none; }
+  .report-title { padding: 10px; }
+}
+
+/* RESPONSIVE */
+@media (max-width: 1400px) { .summary-cards { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 768px) { .inventory-report-page { padding: 16px; } .page-header { flex-direction: column; gap: 16px; } .summary-cards { grid-template-columns: repeat(2, 1fr); } .filter-row { flex-direction: column; } .filter-group { width: 100%; } }

@@ -1,0 +1,116 @@
+<div class="cash-book-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Sổ Quỹ Tiền Mặt</h1>
+      <p class="page-subtitle">Theo dõi thu chi tiền mặt - TK 111</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="print()"><span class="icon">🖨</span> In</button>
+      <button class="btn btn-primary" (click)="exportToExcel()"><span class="icon">📥</span> Xuất Excel</button>
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-cards">
+    <div class="summary-card card-transactions"><div class="card-icon">📝</div><div class="card-content"><span class="card-label">Giao dịch</span><span class="card-value">{{ summary.transactionCount }}</span></div></div>
+    <div class="summary-card card-opening"><div class="card-icon">📋</div><div class="card-content"><span class="card-label">Tồn đầu kỳ</span><span class="card-value">{{ formatCurrency(summary.openingBalance) }}</span></div></div>
+    <div class="summary-card card-receipt"><div class="card-icon">📈</div><div class="card-content"><span class="card-label">Tổng thu</span><span class="card-value text-green">{{ formatCurrency(summary.totalReceipt) }}</span></div></div>
+    <div class="summary-card card-payment"><div class="card-icon">📉</div><div class="card-content"><span class="card-label">Tổng chi</span><span class="card-value text-red">{{ formatCurrency(summary.totalPayment) }}</span></div></div>
+    <div class="summary-card card-closing"><div class="card-icon">💰</div><div class="card-content"><span class="card-label">Tồn cuối kỳ</span><span class="card-value text-blue">{{ formatCurrency(summary.closingBalance) }}</span></div></div>
+  </div>
+
+  <!-- FILTER SECTION -->
+  <div class="filter-section">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Loại phiếu</label>
+        <select [(ngModel)]="filterType" (change)="onTypeFilterChange()">
+          <option value="">-- Tất cả --</option>
+          <option value="RECEIPT">Phiếu thu</option>
+          <option value="PAYMENT">Phiếu chi</option>
+        </select>
+      </div>
+      <div class="filter-group"><label>Từ ngày</label><input type="date" [ngModel]="fromDate | date:'yyyy-MM-dd'" (ngModelChange)="onFromDateChange($event)"></div>
+      <div class="filter-group"><label>Đến ngày</label><input type="date" [ngModel]="toDate | date:'yyyy-MM-dd'" (ngModelChange)="onToDateChange($event)"></div>
+      <div class="filter-group">
+        <div class="date-shortcuts">
+          <button class="btn-chip" (click)="setDateRange('today')">Hôm nay</button>
+          <button class="btn-chip" (click)="setDateRange('thisWeek')">Tuần này</button>
+          <button class="btn-chip" (click)="setDateRange('thisMonth')">Tháng này</button>
+          <button class="btn-chip" (click)="setDateRange('lastMonth')">Tháng trước</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CASH BOOK TABLE -->
+  <div class="table-container">
+    <div class="report-title">
+      <h2>SỔ QUỸ TIỀN MẶT</h2>
+      <p>Kỳ: {{ formatDate(fromDate) }} - {{ formatDate(toDate) }}</p>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th class="col-date">Ngày</th>
+          <th class="col-voucher">Số chứng từ</th>
+          <th class="col-type">Loại</th>
+          <th class="col-desc">Diễn giải</th>
+          <th class="col-amount text-right">Thu</th>
+          <th class="col-amount text-right">Chi</th>
+          <th class="col-amount text-right">Tồn quỹ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Opening Balance Row -->
+        <tr class="opening-row">
+          <td>{{ formatDate(fromDate) }}</td>
+          <td></td>
+          <td></td>
+          <td><strong>Số dư đầu kỳ</strong></td>
+          <td class="text-right"></td>
+          <td class="text-right"></td>
+          <td class="text-right"><strong>{{ formatCurrency(summary.openingBalance) }}</strong></td>
+        </tr>
+
+        <!-- Transaction Rows -->
+        <tr *ngFor="let line of cashBookLines" [class.receipt-row]="line.voucherType === 'RECEIPT'" [class.payment-row]="line.voucherType === 'PAYMENT'">
+          <td>{{ formatDate(line.date) }}</td>
+          <td><span class="voucher-no" [class.voucher-receipt]="line.voucherType === 'RECEIPT'" [class.voucher-payment]="line.voucherType === 'PAYMENT'">{{ line.voucherNo }}</span></td>
+          <td><span class="type-badge" [class.type-receipt]="line.voucherType === 'RECEIPT'" [class.type-payment]="line.voucherType === 'PAYMENT'">{{ getTypeLabel(line.voucherType) }}</span></td>
+          <td>{{ line.description }}</td>
+          <td class="text-right text-green" *ngIf="line.receiptAmount">{{ formatCurrency(line.receiptAmount) }}</td>
+          <td class="text-right" *ngIf="!line.receiptAmount"></td>
+          <td class="text-right text-red" *ngIf="line.paymentAmount">{{ formatCurrency(line.paymentAmount) }}</td>
+          <td class="text-right" *ngIf="!line.paymentAmount"></td>
+          <td class="text-right" [ngClass]="getBalanceClass(line.balance)"><strong>{{ formatCurrency(line.balance) }}</strong></td>
+        </tr>
+
+        <!-- Summary Rows -->
+        <tr class="subtotal-row">
+          <td colspan="4"><strong>Cộng phát sinh</strong></td>
+          <td class="text-right text-green"><strong>{{ formatCurrency(summary.totalReceipt) }}</strong></td>
+          <td class="text-right text-red"><strong>{{ formatCurrency(summary.totalPayment) }}</strong></td>
+          <td class="text-right"></td>
+        </tr>
+        <tr class="closing-row">
+          <td>{{ formatDate(toDate) }}</td>
+          <td colspan="3"><strong>Số dư cuối kỳ</strong></td>
+          <td class="text-right"></td>
+          <td class="text-right"></td>
+          <td class="text-right text-blue"><strong>{{ formatCurrency(summary.closingBalance) }}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="cashBookLines.length === 0 && !isLoading">
+      <div class="empty-icon">📋</div>
+      <p>Không có giao dịch trong kỳ này</p>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" *ngIf="isLoading"><div class="spinner"></div></div>
+</div>

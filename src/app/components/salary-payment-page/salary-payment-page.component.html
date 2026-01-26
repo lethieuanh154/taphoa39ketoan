@@ -1,0 +1,330 @@
+<div class="salary-payment-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>💳 Thanh Toán Lương</h1>
+      <p class="subtitle">Nợ TK 334 / Có TK 111, 112</p>
+    </div>
+    <div class="header-actions">
+      <select [(ngModel)]="filterYear" (change)="onYearChange()" class="year-select">
+        <option *ngFor="let y of years" [value]="y">Năm {{ y }}</option>
+      </select>
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        + Tạo phiếu chi lương
+      </button>
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-cards">
+    <div class="card total-payments">
+      <div class="card-icon">📋</div>
+      <div class="card-content">
+        <span class="card-value">{{ payments.length }}</span>
+        <span class="card-label">Phiếu chi</span>
+      </div>
+    </div>
+    <div class="card total-amount">
+      <div class="card-icon">💰</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(getTotalPayments()) }}</span>
+        <span class="card-label">Tổng chi lương</span>
+      </div>
+    </div>
+    <div class="card cash-payment">
+      <div class="card-icon">💵</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(getTotalCash()) }}</span>
+        <span class="card-label">Tiền mặt</span>
+      </div>
+    </div>
+    <div class="card bank-payment">
+      <div class="card-icon">🏦</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(getTotalBank()) }}</span>
+        <span class="card-label">Chuyển khoản</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAYMENT LIST -->
+  <div class="payment-list">
+    <div class="list-header">
+      <h2>Danh sách phiếu chi lương năm {{ filterYear }}</h2>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-no">Số phiếu</th>
+            <th class="col-date">Ngày chi</th>
+            <th class="col-payroll">Bảng lương</th>
+            <th class="col-count">Số NV</th>
+            <th class="col-amount">Tổng chi</th>
+            <th class="col-method">PT chi</th>
+            <th class="col-status">Trạng thái</th>
+            <th class="col-actions">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let payment of payments"
+              [class.row-cancelled]="payment.status === 'CANCELLED'"
+              (click)="viewPayment(payment)">
+            <td class="col-no">
+              <strong>{{ payment.paymentNo }}</strong>
+            </td>
+            <td class="col-date">{{ formatDate(payment.paymentDate) }}</td>
+            <td class="col-payroll">
+              {{ payment.payrollNo }} (T{{ payment.payrollMonth }}/{{ payment.payrollYear }})
+            </td>
+            <td class="col-count center">{{ payment.summary.employeeCount }}</td>
+            <td class="col-amount amount highlight">{{ formatCurrency(payment.summary.totalPayment) }}</td>
+            <td class="col-method">
+              <span class="method-badge" [class]="payment.primaryMethod === 'CASH' ? 'method-cash' : 'method-bank'">
+                {{ getMethodLabel(payment.primaryMethod) }}
+              </span>
+            </td>
+            <td class="col-status">
+              <span class="status-badge" [ngClass]="getStatusClass(payment.status)">
+                {{ getStatusLabel(payment.status) }}
+              </span>
+            </td>
+            <td class="col-actions" (click)="$event.stopPropagation()">
+              <button class="btn-icon" title="Xem chi tiết" (click)="viewPayment(payment)">👁️</button>
+              <button class="btn-icon" title="Xóa"
+                      *ngIf="payment.status === 'DRAFT'"
+                      (click)="deletePayment(payment.id)">🗑️</button>
+            </td>
+          </tr>
+          <tr *ngIf="payments.length === 0">
+            <td colspan="8" class="empty-row">
+              Chưa có phiếu chi lương nào trong năm {{ filterYear }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CREATE MODAL -->
+  <div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
+    <div class="modal create-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Tạo phiếu chi lương</h2>
+        <button class="btn-close" (click)="closeCreateModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Select Payroll -->
+        <div class="section">
+          <h3>Chọn bảng lương đã duyệt</h3>
+          <div class="payroll-list-select">
+            <div *ngFor="let payroll of payrolls"
+                 class="payroll-item"
+                 [class.selected]="selectedPayroll?.id === payroll.id"
+                 (click)="selectPayroll(payroll)">
+              <div class="payroll-info">
+                <span class="payroll-no">{{ payroll.payrollNo }}</span>
+                <span class="payroll-period">Tháng {{ payroll.month }}/{{ payroll.year }}</span>
+              </div>
+              <div class="payroll-amount">
+                <span class="label">Thực lĩnh:</span>
+                <span class="value">{{ formatCurrency(payroll.summary.totalNetSalary) }}</span>
+              </div>
+              <div class="payroll-count">
+                {{ payroll.summary.employeeCount }} NV
+              </div>
+            </div>
+            <div *ngIf="payrolls.length === 0" class="no-payroll">
+              Không có bảng lương đã duyệt
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Info -->
+        <div class="section" *ngIf="selectedPayroll">
+          <h3>Thông tin thanh toán</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Ngày chi</label>
+              <input type="date" [(ngModel)]="newPaymentDate">
+            </div>
+            <div class="form-group">
+              <label>Phương thức chi</label>
+              <select [(ngModel)]="newPaymentMethod">
+                <option *ngFor="let m of methods" [value]="m.value">{{ m.label }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" *ngIf="newPaymentMethod === 'BANK_TRANSFER'">
+            <label>Tài khoản ngân hàng</label>
+            <select [(ngModel)]="newBankAccountId">
+              <option *ngFor="let acc of bankAccounts" [value]="acc.id">
+                {{ acc.bankName }} - {{ acc.accountNo }}
+              </option>
+            </select>
+          </div>
+
+          <div class="payment-summary">
+            <div class="summary-row">
+              <span>Số nhân viên:</span>
+              <strong>{{ selectedPayroll.summary.employeeCount }}</strong>
+            </div>
+            <div class="summary-row">
+              <span>Tổng thực lĩnh:</span>
+              <strong>{{ formatCurrency(selectedPayroll.summary.totalNetSalary) }}</strong>
+            </div>
+            <div class="summary-row">
+              <span>Đã tạm ứng:</span>
+              <strong class="negative">-{{ formatCurrency(selectedPayroll.summary.totalOtherDeductions) }}</strong>
+            </div>
+            <div class="summary-row total">
+              <span>Số tiền cần chi:</span>
+              <strong>{{ formatCurrency(selectedPayroll.summary.totalNetSalary - selectedPayroll.summary.totalOtherDeductions) }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeCreateModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="createPayment()"
+                [disabled]="!selectedPayroll">
+          Tạo phiếu chi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" *ngIf="showDetailModal" (click)="closeDetailModal()">
+    <div class="modal detail-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>{{ editingPayment?.paymentNo }}</h2>
+          <span class="subtitle">Ngày chi: {{ formatDate(editingPayment?.paymentDate) }}</span>
+          <span class="status-badge" [ngClass]="getStatusClass(editingPayment?.status || 'DRAFT')">
+            {{ getStatusLabel(editingPayment?.status || 'DRAFT') }}
+          </span>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary" (click)="print()">🖨️ In</button>
+          <button class="btn-close" (click)="closeDetailModal()">×</button>
+        </div>
+      </div>
+
+      <div class="modal-body" *ngIf="editingPayment">
+        <!-- Payment Info -->
+        <div class="payment-info-grid">
+          <div class="info-item">
+            <span class="label">Bảng lương:</span>
+            <span class="value">{{ editingPayment.payrollNo }} (T{{ editingPayment.payrollMonth }}/{{ editingPayment.payrollYear }})</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Phương thức:</span>
+            <span class="value">{{ getMethodLabel(editingPayment.primaryMethod) }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Định khoản:</span>
+            <span class="value">Nợ {{ editingPayment.debitAccount }} / Có {{ editingPayment.creditAccount }}</span>
+          </div>
+          <div class="info-item highlight">
+            <span class="label">Tổng chi:</span>
+            <span class="value">{{ formatCurrency(editingPayment.summary.totalPayment) }} VNĐ</span>
+          </div>
+        </div>
+
+        <!-- Detail Table -->
+        <div class="detail-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Mã NV</th>
+                <th>Họ và tên</th>
+                <th>Phòng ban</th>
+                <th>Thực lĩnh</th>
+                <th>Tạm ứng</th>
+                <th>Còn trả</th>
+                <th>Số tiền chi</th>
+                <th>PT chi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let line of editingPayment.lines; let i = index">
+                <td class="center">{{ i + 1 }}</td>
+                <td>{{ line.employeeCode }}</td>
+                <td>{{ line.employeeName }}</td>
+                <td>{{ line.department }}</td>
+                <td class="amount">{{ formatCurrency(line.netSalary) }}</td>
+                <td class="amount negative">{{ formatCurrency(line.advanceAmount) }}</td>
+                <td class="amount">{{ formatCurrency(line.remainingAmount) }}</td>
+                <td class="amount highlight">{{ formatCurrency(line.paymentAmount) }}</td>
+                <td>
+                  <span class="method-badge small" [class]="line.paymentMethod === 'CASH' ? 'method-cash' : 'method-bank'">
+                    {{ getMethodLabel(line.paymentMethod) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="4"><strong>TỔNG CỘNG</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingPayment.summary.totalNetSalary) }}</strong></td>
+                <td class="amount negative"><strong>{{ formatCurrency(editingPayment.summary.totalAdvance) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingPayment.summary.totalRemaining) }}</strong></td>
+                <td class="amount highlight"><strong>{{ formatCurrency(editingPayment.summary.totalPayment) }}</strong></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Payment Split -->
+        <div class="payment-split">
+          <div class="split-item">
+            <span class="icon">💵</span>
+            <span class="label">Tiền mặt:</span>
+            <span class="value">{{ formatCurrency(editingPayment.summary.cashPayment) }}</span>
+          </div>
+          <div class="split-item">
+            <span class="icon">🏦</span>
+            <span class="label">Chuyển khoản:</span>
+            <span class="value">{{ formatCurrency(editingPayment.summary.bankTransfer) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="footer-left">
+          <span *ngIf="editingPayment?.approvedAt">
+            Duyệt: {{ formatDate(editingPayment?.approvedAt) }} bởi {{ editingPayment?.approvedBy }}
+          </span>
+          <span *ngIf="editingPayment?.paidAt">
+            | Chi: {{ formatDate(editingPayment?.paidAt) }}
+          </span>
+        </div>
+        <div class="footer-right">
+          <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+
+          <ng-container *ngIf="editingPayment?.status === 'DRAFT'">
+            <button class="btn btn-primary" (click)="savePayment()">💾 Lưu</button>
+            <button class="btn btn-success" (click)="approvePayment(editingPayment!.id)">✅ Duyệt</button>
+          </ng-container>
+
+          <ng-container *ngIf="editingPayment?.status === 'APPROVED'">
+            <button class="btn btn-success" (click)="markAsPaid(editingPayment!.id)">💰 Xác nhận đã chi</button>
+            <button class="btn btn-danger" (click)="cancelPayment(editingPayment!.id)">❌ Hủy</button>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+  </div>
+</div>

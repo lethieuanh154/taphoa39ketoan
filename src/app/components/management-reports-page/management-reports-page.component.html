@@ -1,0 +1,91 @@
+<div class="reports-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>📊 Báo Cáo Quản Trị</h1>
+      <p class="subtitle">Phân tích & Báo cáo nội bộ doanh nghiệp</p>
+    </div>
+    <div class="header-actions">
+      <select [(ngModel)]="filterCategory" class="filter-select">
+        <option value="">Tất cả danh mục</option>
+        <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- KPI DASHBOARD -->
+  <div class="kpi-section">
+    <h2>Tổng quan hoạt động</h2>
+    <div class="kpi-grid">
+      <div class="kpi-card revenue">
+        <div class="kpi-icon">📈</div>
+        <div class="kpi-content">
+          <span class="kpi-value">{{ formatCurrency(kpis.revenue) }}</span>
+          <span class="kpi-label">Doanh thu</span>
+        </div>
+      </div>
+      <div class="kpi-card expenses">
+        <div class="kpi-icon">📉</div>
+        <div class="kpi-content">
+          <span class="kpi-value">{{ formatCurrency(kpis.expenses) }}</span>
+          <span class="kpi-label">Chi phí</span>
+        </div>
+      </div>
+      <div class="kpi-card profit">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-content">
+          <span class="kpi-value">{{ formatCurrency(kpis.profit) }}</span>
+          <span class="kpi-label">Lợi nhuận ({{ kpis.profitMargin }}%)</span>
+        </div>
+      </div>
+      <div class="kpi-card cash">
+        <div class="kpi-icon">💵</div>
+        <div class="kpi-content">
+          <span class="kpi-value">{{ formatCurrency(kpis.cashBalance) }}</span>
+          <span class="kpi-label">Tiền mặt/Ngân hàng</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-grid secondary">
+      <div class="kpi-card receivables">
+        <div class="kpi-content">
+          <span class="kpi-label">Phải thu KH</span>
+          <span class="kpi-value small">{{ formatCurrency(kpis.receivables) }}</span>
+        </div>
+      </div>
+      <div class="kpi-card payables">
+        <div class="kpi-content">
+          <span class="kpi-label">Phải trả NCC</span>
+          <span class="kpi-value small">{{ formatCurrency(kpis.payables) }}</span>
+        </div>
+      </div>
+      <div class="kpi-card inventory">
+        <div class="kpi-content">
+          <span class="kpi-label">Tồn kho</span>
+          <span class="kpi-value small">{{ formatCurrency(kpis.inventory) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORT CATEGORIES -->
+  <div class="reports-section">
+    <h2>Danh sách báo cáo</h2>
+    <div class="reports-grid">
+      <div *ngFor="let report of filteredReports"
+           class="report-card"
+           (click)="openReport(report)">
+        <div class="report-icon">{{ report.icon }}</div>
+        <div class="report-content">
+          <h3>{{ report.title }}</h3>
+          <p>{{ report.description }}</p>
+          <span class="report-category">{{ report.category }}</span>
+        </div>
+        <div class="report-action">
+          <button class="btn-icon">→</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

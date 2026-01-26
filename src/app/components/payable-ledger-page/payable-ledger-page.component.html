@@ -1,0 +1,115 @@
+<div class="payable-ledger-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Sổ Chi Tiết TK 331</h1>
+      <p class="page-subtitle">Công nợ phải trả nhà cung cấp</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="print()"><span class="icon">🖨</span> In</button>
+      <button class="btn btn-primary" (click)="exportToExcel()"><span class="icon">📥</span> Xuất Excel</button>
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-cards">
+    <div class="summary-card card-suppliers"><div class="card-icon">🏭</div><div class="card-content"><span class="card-label">Nhà cung cấp</span><span class="card-value">{{ summary.totalSuppliers }}</span></div></div>
+    <div class="summary-card card-opening"><div class="card-icon">📋</div><div class="card-content"><span class="card-label">Dư đầu kỳ</span><span class="card-value">{{ formatCurrency(summary.totalOpeningBalance) }}</span></div></div>
+    <div class="summary-card card-debit"><div class="card-icon">📉</div><div class="card-content"><span class="card-label">PS Nợ (Trả)</span><span class="card-value text-green">{{ formatCurrency(summary.totalDebit) }}</span></div></div>
+    <div class="summary-card card-credit"><div class="card-icon">📈</div><div class="card-content"><span class="card-label">PS Có (Mua)</span><span class="card-value text-purple">{{ formatCurrency(summary.totalCredit) }}</span></div></div>
+    <div class="summary-card card-closing"><div class="card-icon">💰</div><div class="card-content"><span class="card-label">Dư cuối kỳ</span><span class="card-value text-red">{{ formatCurrency(summary.totalClosingBalance) }}</span></div></div>
+  </div>
+
+  <!-- FILTER SECTION -->
+  <div class="filter-section">
+    <div class="filter-row">
+      <div class="filter-group filter-supplier">
+        <label>Nhà cung cấp</label>
+        <select [(ngModel)]="selectedSupplierId" (change)="onSupplierChange()">
+          <option value="">-- Tất cả NCC --</option>
+          <option *ngFor="let s of suppliers" [value]="s.id">{{ s.code }} - {{ s.name }}</option>
+        </select>
+      </div>
+      <div class="filter-group"><label>Từ ngày</label><input type="date" [ngModel]="fromDate | date:'yyyy-MM-dd'" (ngModelChange)="onFromDateChange($event)"></div>
+      <div class="filter-group"><label>Đến ngày</label><input type="date" [ngModel]="toDate | date:'yyyy-MM-dd'" (ngModelChange)="onToDateChange($event)"></div>
+      <div class="filter-group">
+        <div class="date-shortcuts">
+          <button class="btn-chip" (click)="setDateRange('thisMonth')">Tháng này</button>
+          <button class="btn-chip" (click)="setDateRange('lastMonth')">Tháng trước</button>
+          <button class="btn-chip" (click)="setDateRange('thisQuarter')">Quý này</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW TABS -->
+  <div class="view-tabs">
+    <button class="tab-btn" [class.active]="viewMode === 'summary'" (click)="showSummary()">Tổng hợp</button>
+    <button class="tab-btn" [class.active]="viewMode === 'detail'" [disabled]="!selectedSupplierId">Chi tiết</button>
+  </div>
+
+  <!-- SUMMARY VIEW -->
+  <div class="table-container" *ngIf="viewMode === 'summary'">
+    <div class="report-title">
+      <h2>SỔ CHI TIẾT TÀI KHOẢN 331 - PHẢI TRẢ NHÀ CUNG CẤP</h2>
+      <p>Kỳ: {{ formatDate(fromDate) }} - {{ formatDate(toDate) }}</p>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th class="col-no">STT</th><th class="col-code">Mã NCC</th><th class="col-name">Tên nhà cung cấp</th>
+          <th class="col-amount text-right">Dư đầu kỳ</th><th class="col-amount text-right">PS Nợ</th>
+          <th class="col-amount text-right">PS Có</th><th class="col-amount text-right">Dư cuối kỳ</th><th class="col-action"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of supplierPayables; let i = index">
+          <td>{{ i + 1 }}</td><td><span class="supplier-code">{{ item.supplierCode }}</span></td><td>{{ item.supplierName }}</td>
+          <td class="text-right">{{ formatCurrency(item.openingBalance) }}</td>
+          <td class="text-right text-green">{{ formatCurrency(item.totalDebit) }}</td>
+          <td class="text-right text-purple">{{ formatCurrency(item.totalCredit) }}</td>
+          <td class="text-right" [ngClass]="getBalanceClass(item.closingBalance)"><strong>{{ formatCurrency(item.closingBalance) }}</strong></td>
+          <td><button class="btn-icon btn-view" title="Xem chi tiết" (click)="showDetail(item.supplierId)">👁</button></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="3"><strong>TỔNG CỘNG</strong></td>
+          <td class="text-right"><strong>{{ formatCurrency(summary.totalOpeningBalance) }}</strong></td>
+          <td class="text-right text-green"><strong>{{ formatCurrency(summary.totalDebit) }}</strong></td>
+          <td class="text-right text-purple"><strong>{{ formatCurrency(summary.totalCredit) }}</strong></td>
+          <td class="text-right text-red"><strong>{{ formatCurrency(summary.totalClosingBalance) }}</strong></td><td></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="empty-state" *ngIf="supplierPayables.length === 0 && !isLoading"><div class="empty-icon">📋</div><p>Không có dữ liệu công nợ</p></div>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div class="table-container" *ngIf="viewMode === 'detail' && selectedSupplierData">
+    <div class="report-title">
+      <h2>SỔ CHI TIẾT TK 331</h2>
+      <p class="supplier-info">{{ selectedSupplierData.supplierCode }} - {{ selectedSupplierData.supplierName }}</p>
+      <p>Kỳ: {{ formatDate(fromDate) }} - {{ formatDate(toDate) }}</p>
+    </div>
+    <table class="data-table">
+      <thead><tr><th class="col-date">Ngày</th><th class="col-voucher">Số chứng từ</th><th class="col-type">Loại</th><th class="col-desc">Diễn giải</th><th class="col-amount text-right">PS Nợ</th><th class="col-amount text-right">PS Có</th><th class="col-amount text-right">Số dư</th></tr></thead>
+      <tbody>
+        <tr class="opening-row"><td>{{ formatDate(fromDate) }}</td><td></td><td></td><td><strong>Dư đầu kỳ</strong></td><td class="text-right"></td><td class="text-right"></td><td class="text-right"><strong>{{ formatCurrency(selectedSupplierData.openingBalance) }}</strong></td></tr>
+        <tr *ngFor="let line of selectedSupplierData.lines">
+          <td>{{ formatDate(line.date) }}</td><td><span class="voucher-no">{{ line.voucherNo }}</span></td>
+          <td><span class="type-badge" [ngClass]="'type-' + line.voucherType.toLowerCase()">{{ getVoucherTypeLabel(line.voucherType) }}</span></td>
+          <td>{{ line.description }}</td>
+          <td class="text-right text-green" *ngIf="line.debitAmount">{{ formatCurrency(line.debitAmount) }}</td><td class="text-right" *ngIf="!line.debitAmount"></td>
+          <td class="text-right text-purple" *ngIf="line.creditAmount">{{ formatCurrency(line.creditAmount) }}</td><td class="text-right" *ngIf="!line.creditAmount"></td>
+          <td class="text-right">{{ formatCurrency(line.balance) }}</td>
+        </tr>
+        <tr class="closing-row"><td>{{ formatDate(toDate) }}</td><td></td><td></td><td><strong>Cộng phát sinh</strong></td><td class="text-right text-green"><strong>{{ formatCurrency(selectedSupplierData.totalDebit) }}</strong></td><td class="text-right text-purple"><strong>{{ formatCurrency(selectedSupplierData.totalCredit) }}</strong></td><td class="text-right"></td></tr>
+        <tr class="closing-row"><td></td><td></td><td></td><td><strong>Dư cuối kỳ</strong></td><td class="text-right"></td><td class="text-right"></td><td class="text-right text-red"><strong>{{ formatCurrency(selectedSupplierData.closingBalance) }}</strong></td></tr>
+      </tbody>
+    </table>
+    <button class="btn btn-secondary" style="margin-top: 16px;" (click)="showSummary()">← Quay lại tổng hợp</button>
+  </div>
+
+  <div class="loading-overlay" *ngIf="isLoading"><div class="spinner"></div></div>
+</div>

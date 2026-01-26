@@ -1,0 +1,452 @@
+<div class="vat-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Thuế GTGT</h1>
+      <p class="page-subtitle">Tờ khai thuế GTGT theo mẫu 01/GTGT - Thông tư 80/2021/TT-BTC</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreateModal()">
+      <span class="icon">+</span>
+      Tạo tờ khai mới
+    </button>
+  </div>
+
+  <!-- STATS CARDS -->
+  <div class="stats-cards">
+    <div class="stat-card card-total">
+      <span class="stat-icon">📋</span>
+      <div class="stat-content">
+        <span class="stat-label">Tổng tờ khai</span>
+        <span class="stat-value">{{ summary.totalDeclarations }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-draft">
+      <span class="stat-icon">📝</span>
+      <div class="stat-content">
+        <span class="stat-label">Nháp</span>
+        <span class="stat-value">{{ summary.draftCount }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-submitted">
+      <span class="stat-icon">✅</span>
+      <div class="stat-content">
+        <span class="stat-label">Đã nộp</span>
+        <span class="stat-value">{{ summary.submittedCount }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-output">
+      <span class="stat-icon">📤</span>
+      <div class="stat-content">
+        <span class="stat-label">Thuế đầu ra</span>
+        <span class="stat-value">{{ formatCurrency(summary.totalVatOutput) }}</span>
+      </div>
+    </div>
+    <div class="stat-card card-input">
+      <span class="stat-icon">📥</span>
+      <div class="stat-content">
+        <span class="stat-label">Thuế đầu vào</span>
+        <span class="stat-value">{{ formatCurrency(summary.totalVatInput) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filter-section">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Năm</label>
+        <select [(ngModel)]="filterYear" (change)="onYearChange()">
+          <option *ngFor="let year of years" [value]="year">{{ year }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Trạng thái</label>
+        <select [(ngModel)]="filterStatus" (change)="onStatusFilterChange()">
+          <option value="">Tất cả</option>
+          <option value="DRAFT">Nháp</option>
+          <option value="SUBMITTED">Đã nộp</option>
+          <option value="ADJUSTED">Điều chỉnh</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th class="col-no">STT</th>
+          <th class="col-period">Kỳ kê khai</th>
+          <th class="col-no-declaration">Số tờ khai</th>
+          <th class="text-right">Doanh số bán ra</th>
+          <th class="text-right">Thuế đầu ra</th>
+          <th class="text-right">Thuế đầu vào</th>
+          <th class="text-right">Phải nộp/Khấu trừ</th>
+          <th class="col-status">Trạng thái</th>
+          <th class="col-actions">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let declaration of filteredDeclarations; let i = index">
+          <td>{{ i + 1 }}</td>
+          <td>
+            <span class="period-name">{{ formatPeriod(declaration) }}</span>
+            <span class="amendment-badge" *ngIf="declaration.isAmendment">BS{{ declaration.amendmentNo }}</span>
+          </td>
+          <td>{{ declaration.declarationNo }}</td>
+          <td class="text-right">{{ formatCurrency(declaration.totalSales) }}</td>
+          <td class="text-right">{{ formatCurrency(declaration.totalVatOutput) }}</td>
+          <td class="text-right">{{ formatCurrency(declaration.totalVatInput) }}</td>
+          <td class="text-right" [ngClass]="getVatResultClass(declaration.vatPayableOrCredit)">
+            {{ formatCurrency(declaration.vatPayableOrCredit) }}
+            <span class="result-label" *ngIf="declaration.vatPayableOrCredit > 0">(Nộp)</span>
+            <span class="result-label" *ngIf="declaration.vatPayableOrCredit < 0">(Khấu trừ)</span>
+          </td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(declaration.status)">
+              {{ statusLabels[declaration.status] }}
+            </span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-icon btn-view" title="Xem chi tiết" (click)="viewDetail(declaration)">👁</button>
+              <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(declaration)"
+                      *ngIf="declaration.status === 'DRAFT'">✏️</button>
+              <button class="btn-icon btn-delete" title="Xóa" (click)="deleteDeclaration(declaration)"
+                      *ngIf="declaration.status === 'DRAFT'">🗑</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="filteredDeclarations.length === 0 && !isLoading">
+      <div class="empty-icon">📋</div>
+      <p>Chưa có tờ khai thuế GTGT nào</p>
+      <p class="empty-text">Nhấn "Tạo tờ khai mới" để bắt đầu</p>
+    </div>
+  </div>
+
+  <!-- CREATE MODAL -->
+  <div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
+    <div class="modal modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Tạo Tờ Khai GTGT Mới</h2>
+        <button class="btn-close" (click)="closeCreateModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Kỳ kê khai <span class="required">*</span></label>
+          <div class="period-select">
+            <select [(ngModel)]="newPeriodMonth">
+              <option *ngFor="let m of months" [value]="m">Tháng {{ m }}</option>
+            </select>
+            <select [(ngModel)]="newPeriodYear">
+              <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="info-note">
+          <p>Tờ khai sẽ được tạo với trạng thái <strong>Nháp</strong>.</p>
+          <p>Bạn có thể nhập số liệu và nộp sau.</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeCreateModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="createDeclaration()">Tạo tờ khai</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT MODAL -->
+  <div class="modal-overlay" *ngIf="showEditModal" (click)="closeEditModal()">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Sửa Tờ Khai GTGT - {{ getEditingPeriodName() }}</h2>
+        <button class="btn-close" (click)="closeEditModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Output Section -->
+        <div class="form-section">
+          <h3 class="section-title">I. HÀNG HÓA DỊCH VỤ BÁN RA</h3>
+
+          <div class="form-grid">
+            <div class="form-group col-span-2">
+              <label>[22a] HHDV bán ra không chịu thuế</label>
+              <input type="number" [(ngModel)]="editingDeclaration.salesExempt"
+                     (input)="calculateTotals()" min="0">
+            </div>
+            <div class="form-group col-span-2"></div>
+
+            <div class="form-group col-span-2">
+              <label>[23] HHDV bán ra chịu thuế suất 0%</label>
+              <input type="number" [(ngModel)]="editingDeclaration.sales0"
+                     (input)="calculateTotals()" min="0">
+            </div>
+            <div class="form-group col-span-2"></div>
+
+            <div class="form-group col-span-2">
+              <label>[24] HHDV bán ra chịu thuế suất 5%</label>
+              <input type="number" [(ngModel)]="editingDeclaration.sales5"
+                     (input)="calculateVat5()" min="0">
+            </div>
+            <div class="form-group col-span-2">
+              <label>Thuế GTGT 5%</label>
+              <input type="number" [(ngModel)]="editingDeclaration.vat5Output"
+                     (input)="calculateTotals()" min="0">
+            </div>
+
+            <div class="form-group col-span-2">
+              <label>[25] HHDV bán ra chịu thuế suất 8%</label>
+              <input type="number" [(ngModel)]="editingDeclaration.sales8"
+                     (input)="calculateVat8()" min="0">
+            </div>
+            <div class="form-group col-span-2">
+              <label>Thuế GTGT 8%</label>
+              <input type="number" [(ngModel)]="editingDeclaration.vat8Output"
+                     (input)="calculateTotals()" min="0">
+            </div>
+
+            <div class="form-group col-span-2">
+              <label>[26] HHDV bán ra chịu thuế suất 10%</label>
+              <input type="number" [(ngModel)]="editingDeclaration.sales10"
+                     (input)="calculateVat10()" min="0">
+            </div>
+            <div class="form-group col-span-2">
+              <label>Thuế GTGT 10%</label>
+              <input type="number" [(ngModel)]="editingDeclaration.vat10Output"
+                     (input)="calculateTotals()" min="0">
+            </div>
+          </div>
+
+          <div class="totals-row">
+            <div class="total-item">
+              <label>[27] Tổng doanh số bán ra:</label>
+              <span class="total-value">{{ formatCurrency(editingDeclaration.totalSales) }}</span>
+            </div>
+            <div class="total-item">
+              <label>[28] Tổng thuế GTGT đầu ra:</label>
+              <span class="total-value highlight">{{ formatCurrency(editingDeclaration.totalVatOutput) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Input Section -->
+        <div class="form-section">
+          <h3 class="section-title">II. HÀNG HÓA DỊCH VỤ MUA VÀO</h3>
+
+          <div class="form-grid">
+            <div class="form-group col-span-2">
+              <label>[29a] Giá trị HHDV mua vào</label>
+              <input type="number" [(ngModel)]="editingDeclaration.totalPurchases"
+                     (input)="calculateTotals()" min="0">
+            </div>
+            <div class="form-group col-span-2">
+              <label>[29b] Thuế GTGT mua vào</label>
+              <input type="number" [(ngModel)]="editingDeclaration.totalVatInput"
+                     (input)="calculateTotals()" min="0">
+            </div>
+
+            <div class="form-group col-span-2">
+              <label>[30] Thuế GTGT được khấu trừ kỳ trước chuyển sang</label>
+              <input type="number" [(ngModel)]="editingDeclaration.vatCreditBroughtForward"
+                     (input)="calculateTotals()" min="0">
+            </div>
+            <div class="form-group col-span-2"></div>
+          </div>
+
+          <div class="totals-row">
+            <div class="total-item">
+              <label>[31] Tổng thuế GTGT được khấu trừ:</label>
+              <span class="total-value">{{ formatCurrency(editingDeclaration.totalVatDeductible) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Result Section -->
+        <div class="form-section result-section">
+          <h3 class="section-title">III. KẾT QUẢ</h3>
+
+          <div class="result-box" [ngClass]="getVatResultClass(editingDeclaration.vatPayableOrCredit || 0)">
+            <div class="result-item">
+              <label>[32] Thuế GTGT còn phải nộp (+) hoặc còn được khấu trừ (-):</label>
+              <span class="result-value">{{ formatCurrency(editingDeclaration.vatPayableOrCredit) }}</span>
+            </div>
+          </div>
+
+          <div class="form-grid" *ngIf="(editingDeclaration.vatPayableOrCredit || 0) < 0">
+            <div class="form-group col-span-2">
+              <label>[33] Thuế GTGT đề nghị hoàn</label>
+              <input type="number" [(ngModel)]="editingDeclaration.vatRefundRequested"
+                     (input)="calculateTotals()" min="0">
+            </div>
+            <div class="form-group col-span-2">
+              <label>[34] Thuế GTGT còn được khấu trừ chuyển kỳ sau</label>
+              <input type="number" [value]="editingDeclaration.vatCreditCarryForward" disabled>
+            </div>
+          </div>
+        </div>
+
+        <!-- Note -->
+        <div class="form-group">
+          <label>Ghi chú</label>
+          <textarea [(ngModel)]="editingDeclaration.note" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeEditModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="saveDeclaration()" [disabled]="isSaving">
+          {{ isSaving ? 'Đang lưu...' : 'Lưu tờ khai' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" *ngIf="showDetailModal && selectedDeclaration" (click)="closeDetailModal()">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Chi tiết Tờ Khai GTGT - {{ formatPeriod(selectedDeclaration) }}</h2>
+        <button class="btn-close" (click)="closeDetailModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Info -->
+        <div class="detail-header">
+          <div class="detail-info">
+            <p><strong>Số tờ khai:</strong> {{ selectedDeclaration.declarationNo }}</p>
+            <p><strong>Kỳ kê khai:</strong> {{ formatPeriod(selectedDeclaration) }}</p>
+            <p><strong>Trạng thái:</strong>
+              <span class="status-badge" [ngClass]="getStatusClass(selectedDeclaration.status)">
+                {{ statusLabels[selectedDeclaration.status] }}
+              </span>
+            </p>
+          </div>
+          <div class="detail-info" *ngIf="selectedDeclaration.isAmendment">
+            <span class="amendment-label">Tờ khai bổ sung lần {{ selectedDeclaration.amendmentNo }}</span>
+          </div>
+        </div>
+
+        <!-- Output -->
+        <div class="detail-section">
+          <h4>I. HÀNG HÓA DỊCH VỤ BÁN RA</h4>
+          <table class="detail-table">
+            <tr>
+              <td>[22a] HHDV không chịu thuế:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.salesExempt) }}</td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>[23] HHDV chịu thuế 0%:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.sales0) }}</td>
+              <td>Thuế:</td>
+              <td class="text-right">0</td>
+            </tr>
+            <tr>
+              <td>[24] HHDV chịu thuế 5%:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.sales5) }}</td>
+              <td>Thuế:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.vat5Output) }}</td>
+            </tr>
+            <tr>
+              <td>[25] HHDV chịu thuế 8%:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.sales8) }}</td>
+              <td>Thuế:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.vat8Output) }}</td>
+            </tr>
+            <tr>
+              <td>[26] HHDV chịu thuế 10%:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.sales10) }}</td>
+              <td>Thuế:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.vat10Output) }}</td>
+            </tr>
+            <tr class="total-row">
+              <td><strong>[27] Tổng doanh số:</strong></td>
+              <td class="text-right"><strong>{{ formatCurrency(selectedDeclaration.totalSales) }}</strong></td>
+              <td><strong>[28] Tổng thuế:</strong></td>
+              <td class="text-right"><strong>{{ formatCurrency(selectedDeclaration.totalVatOutput) }}</strong></td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Input -->
+        <div class="detail-section">
+          <h4>II. HÀNG HÓA DỊCH VỤ MUA VÀO</h4>
+          <table class="detail-table">
+            <tr>
+              <td>[29a] Giá trị HHDV mua vào:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.totalPurchases) }}</td>
+              <td>[29b] Thuế GTGT:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.totalVatInput) }}</td>
+            </tr>
+            <tr>
+              <td>[30] Thuế khấu trừ kỳ trước chuyển sang:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.vatCreditBroughtForward) }}</td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="2"><strong>[31] Tổng thuế được khấu trừ:</strong></td>
+              <td colspan="2" class="text-right"><strong>{{ formatCurrency(selectedDeclaration.totalVatDeductible) }}</strong></td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Result -->
+        <div class="detail-section result-section">
+          <h4>III. KẾT QUẢ</h4>
+          <div class="result-display" [ngClass]="getVatResultClass(selectedDeclaration.vatPayableOrCredit)">
+            <span class="result-label">[32] Thuế GTGT còn phải nộp (+) / được khấu trừ (-):</span>
+            <span class="result-amount">{{ formatCurrency(selectedDeclaration.vatPayableOrCredit) }} ₫</span>
+            <span class="result-type" *ngIf="selectedDeclaration.vatPayableOrCredit > 0">Phải nộp</span>
+            <span class="result-type" *ngIf="selectedDeclaration.vatPayableOrCredit < 0">Được khấu trừ</span>
+          </div>
+
+          <table class="detail-table" *ngIf="selectedDeclaration.vatPayableOrCredit < 0">
+            <tr>
+              <td>[33] Thuế đề nghị hoàn:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.vatRefundRequested) }}</td>
+            </tr>
+            <tr>
+              <td>[34] Thuế khấu trừ chuyển kỳ sau:</td>
+              <td class="text-right">{{ formatCurrency(selectedDeclaration.vatCreditCarryForward) }}</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Audit -->
+        <div class="detail-audit">
+          <p><strong>Ngày tạo:</strong> {{ formatDate(selectedDeclaration.createdAt) }} - {{ selectedDeclaration.createdBy }}</p>
+          <p *ngIf="selectedDeclaration.submittedAt">
+            <strong>Ngày nộp:</strong> {{ formatDate(selectedDeclaration.submittedAt) }} - {{ selectedDeclaration.submittedBy }}
+          </p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+        <button class="btn btn-secondary" (click)="createAmendment(selectedDeclaration)"
+                *ngIf="selectedDeclaration.status === 'SUBMITTED'">
+          Tạo tờ khai bổ sung
+        </button>
+        <button class="btn btn-primary" (click)="submitDeclaration(selectedDeclaration)"
+                *ngIf="selectedDeclaration.status === 'DRAFT'">
+          Nộp tờ khai
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+  </div>
+</div>

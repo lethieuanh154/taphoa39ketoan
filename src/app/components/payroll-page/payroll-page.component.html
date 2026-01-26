@@ -1,0 +1,326 @@
+<div class="payroll-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>📋 Bảng Lương</h1>
+      <p class="subtitle">TK 334 - Phải trả người lao động</p>
+    </div>
+    <div class="header-actions">
+      <select [(ngModel)]="filterYear" (change)="onYearChange()" class="year-select">
+        <option *ngFor="let y of years" [value]="y">Năm {{ y }}</option>
+      </select>
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        + Tạo bảng lương
+      </button>
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-cards">
+    <div class="card total-employees">
+      <div class="card-icon">👥</div>
+      <div class="card-content">
+        <span class="card-value">{{ payrolls.length }}</span>
+        <span class="card-label">Bảng lương</span>
+      </div>
+    </div>
+    <div class="card total-gross">
+      <div class="card-icon">💰</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(getTotalGross()) }}</span>
+        <span class="card-label">Tổng thu nhập</span>
+      </div>
+    </div>
+    <div class="card total-deductions">
+      <div class="card-icon">📉</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(getTotalDeductions()) }}</span>
+        <span class="card-label">Tổng khấu trừ</span>
+      </div>
+    </div>
+    <div class="card total-net">
+      <div class="card-icon">💵</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(getTotalNet()) }}</span>
+        <span class="card-label">Tổng thực lĩnh</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAYROLL LIST -->
+  <div class="payroll-list">
+    <div class="list-header">
+      <h2>Danh sách bảng lương năm {{ filterYear }}</h2>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-month">Tháng</th>
+            <th class="col-no">Số bảng lương</th>
+            <th class="col-count">Số NV</th>
+            <th class="col-gross">Tổng thu nhập</th>
+            <th class="col-insurance">BH NLĐ</th>
+            <th class="col-pit">Thuế TNCN</th>
+            <th class="col-net">Thực lĩnh</th>
+            <th class="col-status">Trạng thái</th>
+            <th class="col-actions">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let payroll of payrolls"
+              [class.row-cancelled]="payroll.status === 'CANCELLED'"
+              (click)="viewPayroll(payroll)">
+            <td class="col-month">
+              <strong>{{ getMonthLabel(payroll.month) }}</strong>
+            </td>
+            <td class="col-no">{{ payroll.payrollNo }}</td>
+            <td class="col-count">{{ payroll.summary.employeeCount }}</td>
+            <td class="col-gross amount">{{ formatCurrency(payroll.summary.totalGrossSalary) }}</td>
+            <td class="col-insurance amount">{{ formatCurrency(payroll.summary.totalInsuranceDeduction) }}</td>
+            <td class="col-pit amount">{{ formatCurrency(payroll.summary.totalPIT) }}</td>
+            <td class="col-net amount highlight">{{ formatCurrency(payroll.summary.totalNetSalary) }}</td>
+            <td class="col-status">
+              <span class="status-badge" [ngClass]="getStatusClass(payroll.status)">
+                {{ getStatusLabel(payroll.status) }}
+              </span>
+            </td>
+            <td class="col-actions" (click)="$event.stopPropagation()">
+              <button class="btn-icon" title="Xem chi tiết" (click)="viewPayroll(payroll)">👁️</button>
+              <button class="btn-icon" title="Xóa"
+                      *ngIf="payroll.status === 'DRAFT'"
+                      (click)="deletePayroll(payroll.id)">🗑️</button>
+            </td>
+          </tr>
+          <tr *ngIf="payrolls.length === 0">
+            <td colspan="9" class="empty-row">
+              Chưa có bảng lương nào trong năm {{ filterYear }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CREATE MODAL -->
+  <div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
+    <div class="modal create-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Tạo bảng lương mới</h2>
+        <button class="btn-close" (click)="closeCreateModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Period Selection -->
+        <div class="period-selection">
+          <div class="form-group">
+            <label>Tháng</label>
+            <select [(ngModel)]="newMonth">
+              <option *ngFor="let m of getMonths()" [value]="m">{{ getMonthLabel(m) }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Năm</label>
+            <select [(ngModel)]="newYear">
+              <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Employee List -->
+        <div class="employee-list">
+          <h3>Danh sách nhân viên ({{ newLines.length }} người)</h3>
+
+          <div class="table-container">
+            <table class="data-table compact">
+              <thead>
+                <tr>
+                  <th>Mã NV</th>
+                  <th>Họ tên</th>
+                  <th>Phòng ban</th>
+                  <th>Ngày công</th>
+                  <th>Lương CB</th>
+                  <th>Phụ cấp</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let line of newLines; let i = index">
+                  <td>{{ line.employeeCode }}</td>
+                  <td>{{ line.employeeName }}</td>
+                  <td>{{ line.department }}</td>
+                  <td>
+                    <input type="number" [(ngModel)]="line.workingDays"
+                           min="0" max="31" class="input-days">
+                  </td>
+                  <td class="amount">{{ formatCurrency(line.baseSalary || 0) }}</td>
+                  <td class="amount">{{ formatCurrency(getTotalAllowance(line)) }}</td>
+                  <td>
+                    <button class="btn-icon small" (click)="removeEmployeeFromNew(i)">×</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeCreateModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="createPayroll()"
+                [disabled]="newLines.length === 0">
+          Tạo bảng lương
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" *ngIf="showDetailModal" (click)="closeDetailModal()">
+    <div class="modal detail-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>{{ editingPayroll?.payrollNo }} - Tháng {{ editingPayroll?.month }}/{{ editingPayroll?.year }}</h2>
+          <span class="status-badge" [ngClass]="getStatusClass(editingPayroll?.status || 'DRAFT')">
+            {{ getStatusLabel(editingPayroll?.status || 'DRAFT') }}
+          </span>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary" (click)="print()">🖨️ In</button>
+          <button class="btn btn-secondary" (click)="exportToExcel()">📊 Excel</button>
+          <button class="btn-close" (click)="closeDetailModal()">×</button>
+        </div>
+      </div>
+
+      <div class="modal-body" *ngIf="editingPayroll">
+        <!-- Summary -->
+        <div class="payroll-summary">
+          <div class="summary-item">
+            <span class="label">Số nhân viên:</span>
+            <span class="value">{{ editingPayroll.summary.employeeCount }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Tổng ngày công:</span>
+            <span class="value">{{ editingPayroll.summary.totalWorkingDays }}</span>
+          </div>
+          <div class="summary-item highlight">
+            <span class="label">Tổng thu nhập:</span>
+            <span class="value">{{ formatCurrency(editingPayroll.summary.totalGrossSalary) }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">BH NLĐ đóng:</span>
+            <span class="value negative">-{{ formatCurrency(editingPayroll.summary.totalInsuranceDeduction) }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Thuế TNCN:</span>
+            <span class="value negative">-{{ formatCurrency(editingPayroll.summary.totalPIT) }}</span>
+          </div>
+          <div class="summary-item primary">
+            <span class="label">Thực lĩnh:</span>
+            <span class="value">{{ formatCurrency(editingPayroll.summary.totalNetSalary) }}</span>
+          </div>
+        </div>
+
+        <!-- Detail Table -->
+        <div class="detail-table-container">
+          <table class="data-table detail-table">
+            <thead>
+              <tr>
+                <th rowspan="2" class="sticky-col">STT</th>
+                <th rowspan="2" class="sticky-col">Mã NV</th>
+                <th rowspan="2" class="sticky-col">Họ và tên</th>
+                <th rowspan="2">Phòng ban</th>
+                <th rowspan="2">Ngày công</th>
+                <th colspan="3" class="group-header">Thu nhập</th>
+                <th colspan="3" class="group-header">Khấu trừ NLĐ</th>
+                <th rowspan="2" class="highlight-col">Thực lĩnh</th>
+              </tr>
+              <tr>
+                <th>Lương TT</th>
+                <th>Phụ cấp</th>
+                <th>Tổng TN</th>
+                <th>BHXH/YT/TN</th>
+                <th>Thuế TNCN</th>
+                <th>Khác</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let line of editingPayroll.lines; let i = index">
+                <td class="sticky-col center">{{ i + 1 }}</td>
+                <td class="sticky-col">{{ line.employeeCode }}</td>
+                <td class="sticky-col name">{{ line.employeeName }}</td>
+                <td>{{ line.department }}</td>
+                <td class="center">{{ line.workingDays }}/{{ line.standardDays }}</td>
+                <td class="amount">{{ formatCurrency(line.actualSalary) }}</td>
+                <td class="amount">{{ formatCurrency(line.totalAllowances) }}</td>
+                <td class="amount">{{ formatCurrency(line.grossSalary) }}</td>
+                <td class="amount negative">{{ formatCurrency(line.totalInsuranceDeduction) }}</td>
+                <td class="amount negative">{{ formatCurrency(line.pitAmount) }}</td>
+                <td class="amount negative">{{ formatCurrency(line.totalOtherDeductions) }}</td>
+                <td class="amount highlight">{{ formatCurrency(line.netSalary) }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="4" class="sticky-col"><strong>TỔNG CỘNG</strong></td>
+                <td class="center"><strong>{{ editingPayroll.summary.totalWorkingDays }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingPayroll.summary.totalBaseSalary) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingPayroll.summary.totalAllowances) }}</strong></td>
+                <td class="amount"><strong>{{ formatCurrency(editingPayroll.summary.totalGrossSalary) }}</strong></td>
+                <td class="amount negative"><strong>{{ formatCurrency(editingPayroll.summary.totalInsuranceDeduction) }}</strong></td>
+                <td class="amount negative"><strong>{{ formatCurrency(editingPayroll.summary.totalPIT) }}</strong></td>
+                <td class="amount negative"><strong>{{ formatCurrency(editingPayroll.summary.totalOtherDeductions) }}</strong></td>
+                <td class="amount highlight"><strong>{{ formatCurrency(editingPayroll.summary.totalNetSalary) }}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Company Cost Summary -->
+        <div class="company-cost">
+          <h3>Chi phí công ty</h3>
+          <div class="cost-items">
+            <div class="cost-item">
+              <span>BH công ty đóng (22%):</span>
+              <span class="value">{{ formatCurrency(editingPayroll.summary.totalCompanyInsurance) }}</span>
+            </div>
+            <div class="cost-item total">
+              <span>Tổng chi phí lao động:</span>
+              <span class="value">{{ formatCurrency(editingPayroll.summary.totalLaborCost) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="footer-left">
+          <span *ngIf="editingPayroll?.approvedAt">
+            Duyệt: {{ formatDate(editingPayroll?.approvedAt) }} bởi {{ editingPayroll?.approvedBy }}
+          </span>
+          <span *ngIf="editingPayroll?.paidAt">
+            | Chi: {{ formatDate(editingPayroll?.paidAt) }}
+          </span>
+        </div>
+        <div class="footer-right">
+          <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+
+          <ng-container *ngIf="editingPayroll?.status === 'DRAFT'">
+            <button class="btn btn-primary" (click)="savePayroll()">💾 Lưu</button>
+            <button class="btn btn-success" (click)="approvePayroll(editingPayroll!.id)">✅ Duyệt</button>
+          </ng-container>
+
+          <ng-container *ngIf="editingPayroll?.status === 'APPROVED'">
+            <button class="btn btn-success" (click)="markAsPaid(editingPayroll!.id)">💰 Xác nhận chi</button>
+            <button class="btn btn-danger" (click)="cancelPayroll(editingPayroll!.id)">❌ Hủy</button>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+  </div>
+</div>

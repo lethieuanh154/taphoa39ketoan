@@ -1,0 +1,173 @@
+<div class="inventory-report-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Tổng hợp Nhập - Xuất - Tồn</h1>
+      <p class="page-subtitle">Báo cáo tổng hợp tình hình nhập xuất tồn kho trong kỳ</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="print()">
+        <span class="icon">🖨</span> In
+      </button>
+      <button class="btn btn-primary" (click)="exportToExcel()">
+        <span class="icon">📥</span> Xuất Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-cards">
+    <div class="summary-card card-products">
+      <div class="card-icon">📦</div>
+      <div class="card-content">
+        <span class="card-label">Sản phẩm</span>
+        <span class="card-value">{{ summary.totalProducts }}</span>
+      </div>
+    </div>
+    <div class="summary-card card-opening">
+      <div class="card-icon">📋</div>
+      <div class="card-content">
+        <span class="card-label">Tồn đầu kỳ</span>
+        <span class="card-value">{{ formatCurrency(summary.openingAmount) }}</span>
+      </div>
+    </div>
+    <div class="summary-card card-receipt">
+      <div class="card-icon">📥</div>
+      <div class="card-content">
+        <span class="card-label">Nhập trong kỳ</span>
+        <span class="card-value text-blue">+{{ formatCurrency(summary.receiptAmount) }}</span>
+      </div>
+    </div>
+    <div class="summary-card card-issue">
+      <div class="card-icon">📤</div>
+      <div class="card-content">
+        <span class="card-label">Xuất trong kỳ</span>
+        <span class="card-value text-red">-{{ formatCurrency(summary.issueAmount) }}</span>
+      </div>
+    </div>
+    <div class="summary-card card-closing">
+      <div class="card-icon">✅</div>
+      <div class="card-content">
+        <span class="card-label">Tồn cuối kỳ</span>
+        <span class="card-value text-green">{{ formatCurrency(summary.closingAmount) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTER SECTION -->
+  <div class="filter-section">
+    <div class="filter-row">
+      <div class="filter-group filter-search">
+        <label>Tìm kiếm</label>
+        <input type="text" [(ngModel)]="searchText" (input)="onSearch()"
+               placeholder="Mã hàng, tên hàng...">
+      </div>
+      <div class="filter-group">
+        <label>Loại hàng</label>
+        <select [(ngModel)]="filterProductType" (change)="onFilterChange()">
+          <option value="">Tất cả</option>
+          <option *ngFor="let type of productTypes" [value]="type.value">{{ type.label }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Nhóm hàng</label>
+        <select [(ngModel)]="filterProductGroup" (change)="onFilterChange()">
+          <option value="">Tất cả</option>
+          <option *ngFor="let group of productGroups" [value]="group.value">{{ group.label }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Từ ngày</label>
+        <input type="date" [ngModel]="fromDate | date:'yyyy-MM-dd'"
+               (ngModelChange)="onFromDateChange($event)">
+      </div>
+      <div class="filter-group">
+        <label>Đến ngày</label>
+        <input type="date" [ngModel]="toDate | date:'yyyy-MM-dd'"
+               (ngModelChange)="onToDateChange($event)">
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="date-shortcuts">
+        <button class="btn-chip" (click)="setDateRange('thisMonth')">Tháng này</button>
+        <button class="btn-chip" (click)="setDateRange('lastMonth')">Tháng trước</button>
+        <button class="btn-chip" (click)="setDateRange('thisQuarter')">Quý này</button>
+        <button class="btn-chip" (click)="setDateRange('thisYear')">Năm nay</button>
+      </div>
+      <button class="btn btn-secondary btn-sm" (click)="clearFilters()">Xóa lọc</button>
+    </div>
+  </div>
+
+  <!-- REPORT TABLE -->
+  <div class="table-container">
+    <div class="report-title">
+      <h2>BÁO CÁO TỔNG HỢP NHẬP - XUẤT - TỒN</h2>
+      <p>Kỳ: {{ formatDate(fromDate) }} - {{ formatDate(toDate) }}</p>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th rowspan="2" class="col-no">STT</th>
+          <th rowspan="2" class="col-code">Mã hàng</th>
+          <th rowspan="2" class="col-name">Tên hàng hóa</th>
+          <th rowspan="2" class="col-unit">ĐVT</th>
+          <th colspan="2" class="group-header opening">Tồn đầu kỳ</th>
+          <th colspan="2" class="group-header receipt">Nhập trong kỳ</th>
+          <th colspan="2" class="group-header issue">Xuất trong kỳ</th>
+          <th colspan="2" class="group-header closing">Tồn cuối kỳ</th>
+        </tr>
+        <tr>
+          <th class="col-qty text-right sub-header">SL</th>
+          <th class="col-amount text-right sub-header">Thành tiền</th>
+          <th class="col-qty text-right sub-header">SL</th>
+          <th class="col-amount text-right sub-header">Thành tiền</th>
+          <th class="col-qty text-right sub-header">SL</th>
+          <th class="col-amount text-right sub-header">Thành tiền</th>
+          <th class="col-qty text-right sub-header">SL</th>
+          <th class="col-amount text-right sub-header">Thành tiền</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let line of filteredLines; let i = index">
+          <td>{{ i + 1 }}</td>
+          <td><span class="product-code">{{ line.productCode }}</span></td>
+          <td>{{ line.productName }}</td>
+          <td>{{ line.unit }}</td>
+          <td class="text-right">{{ formatCurrency(line.openingQty) }}</td>
+          <td class="text-right">{{ formatCurrency(line.openingAmount) }}</td>
+          <td class="text-right text-blue">{{ formatCurrency(line.receiptQty) }}</td>
+          <td class="text-right text-blue">{{ formatCurrency(line.receiptAmount) }}</td>
+          <td class="text-right text-red">{{ formatCurrency(line.issueQty) }}</td>
+          <td class="text-right text-red">{{ formatCurrency(line.issueAmount) }}</td>
+          <td class="text-right text-green">{{ formatCurrency(line.closingQty) }}</td>
+          <td class="text-right text-green">{{ formatCurrency(line.closingAmount) }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="4"><strong>TỔNG CỘNG</strong></td>
+          <td class="text-right"></td>
+          <td class="text-right"><strong>{{ formatCurrency(summary.openingAmount) }}</strong></td>
+          <td class="text-right"></td>
+          <td class="text-right text-blue"><strong>{{ formatCurrency(summary.receiptAmount) }}</strong></td>
+          <td class="text-right"></td>
+          <td class="text-right text-red"><strong>{{ formatCurrency(summary.issueAmount) }}</strong></td>
+          <td class="text-right"></td>
+          <td class="text-right text-green"><strong>{{ formatCurrency(summary.closingAmount) }}</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="filteredLines.length === 0 && !isLoading">
+      <div class="empty-icon">📊</div>
+      <p>Không có dữ liệu</p>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+  </div>
+</div>

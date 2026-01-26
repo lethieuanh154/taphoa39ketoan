@@ -1,0 +1,332 @@
+<div class="bank-book-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>So Tien Gui Ngan Hang</h1>
+      <p class="subtitle">TK 112 - So theo doi giao dich tien gui ngan hang</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="openNewTransaction()">
+        + Them giao dich
+      </button>
+      <button class="btn btn-outline" (click)="print()">
+        In so
+      </button>
+      <button class="btn btn-outline" (click)="exportToExcel()">
+        Xuat Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-section">
+    <div class="filter-row">
+      <!-- Account selector -->
+      <div class="filter-group account-selector">
+        <label>Tai khoan ngan hang</label>
+        <select [(ngModel)]="selectedAccountId" (change)="onAccountChange()">
+          <option *ngFor="let acc of bankAccounts" [value]="acc.id">
+            {{ acc.bankName }} - {{ acc.accountNo }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Date range -->
+      <div class="filter-group">
+        <label>Tu ngay</label>
+        <input type="date"
+               [value]="formatDateInput(fromDate)"
+               (change)="onFromDateChange($any($event.target).value)">
+      </div>
+      <div class="filter-group">
+        <label>Den ngay</label>
+        <input type="date"
+               [value]="formatDateInput(toDate)"
+               (change)="onToDateChange($any($event.target).value)">
+      </div>
+
+      <!-- Type filter -->
+      <div class="filter-group">
+        <label>Loai giao dich</label>
+        <select [(ngModel)]="filterType" (change)="onTypeFilterChange()">
+          <option value="">Tat ca</option>
+          <option *ngFor="let type of transactionTypes" [value]="type.value">
+            {{ type.label }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Search -->
+      <div class="filter-group search-group">
+        <label>Tim kiem</label>
+        <input type="text"
+               [(ngModel)]="searchText"
+               (input)="onSearchChange()"
+               placeholder="So CT, dien giai, doi tac...">
+      </div>
+    </div>
+
+    <!-- Quick date buttons -->
+    <div class="quick-dates">
+      <button class="date-btn" (click)="setDateRange('today')">Hom nay</button>
+      <button class="date-btn" (click)="setDateRange('thisWeek')">Tuan nay</button>
+      <button class="date-btn active" (click)="setDateRange('thisMonth')">Thang nay</button>
+      <button class="date-btn" (click)="setDateRange('lastMonth')">Thang truoc</button>
+      <button class="date-btn" (click)="setDateRange('thisQuarter')">Quy nay</button>
+    </div>
+  </div>
+
+  <!-- Account Info -->
+  <div class="account-info" *ngIf="summary.bankAccountNo">
+    <div class="info-card">
+      <span class="info-label">Ngan hang</span>
+      <span class="info-value">{{ summary.bankName }}</span>
+    </div>
+    <div class="info-card">
+      <span class="info-label">So tai khoan</span>
+      <span class="info-value account-no">{{ summary.bankAccountNo }}</span>
+    </div>
+    <div class="info-card">
+      <span class="info-label">Loai tien</span>
+      <span class="info-value">{{ summary.currency }}</span>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="summary-cards">
+    <div class="summary-card opening">
+      <div class="card-icon">SD</div>
+      <div class="card-content">
+        <span class="card-label">So du dau ky</span>
+        <span class="card-value">{{ formatCurrency(summary.openingBalance) }}</span>
+      </div>
+    </div>
+    <div class="summary-card debit">
+      <div class="card-icon">+</div>
+      <div class="card-content">
+        <span class="card-label">Tong thu vao</span>
+        <span class="card-value">{{ formatCurrency(summary.totalDebit) }}</span>
+      </div>
+    </div>
+    <div class="summary-card credit">
+      <div class="card-icon">-</div>
+      <div class="card-content">
+        <span class="card-label">Tong chi ra</span>
+        <span class="card-value">{{ formatCurrency(summary.totalCredit) }}</span>
+      </div>
+    </div>
+    <div class="summary-card closing">
+      <div class="card-icon">=</div>
+      <div class="card-content">
+        <span class="card-label">So du cuoi ky</span>
+        <span class="card-value" [class]="getBalanceClass(summary.closingBalance)">
+          {{ formatCurrency(summary.closingBalance) }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Draft Transactions -->
+  <div class="draft-section" *ngIf="getDraftTransactions().length > 0">
+    <h3>Giao dich chua ghi so ({{ getDraftTransactions().length }})</h3>
+    <div class="draft-list">
+      <div class="draft-item" *ngFor="let t of getDraftTransactions()">
+        <div class="draft-info">
+          <span class="draft-no">{{ t.transactionNo }}</span>
+          <span class="draft-date">{{ formatDate(t.transactionDate) }}</span>
+          <span class="draft-type" [class]="getTypeClass(t.transactionType)">
+            {{ getTypeLabel(t.transactionType) }}
+          </span>
+          <span class="draft-desc">{{ t.description }}</span>
+          <span class="draft-amount">{{ formatCurrency(t.amount) }}</span>
+        </div>
+        <div class="draft-actions">
+          <button class="btn-sm btn-edit" (click)="editTransaction(t.id)">Sua</button>
+          <button class="btn-sm btn-post" (click)="postTransaction(t.id)">Ghi so</button>
+          <button class="btn-sm btn-delete" (click)="deleteTransaction(t.id)">Xoa</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Table -->
+  <div class="table-container">
+    <table class="bank-book-table">
+      <thead>
+        <tr>
+          <th class="col-date">Ngay</th>
+          <th class="col-no">So CT</th>
+          <th class="col-type">Loai GD</th>
+          <th class="col-counterparty">Doi tac</th>
+          <th class="col-desc">Dien giai</th>
+          <th class="col-ref">So tham chieu</th>
+          <th class="col-debit">Thu vao</th>
+          <th class="col-credit">Chi ra</th>
+          <th class="col-balance">So du</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Opening balance row -->
+        <tr class="row-opening">
+          <td>{{ formatDate(fromDate) }}</td>
+          <td colspan="5" class="text-center">So du dau ky</td>
+          <td></td>
+          <td></td>
+          <td class="text-right" [class]="getBalanceClass(summary.openingBalance)">
+            {{ formatCurrency(summary.openingBalance) }}
+          </td>
+        </tr>
+
+        <!-- Transaction rows -->
+        <tr *ngFor="let line of bankBookLines; let i = index"
+            [class.row-even]="i % 2 === 0"
+            [class.row-odd]="i % 2 === 1">
+          <td>{{ formatDate(line.date) }}</td>
+          <td class="voucher-no">{{ line.transactionNo }}</td>
+          <td>
+            <span class="type-badge" [class]="getTypeClass(line.transactionType)">
+              {{ getTypeLabel(line.transactionType) }}
+            </span>
+          </td>
+          <td class="counterparty">{{ line.counterpartyName || '-' }}</td>
+          <td class="description">{{ line.description }}</td>
+          <td class="ref-no">{{ line.referenceNo || '-' }}</td>
+          <td class="text-right amount-debit">
+            {{ line.debitAmount > 0 ? formatCurrency(line.debitAmount) : '' }}
+          </td>
+          <td class="text-right amount-credit">
+            {{ line.creditAmount > 0 ? formatCurrency(line.creditAmount) : '' }}
+          </td>
+          <td class="text-right" [class]="getBalanceClass(line.balance)">
+            {{ formatCurrency(line.balance) }}
+          </td>
+        </tr>
+
+        <!-- Empty state -->
+        <tr *ngIf="bankBookLines.length === 0">
+          <td colspan="9" class="empty-row">
+            Khong co giao dich trong ky
+          </td>
+        </tr>
+
+        <!-- Totals row -->
+        <tr class="row-totals">
+          <td colspan="6" class="text-right">Cong phat sinh</td>
+          <td class="text-right total-debit">{{ formatCurrency(summary.totalDebit) }}</td>
+          <td class="text-right total-credit">{{ formatCurrency(summary.totalCredit) }}</td>
+          <td></td>
+        </tr>
+
+        <!-- Closing balance row -->
+        <tr class="row-closing">
+          <td>{{ formatDate(toDate) }}</td>
+          <td colspan="5" class="text-center">So du cuoi ky</td>
+          <td></td>
+          <td></td>
+          <td class="text-right" [class]="getBalanceClass(summary.closingBalance)">
+            {{ formatCurrency(summary.closingBalance) }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Transaction count -->
+  <div class="table-footer">
+    <span>Tong so giao dich: {{ summary.transactionCount }}</span>
+  </div>
+</div>
+
+<!-- Transaction Modal -->
+<div class="modal-overlay" *ngIf="showModal" (click)="closeModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>{{ isEditing ? 'Sua giao dich' : 'Them giao dich moi' }}</h2>
+      <button class="btn-close" (click)="closeModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Validation errors -->
+      <div class="validation-errors" *ngIf="validationErrors.length > 0">
+        <div class="error-item" *ngFor="let err of validationErrors">{{ err }}</div>
+      </div>
+
+      <div class="form-grid">
+        <!-- Row 1: Date & Type -->
+        <div class="form-group">
+          <label>Ngay giao dich *</label>
+          <input type="date"
+                 [value]="formatDateInput(editingTransaction.transactionDate || toDate)"
+                 (change)="editingTransaction.transactionDate = $any($event.target).valueAsDate">
+        </div>
+        <div class="form-group">
+          <label>Loai giao dich *</label>
+          <select [(ngModel)]="editingTransaction.transactionType"
+                  (change)="onTransactionTypeChange()">
+            <option *ngFor="let type of transactionTypes" [value]="type.value">
+              {{ type.label }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Row 2: Amount -->
+        <div class="form-group">
+          <label>So tien *</label>
+          <input type="number" [(ngModel)]="editingTransaction.amount" min="0">
+        </div>
+        <div class="form-group">
+          <label>Loai tien</label>
+          <select [(ngModel)]="editingTransaction.currency">
+            <option value="VND">VND</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </div>
+
+        <!-- Row 3: Counterparty -->
+        <div class="form-group">
+          <label>Doi tac</label>
+          <input type="text" [(ngModel)]="editingTransaction.counterpartyName"
+                 placeholder="Ten doi tac">
+        </div>
+        <div class="form-group">
+          <label>TK doi tac</label>
+          <input type="text" [(ngModel)]="editingTransaction.counterpartyAccountNo"
+                 placeholder="So tai khoan">
+        </div>
+
+        <!-- Row 4: Description -->
+        <div class="form-group full-width">
+          <label>Dien giai *</label>
+          <input type="text" [(ngModel)]="editingTransaction.description"
+                 placeholder="Noi dung giao dich">
+        </div>
+
+        <!-- Row 5: Reference -->
+        <div class="form-group">
+          <label>So tham chieu NH</label>
+          <input type="text" [(ngModel)]="editingTransaction.referenceNo"
+                 placeholder="FT...">
+        </div>
+        <div class="form-group"></div>
+
+        <!-- Row 6: Accounting -->
+        <div class="form-group">
+          <label>TK No</label>
+          <input type="text" [(ngModel)]="editingTransaction.debitAccount">
+        </div>
+        <div class="form-group">
+          <label>TK Co</label>
+          <input type="text" [(ngModel)]="editingTransaction.creditAccount">
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" (click)="closeModal()">Huy</button>
+      <button class="btn btn-primary" (click)="saveTransaction()">
+        {{ isEditing ? 'Cap nhat' : 'Tao giao dich' }}
+      </button>
+    </div>
+  </div>
+</div>

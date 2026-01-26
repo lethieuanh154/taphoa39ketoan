@@ -1,0 +1,256 @@
+<div class="other-voucher-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Chứng Từ Khác</h1>
+      <p class="page-subtitle">Bút toán điều chỉnh, kết chuyển, khấu hao, phân bổ</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        <span class="icon">➕</span> Tạo chứng từ
+      </button>
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-cards">
+    <div class="summary-card card-total">
+      <div class="card-icon">📝</div>
+      <div class="card-content">
+        <span class="card-label">Tổng chứng từ</span>
+        <span class="card-value">{{ stats.total }}</span>
+      </div>
+    </div>
+    <div class="summary-card card-draft">
+      <div class="card-icon">📋</div>
+      <div class="card-content">
+        <span class="card-label">Nháp</span>
+        <span class="card-value text-orange">{{ stats.draft }}</span>
+      </div>
+    </div>
+    <div class="summary-card card-posted">
+      <div class="card-icon">✅</div>
+      <div class="card-content">
+        <span class="card-label">Đã ghi sổ</span>
+        <span class="card-value text-green">{{ stats.posted }}</span>
+      </div>
+    </div>
+    <div class="summary-card card-amount">
+      <div class="card-icon">💰</div>
+      <div class="card-content">
+        <span class="card-label">Tổng PS (Nợ)</span>
+        <span class="card-value">{{ formatCurrency(stats.totalAmount) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTER SECTION -->
+  <div class="filter-section">
+    <div class="filter-row">
+      <div class="filter-group filter-search">
+        <label>Tìm kiếm</label>
+        <input type="text" [(ngModel)]="searchText" (input)="onSearch()"
+               placeholder="Số chứng từ, diễn giải...">
+      </div>
+      <div class="filter-group">
+        <label>Loại chứng từ</label>
+        <select [(ngModel)]="filter.voucherType" (change)="onFilterChange()">
+          <option [ngValue]="undefined">Tất cả</option>
+          <option *ngFor="let t of voucherTypes" [value]="t.value">{{ t.label }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Trạng thái</label>
+        <select [(ngModel)]="filter.status" (change)="onFilterChange()">
+          <option [ngValue]="undefined">Tất cả</option>
+          <option *ngFor="let s of voucherStatuses" [value]="s.value">{{ s.label }}</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary btn-sm" (click)="clearFilters()">Xóa lọc</button>
+    </div>
+  </div>
+
+  <!-- VOUCHERS TABLE -->
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th class="col-no">STT</th>
+          <th class="col-date">Ngày CT</th>
+          <th class="col-voucher">Số chứng từ</th>
+          <th class="col-type">Loại</th>
+          <th class="col-desc">Diễn giải</th>
+          <th class="col-amount text-right">Nợ</th>
+          <th class="col-amount text-right">Có</th>
+          <th class="col-status">Trạng thái</th>
+          <th class="col-actions">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let v of filteredVouchers; let i = index" [class.cancelled-row]="v.status === 'CANCELLED'">
+          <td>{{ i + 1 }}</td>
+          <td>{{ formatDate(v.voucherDate) }}</td>
+          <td><span class="voucher-no">{{ v.voucherNo }}</span></td>
+          <td><span class="type-badge type-{{ v.voucherType.toLowerCase() }}">{{ getVoucherTypeLabel(v.voucherType) }}</span></td>
+          <td class="desc-cell">{{ v.description }}</td>
+          <td class="text-right">{{ formatCurrency(v.totalDebit) }}</td>
+          <td class="text-right">{{ formatCurrency(v.totalCredit) }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(v.status)">
+              {{ getStatusLabel(v.status) }}
+            </span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-icon btn-view" title="Xem" (click)="openViewModal(v)">👁</button>
+              <button class="btn-icon btn-edit" title="Sửa" *ngIf="v.status === 'DRAFT'" (click)="openEditModal(v)">✏️</button>
+              <button class="btn-icon btn-post" title="Ghi sổ" *ngIf="v.status === 'DRAFT'" (click)="postVoucher(v)">📗</button>
+              <button class="btn-icon btn-cancel" title="Hủy" *ngIf="v.status === 'POSTED'" (click)="cancelVoucher(v)">🚫</button>
+              <button class="btn-icon btn-delete" title="Xóa" *ngIf="v.status === 'DRAFT'" (click)="deleteVoucher(v)">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="filteredVouchers.length === 0 && !isLoading">
+      <div class="empty-icon">📝</div>
+      <p>Chưa có chứng từ nào</p>
+      <button class="btn btn-primary" (click)="openCreateModal()">Tạo chứng từ đầu tiên</button>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" *ngIf="showModal" (click)="closeModal()">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>
+          {{ modalMode === 'create' ? 'Tạo chứng từ mới' :
+             modalMode === 'edit' ? 'Chỉnh sửa chứng từ' : 'Chi tiết chứng từ' }}
+        </h2>
+        <button class="btn-close" (click)="closeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Validation Errors -->
+        <div class="validation-errors" *ngIf="validationErrors.length > 0">
+          <p *ngFor="let err of validationErrors">⚠️ {{ err }}</p>
+        </div>
+
+        <!-- Header Info -->
+        <div class="form-section">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Loại chứng từ <span class="required">*</span></label>
+              <select [(ngModel)]="editingVoucher.voucherType" [disabled]="modalMode === 'view'">
+                <option *ngFor="let t of voucherTypes" [value]="t.value">{{ t.label }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Ngày chứng từ <span class="required">*</span></label>
+              <input type="date" [ngModel]="editingVoucher.voucherDate | date:'yyyy-MM-dd'"
+                     (ngModelChange)="onDateChange('voucherDate', $event)" [disabled]="modalMode === 'view'">
+            </div>
+            <div class="form-group">
+              <label>Số chứng từ</label>
+              <input type="text" [(ngModel)]="editingVoucher.voucherNo" [disabled]="modalMode === 'view'"
+                     placeholder="Tự động">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label>Diễn giải <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="editingVoucher.description" [disabled]="modalMode === 'view'"
+                     placeholder="Nội dung bút toán">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label>Lý do</label>
+              <input type="text" [(ngModel)]="editingVoucher.reason" [disabled]="modalMode === 'view'">
+            </div>
+          </div>
+        </div>
+
+        <!-- Entries -->
+        <div class="form-section">
+          <div class="section-header">
+            <h4>Chi tiết bút toán</h4>
+            <button class="btn btn-secondary btn-sm" *ngIf="modalMode !== 'view'" (click)="addEntry()">
+              ➕ Thêm dòng
+            </button>
+          </div>
+
+          <table class="entry-table">
+            <thead>
+              <tr>
+                <th class="col-line">#</th>
+                <th class="col-account">Tài khoản</th>
+                <th class="col-entry-desc">Diễn giải</th>
+                <th class="col-entry-debit text-right">Nợ</th>
+                <th class="col-entry-credit text-right">Có</th>
+                <th class="col-entry-action" *ngIf="modalMode !== 'view'"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let entry of editingVoucher.entries; let i = index">
+                <td>{{ entry.lineNo }}</td>
+                <td>
+                  <input type="text" [(ngModel)]="entry.accountCode" [disabled]="modalMode === 'view'"
+                         placeholder="111" class="input-sm">
+                </td>
+                <td>
+                  <input type="text" [(ngModel)]="entry.description" [disabled]="modalMode === 'view'"
+                         placeholder="Diễn giải" class="input-full">
+                </td>
+                <td>
+                  <input type="number" [(ngModel)]="entry.debitAmount" [disabled]="modalMode === 'view'"
+                         class="input-sm text-right">
+                </td>
+                <td>
+                  <input type="number" [(ngModel)]="entry.creditAmount" [disabled]="modalMode === 'view'"
+                         class="input-sm text-right">
+                </td>
+                <td *ngIf="modalMode !== 'view'">
+                  <button class="btn-icon btn-delete" (click)="removeEntry(i)"
+                          [disabled]="editingVoucher.entries!.length <= 1">🗑️</button>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="3"><strong>Tổng cộng</strong></td>
+                <td class="text-right"><strong>{{ formatCurrency(getTotals().totalDebit) }}</strong></td>
+                <td class="text-right"><strong>{{ formatCurrency(getTotals().totalCredit) }}</strong></td>
+                <td *ngIf="modalMode !== 'view'"></td>
+              </tr>
+              <tr class="balance-row" [class.balanced]="getTotals().balanced" [class.unbalanced]="!getTotals().balanced">
+                <td colspan="6">
+                  <span *ngIf="getTotals().balanced">✅ Bút toán cân đối</span>
+                  <span *ngIf="!getTotals().balanced">⚠️ Bút toán KHÔNG cân đối (chênh lệch: {{ formatCurrency(getBalanceDiff()) }})</span>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer" *ngIf="modalMode !== 'view'">
+        <button class="btn btn-secondary" (click)="closeModal()">Hủy</button>
+        <button class="btn btn-primary" (click)="saveVoucher()" [disabled]="!getTotals().balanced">
+          {{ modalMode === 'create' ? 'Tạo mới' : 'Cập nhật' }}
+        </button>
+      </div>
+      <div class="modal-footer" *ngIf="modalMode === 'view'">
+        <button class="btn btn-secondary" (click)="closeModal()">Đóng</button>
+        <button class="btn btn-primary" *ngIf="editingVoucher.status === 'DRAFT'" (click)="modalMode = 'edit'">Chỉnh sửa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+  </div>
+</div>

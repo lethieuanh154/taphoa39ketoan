@@ -1,0 +1,159 @@
+<div class="cit-page">
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>🏢 Thuế Thu Nhập Doanh Nghiệp</h1>
+      <p class="subtitle">TK 3334 - Thuế TNDN phải nộp | Thuế suất: 20%</p>
+    </div>
+    <div class="header-actions">
+      <select [(ngModel)]="filterYear" (change)="onYearChange()" class="year-select">
+        <option *ngFor="let y of years" [value]="y">Năm {{ y }}</option>
+      </select>
+      <button class="btn btn-primary">+ Tạo tờ khai</button>
+    </div>
+  </div>
+
+  <!-- TAX INFO -->
+  <div class="tax-info">
+    <div class="info-item">
+      <strong>Thuế suất TNDN phổ thông:</strong> 20%
+    </div>
+    <div class="info-item">
+      <strong>DN siêu nhỏ (DT &lt; 3 tỷ):</strong> 15-17%
+    </div>
+    <div class="info-item">
+      <strong>Kỳ kê khai:</strong> Quý / Năm
+    </div>
+    <div class="info-item">
+      <strong>Hạn nộp:</strong> Ngày 30 tháng sau quý
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-cards">
+    <div class="card revenue">
+      <div class="card-icon">📈</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(yearStats.totalRevenue) }}</span>
+        <span class="card-label">Tổng doanh thu</span>
+      </div>
+    </div>
+    <div class="card expenses">
+      <div class="card-icon">📉</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(yearStats.totalExpenses) }}</span>
+        <span class="card-label">Tổng chi phí</span>
+      </div>
+    </div>
+    <div class="card income">
+      <div class="card-icon">💰</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(yearStats.totalTaxableIncome) }}</span>
+        <span class="card-label">TN chịu thuế</span>
+      </div>
+    </div>
+    <div class="card cit">
+      <div class="card-icon">🏛️</div>
+      <div class="card-content">
+        <span class="card-value">{{ formatCurrency(yearStats.totalCIT) }}</span>
+        <span class="card-label">Thuế TNDN</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DECLARATION LIST -->
+  <div class="declaration-list">
+    <div class="list-header">
+      <h2>Tờ khai thuế TNDN năm {{ filterYear }}</h2>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Kỳ</th>
+            <th>Số tờ khai</th>
+            <th>Doanh thu</th>
+            <th>Chi phí</th>
+            <th>TN chịu thuế</th>
+            <th>Thuế suất</th>
+            <th>Thuế TNDN</th>
+            <th>Hạn nộp</th>
+            <th>Trạng thái</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let dec of declarations" (click)="viewDeclaration(dec)">
+            <td><strong>{{ getQuarterLabel(dec.quarter) }}/{{ dec.year }}</strong></td>
+            <td>{{ dec.declarationNo }}</td>
+            <td class="amount">{{ formatCurrency(dec.revenue) }}</td>
+            <td class="amount">{{ formatCurrency(dec.expenses) }}</td>
+            <td class="amount">{{ formatCurrency(dec.taxableIncome) }}</td>
+            <td class="center">{{ dec.taxRate }}%</td>
+            <td class="amount highlight">{{ formatCurrency(dec.citAmount) }}</td>
+            <td>{{ formatDate(dec.submissionDeadline) }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="getStatusClass(dec.status)">
+                {{ getStatusLabel(dec.status) }}
+              </span>
+            </td>
+            <td (click)="$event.stopPropagation()">
+              <button class="btn-icon" (click)="viewDeclaration(dec)">👁️</button>
+            </td>
+          </tr>
+          <tr *ngIf="declarations.length === 0">
+            <td colspan="10" class="empty-row">Chưa có tờ khai thuế TNDN</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" *ngIf="showDetailModal" (click)="closeDetailModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ selectedDeclaration?.declarationNo }}</h2>
+        <button class="btn-close" (click)="closeDetailModal()">×</button>
+      </div>
+      <div class="modal-body" *ngIf="selectedDeclaration">
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="label">Kỳ kê khai:</span>
+            <span class="value">{{ getQuarterLabel(selectedDeclaration.quarter) }}/{{ selectedDeclaration.year }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Doanh thu:</span>
+            <span class="value">{{ formatCurrency(selectedDeclaration.revenue) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Chi phí được trừ:</span>
+            <span class="value">{{ formatCurrency(selectedDeclaration.expenses) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Thu nhập chịu thuế:</span>
+            <span class="value">{{ formatCurrency(selectedDeclaration.taxableIncome) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Thuế suất:</span>
+            <span class="value">{{ selectedDeclaration.taxRate }}%</span>
+          </div>
+          <div class="detail-item main">
+            <span class="label">Thuế TNDN phải nộp:</span>
+            <span class="value">{{ formatCurrency(selectedDeclaration.citAmount) }}</span>
+          </div>
+        </div>
+
+        <div class="accounting-entry">
+          <h3>Định khoản</h3>
+          <p>Nợ TK 8211 - Chi phí thuế TNDN hiện hành: {{ formatCurrency(selectedDeclaration.citAmount) }}</p>
+          <p>Có TK 3334 - Thuế TNDN: {{ formatCurrency(selectedDeclaration.citAmount) }}</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+</div>
