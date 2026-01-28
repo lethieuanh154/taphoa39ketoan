@@ -23,6 +23,7 @@ export class MainLayoutComponent {
 
   // Expanded groups state
   expandedGroups: { [key: string]: boolean } = {
+    kiemTraHoaDon: true,  // 0. Kiểm tra hóa đơn tự động - mở mặc định
     danhMuc: false,
     chungTu: false,
     banHang: false,

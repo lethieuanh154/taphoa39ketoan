@@ -39,6 +39,8 @@ import { CITPageComponent } from './components/cit-page/cit-page.component';
 import { ManagementReportsPageComponent } from './components/management-reports-page/management-reports-page.component';
 import { UserRolesPageComponent } from './components/user-roles-page/user-roles-page.component';
 import { SystemSettingsPageComponent } from './components/system-settings-page/system-settings-page.component';
+import { Ledger8DongBoHoaDonV2Component } from './components/accountant-pages/ledger-8-dong-bo-hoa-don-v2/ledger-8-dong-bo-hoa-don-v2.component';
+import { Ledger9DongBoHoaDonDauRaComponent } from './components/accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra/ledger-9-dong-bo-hoa-don-dau-ra.component';
 
 /**
  * TAPHOA39KETOAN ROUTES
@@ -57,6 +59,12 @@ export const routes: Routes = [
       // ═══════════════════════════════════════════════════════════════════
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: AccountantDashboardComponent },
+
+      // ═══════════════════════════════════════════════════════════════════
+      // 0. ĐỒNG BỘ HÓA ĐƠN
+      // ═══════════════════════════════════════════════════════════════════
+      { path: 'dong-bo/hoa-don-dau-vao', component: Ledger8DongBoHoaDonV2Component },
+      { path: 'dong-bo/hoa-don-dau-ra', component: Ledger9DongBoHoaDonDauRaComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 1. DANH MỤC KẾ TOÁN

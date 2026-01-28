@@ -29,6 +29,28 @@
         <div class="nav-divider"></div>
 
         <!-- ═══════════════════════════════════════════════════════════════════
+             0. KIỂM TRA HÓA ĐƠN TỰ ĐỘNG
+        ═══════════════════════════════════════════════════════════════════ -->
+        <div class="nav-group">
+          <div class="nav-group-header" (click)="toggleGroup('kiemTraHoaDon')">
+            <span class="nav-number">0.</span>
+            <i class="fa-solid fa-rotate nav-icon"></i>
+            <span class="nav-text" *ngIf="!isSidebarCollapsed">Kiểm tra hóa đơn tự động</span>
+            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
+               [class.fa-chevron-down]="expandedGroups['kiemTraHoaDon']"
+               [class.fa-chevron-right]="!expandedGroups['kiemTraHoaDon']"></i>
+          </div>
+          <div class="nav-group-items" *ngIf="expandedGroups['kiemTraHoaDon'] && !isSidebarCollapsed">
+            <a routerLink="/dong-bo/hoa-don-dau-vao" routerLinkActive="active" class="nav-sublink">
+              <i class="fa-solid fa-file-import"></i> Hóa đơn đầu vào
+            </a>
+            <a routerLink="/dong-bo/hoa-don-dau-ra" routerLinkActive="active" class="nav-sublink">
+              <i class="fa-solid fa-file-export"></i> Hóa đơn đầu ra
+            </a>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
              1. DANH MỤC KẾ TOÁN
         ═══════════════════════════════════════════════════════════════════ -->
         <div class="nav-group">

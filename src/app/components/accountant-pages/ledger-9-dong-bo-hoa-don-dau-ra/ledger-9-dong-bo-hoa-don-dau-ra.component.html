@@ -1,0 +1,521 @@
+<!--
+  LEDGER 9 - ĐỒNG BỘ HÓA ĐƠN ĐẦU RA (Output Invoices)
+  Đồng bộ hóa đơn từ Trang thuế với Hóa đơn Local (invoices-page)
+  Scalable component với pagination cho 100.000+ hóa đơn
+-->
+<div class="invoice-page">
+  <!-- Page Title -->
+  <h2 class="page-title">ĐỒNG BỘ HÓA ĐƠN ĐẦU RA</h2>
+
+  <!-- ============================================ -->
+  <!-- FILTER SECTION -->
+  <!-- ============================================ -->
+  <div class="filter-section">
+    <h3 class="section-title">Bộ lọc</h3>
+
+    <form [formGroup]="filterForm" class="filter-form">
+      <!-- Row 1: Filter Type + Date Filters -->
+      <div class="filter-row">
+        <!-- Filter Type -->
+        <div class="filter-group">
+          <label>Lọc theo</label>
+          <select formControlName="filterType" class="filter-input">
+            <option value="all">Tất cả</option>
+            <option value="month">Tháng</option>
+            <option value="year">Năm</option>
+            <option value="range">Khoảng ngày</option>
+          </select>
+        </div>
+
+        <!-- Month (khi filterType = month) -->
+        <div class="filter-group" *ngIf="filterForm.get('filterType')?.value === 'month'">
+          <label>Tháng</label>
+          <select formControlName="monthKey" class="filter-input">
+            <option *ngFor="let opt of monthOptions" [value]="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+
+        <!-- Year (khi filterType = year) -->
+        <div class="filter-group" *ngIf="filterForm.get('filterType')?.value === 'year'">
+          <label>Năm</label>
+          <select formControlName="year" class="filter-input">
+            <option *ngFor="let y of yearOptions" [value]="y">{{ y }}</option>
+          </select>
+        </div>
+
+        <!-- Date Range (khi filterType = range) - Format dd/mm/yyyy -->
+        <div class="filter-group" *ngIf="filterForm.get('filterType')?.value === 'range'">
+          <label>Từ ngày</label>
+          <input type="text"
+                 formControlName="fromDate"
+                 class="filter-input"
+                 placeholder="dd/mm/yyyy"
+                 maxlength="10"
+                 (blur)="validateDateInput('fromDate')">
+        </div>
+        <div class="filter-group" *ngIf="filterForm.get('filterType')?.value === 'range'">
+          <label>Đến ngày</label>
+          <input type="text"
+                 formControlName="toDate"
+                 class="filter-input"
+                 placeholder="dd/mm/yyyy"
+                 maxlength="10"
+                 (blur)="validateDateInput('toDate')">
+        </div>
+      </div>
+
+      <!-- Row 2: Customer + Status + Page Size + Actions -->
+      <div class="filter-row">
+        <!-- Customer -->
+        <div class="filter-group filter-group-wide">
+          <label>Khách hàng</label>
+          <select formControlName="customerName" class="filter-input">
+            <option value="">Tất cả KH</option>
+            <option *ngFor="let c of customers" [value]="c">
+              {{ c }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Reconcile Status -->
+        <div class="filter-group">
+          <label>Trạng thái</label>
+          <select formControlName="reconcileStatus" class="filter-input">
+            <option value="">Tất cả</option>
+            <option value="PENDING">Chưa đối chiếu</option>
+            <option value="MATCHED">Khớp</option>
+            <option value="UNMATCHED">Thiếu</option>
+            <option value="MISMATCH">Sai số</option>
+          </select>
+        </div>
+
+        <!-- Page Size -->
+        <div class="filter-group">
+          <label>Số dòng/trang</label>
+          <select formControlName="pageSize" class="filter-input">
+            <option [value]="25">25</option>
+            <option [value]="50">50</option>
+            <option [value]="100">100</option>
+          </select>
+        </div>
+
+        <!-- Actions -->
+        <div class="filter-group">
+          <label>&nbsp;</label>
+          <div class="button-group">
+            <button type="button" class="btn btn-primary" (click)="applyFilter()" [disabled]="loading">
+              <i class="fa-solid fa-search"></i> Tìm kiếm
+            </button>
+            <button type="button" class="btn btn-outline-primary" (click)="forceReload()" [disabled]="loading" title="Tải lại từ server (bỏ qua cache)">
+              <i class="fa-solid fa-sync"></i> Tải lại
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SUMMARY SECTION -->
+  <!-- ============================================ -->
+  <div class="summary-section" *ngIf="summary">
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="card-label">Trang thuế</div>
+        <div class="card-value">{{ summary.taxPortalCount }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">Local</div>
+        <div class="card-value">{{ summary.localCount }}</div>
+      </div>
+      <div class="summary-card card-success">
+        <div class="card-label">Khớp</div>
+        <div class="card-value">{{ summary.matchedCount }}</div>
+      </div>
+      <div class="summary-card card-warning">
+        <div class="card-label">Thiếu</div>
+        <div class="card-value">{{ summary.unmatchedCount }}</div>
+      </div>
+      <div class="summary-card card-danger">
+        <div class="card-label">Sai số</div>
+        <div class="card-value">{{ summary.mismatchCount }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- ACTION BUTTONS -->
+  <!-- ============================================ -->
+  <div class="action-section">
+    <div class="action-left">
+      <button class="btn btn-primary" (click)="uploadXmlFiles()" [disabled]="importing">
+        <span *ngIf="!importing">
+          <i class="fa-solid fa-upload"></i> Import XML (Trang thuế)
+        </span>
+        <span *ngIf="importing">
+          <i class="fa-solid fa-spinner fa-spin"></i> Đang import...
+        </span>
+      </button>
+      <button class="btn btn-secondary" (click)="reloadLocalInvoices()" [disabled]="loadingLocal">
+        <span *ngIf="!loadingLocal">
+          <i class="fa-solid fa-refresh"></i> Reload KiotViet
+        </span>
+        <span *ngIf="loadingLocal">
+          <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
+        </span>
+      </button>
+    </div>
+
+    <div class="action-center">
+      <button class="btn btn-success btn-large" (click)="runReconciliation()" [disabled]="reconciling">
+        <span *ngIf="!reconciling">
+          <i class="fa-solid fa-check-double"></i> Chạy đối chiếu
+        </span>
+        <span *ngIf="reconciling">
+          <i class="fa-solid fa-spinner fa-spin"></i> Đang đối chiếu...
+        </span>
+      </button>
+      <button class="btn btn-info" (click)="loadReconciliationResults()" [disabled]="loadingResults" style="margin-left: 8px;">
+        <span *ngIf="!loadingResults">
+          <i class="fa-solid fa-list-check"></i> Xem kết quả
+        </span>
+        <span *ngIf="loadingResults">
+          <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
+        </span>
+      </button>
+    </div>
+
+    <div class="action-right">
+      <button style="background-color: #27ae60;" class="btn btn-danger" (click)="clearBySource('TAX_PORTAL_OUTPUT')" [disabled]="clearing">
+        <i class="fa-solid fa-trash"></i> Xóa Thuế
+      </button>
+      <button style="background-color: #3498db;" class="btn btn-danger" (click)="clearBySource('LOCAL')" [disabled]="clearing">
+        <i class="fa-solid fa-trash"></i> Xóa Local
+      </button>
+      <button class="btn btn-danger" (click)="clearAll()" [disabled]="clearing">
+        <i class="fa-solid fa-trash-can"></i> Xóa tất cả
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- RECONCILIATION RESULTS (Chi tiết sai lệch) -->
+  <!-- ============================================ -->
+  <div class="reconciliation-section" *ngIf="reconciliationResults.length > 0">
+    <div class="section-header">
+      <h3><i class="fa-solid fa-balance-scale"></i> Kết quả đối chiếu chi tiết</h3>
+      <div class="result-filter">
+        <button class="btn btn-sm" [class.active]="!loadingResults" (click)="loadReconciliationResults()">Tất cả</button>
+        <button class="btn btn-sm btn-mismatch" (click)="loadReconciliationResults('MISMATCH')">Sai số</button>
+        <button class="btn btn-sm btn-missing" (click)="loadReconciliationResults('MISSING_LOCAL')">Thiếu Local</button>
+        <button class="btn btn-sm btn-missing" (click)="loadReconciliationResults('MISSING_TAX')">Thiếu Thuế</button>
+      </div>
+    </div>
+
+    <div class="results-table-wrapper">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Số HĐ</th>
+            <th>Trạng thái</th>
+            <th>Số field sai</th>
+            <th>Chi tiết sai lệch</th>
+            <th>Hành động</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let result of reconciliationResults"
+              [ngClass]="getReconcileResultStatusClass(result.status)">
+            <td>{{ result.invoiceKey }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="getReconcileResultStatusClass(result.status)">
+                {{ getReconcileResultStatusLabel(result.status) }}
+              </span>
+            </td>
+            <td>{{ getFieldDiffsCount(result) }}</td>
+            <td class="diff-summary">
+              <ng-container *ngIf="result.fieldDiffs && result.fieldDiffs.length > 0">
+                <span *ngFor="let diff of result.fieldDiffs.slice(0, 2); let i = index" class="diff-chip">
+                  {{ diff.fieldLabel }}: {{ diff.taxValue }} → {{ diff.localValue }}
+                </span>
+                <span *ngIf="result.fieldDiffs.length > 2" class="diff-more">+{{ result.fieldDiffs.length - 2 }} more</span>
+              </ng-container>
+              <span *ngIf="!result.fieldDiffs || result.fieldDiffs.length === 0" class="no-diff">
+                {{ result.status === 'MATCH' ? 'Khớp hoàn toàn' : 'Không có dữ liệu so sánh' }}
+              </span>
+            </td>
+            <td>
+              <button class="btn btn-sm btn-info" (click)="showMismatchDetails(result)"
+                      *ngIf="result.fieldDiffs && result.fieldDiffs.length > 0">
+                <i class="fa-solid fa-eye"></i> Chi tiết
+              </button>
+              <button class="btn btn-sm btn-danger" (click)="deleteReconciliationResult(result)"
+                      style="margin-left: 4px;" title="Xóa kết quả đối chiếu này">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+
+          <!-- Loading -->
+          <tr *ngIf="loadingResults">
+            <td colspan="5" class="loading-data">
+              <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- MISMATCH DETAIL MODAL -->
+  <!-- ============================================ -->
+  <div class="modal-overlay" *ngIf="showMismatchModal" (click)="closeMismatchModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-search-plus"></i> Chi tiết sai lệch</h3>
+        <button class="btn-close" (click)="closeMismatchModal()">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" *ngIf="selectedResult">
+        <!-- Invoice Info -->
+        <div class="invoice-info-row">
+          <div class="info-item">
+            <label>Số hóa đơn:</label>
+            <span>{{ selectedResult.invoiceKey }}</span>
+          </div>
+          <div class="info-item">
+            <label>Trạng thái:</label>
+            <span class="status-badge" [ngClass]="getReconcileResultStatusClass(selectedResult.status)">
+              {{ getReconcileResultStatusLabel(selectedResult.status) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Field Diffs Table -->
+        <div class="diff-table-wrapper" *ngIf="selectedResult.fieldDiffs && selectedResult.fieldDiffs.length > 0">
+          <h4>Các trường sai lệch ({{ selectedResult.fieldDiffs.length }} trường)</h4>
+          <table class="diff-table">
+            <thead>
+              <tr>
+                <th>Trường</th>
+                <th>Giá trị Trang thuế</th>
+                <th>Giá trị Local</th>
+                <th>Chênh lệch</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let diff of selectedResult.fieldDiffs" class="diff-row">
+                <td class="field-name">{{ diff.fieldLabel }}</td>
+                <td class="tax-value">
+                  <span *ngIf="diff.diffType === 'number'">{{ formatCurrency(diff.taxValue) }}</span>
+                  <span *ngIf="diff.diffType !== 'number'">{{ diff.taxValue }}</span>
+                </td>
+                <td class="local-value">
+                  <span *ngIf="diff.diffType === 'number'">{{ formatCurrency(diff.localValue) }}</span>
+                  <span *ngIf="diff.diffType !== 'number'">{{ diff.localValue }}</span>
+                </td>
+                <td class="diff-value" [class.positive]="diff.diff > 0" [class.negative]="diff.diff < 0">
+                  {{ formatDiffValue(diff) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Full Invoice Comparison -->
+        <div class="full-comparison" *ngIf="selectedResult.taxData || selectedResult.localData">
+          <h4>So sánh đầy đủ</h4>
+          <div class="comparison-grid">
+            <!-- Tax Data -->
+            <div class="comparison-column">
+              <h5><i class="fa-solid fa-building-columns"></i> Trang thuế</h5>
+              <div class="data-fields" *ngIf="selectedResult.taxData">
+                <div class="field-row"><label>Số HĐ:</label><span>{{ selectedResult.taxData.invoiceNo }}</span></div>
+                <div class="field-row"><label>Ký hiệu:</label><span>{{ selectedResult.taxData.invoiceSymbol }}</span></div>
+                <div class="field-row"><label>Ngày:</label><span>{{ selectedResult.taxData.invoiceDate }}</span></div>
+                <div class="field-row"><label>Khách hàng:</label><span>{{ selectedResult.taxData.customerName }}</span></div>
+                <div class="field-row"><label>MST KH:</label><span>{{ selectedResult.taxData.customerTaxCode }}</span></div>
+                <div class="field-row"><label>Tiền hàng:</label><span>{{ formatCurrency(selectedResult.taxData.totalBeforeVat) }}</span></div>
+                <div class="field-row"><label>Thuế suất:</label><span>{{ selectedResult.taxData.vatRate }}%</span></div>
+                <div class="field-row"><label>Tiền thuế:</label><span>{{ formatCurrency(selectedResult.taxData.vatAmount) }}</span></div>
+                <div class="field-row highlight"><label>Tổng tiền:</label><span>{{ formatCurrency(selectedResult.taxData.totalAmount) }}</span></div>
+              </div>
+              <div class="no-data" *ngIf="!selectedResult.taxData">Không có dữ liệu</div>
+            </div>
+
+            <!-- Local Data -->
+            <div class="comparison-column">
+              <h5><i class="fa-solid fa-database"></i> Local</h5>
+              <div class="data-fields" *ngIf="selectedResult.localData">
+                <div class="field-row"><label>Số HĐ:</label><span>{{ selectedResult.localData.invoiceNo }}</span></div>
+                <div class="field-row"><label>Ký hiệu:</label><span>{{ selectedResult.localData.invoiceSymbol }}</span></div>
+                <div class="field-row"><label>Ngày:</label><span>{{ selectedResult.localData.invoiceDate }}</span></div>
+                <div class="field-row"><label>Khách hàng:</label><span>{{ selectedResult.localData.customerName }}</span></div>
+                <div class="field-row"><label>MST KH:</label><span>{{ selectedResult.localData.customerTaxCode }}</span></div>
+                <div class="field-row"><label>Tiền hàng:</label><span>{{ formatCurrency(selectedResult.localData.totalBeforeVat) }}</span></div>
+                <div class="field-row"><label>Thuế suất:</label><span>{{ selectedResult.localData.vatRate }}%</span></div>
+                <div class="field-row"><label>Tiền thuế:</label><span>{{ formatCurrency(selectedResult.localData.vatAmount) }}</span></div>
+                <div class="field-row highlight"><label>Tổng tiền:</label><span>{{ formatCurrency(selectedResult.localData.totalAmount) }}</span></div>
+              </div>
+              <div class="no-data" *ngIf="!selectedResult.localData">Không có dữ liệu</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeMismatchModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- TWO-PANEL INVOICE TABLES -->
+  <!-- ============================================ -->
+  <div class="data-panels">
+    <!-- ======================================== -->
+    <!-- Panel Trái: HÓA ĐƠN TỪ TRANG THUẾ -->
+    <!-- ======================================== -->
+    <div class="panel">
+      <div class="panel-header">
+        <h3><i class="fa-solid fa-building-columns"></i> Hóa đơn từ Trang thuế (Đầu ra)</h3>
+        <div class="panel-info">
+          <span class="invoice-count">{{ taxPagination.count }} hóa đơn</span>
+        </div>
+      </div>
+
+      <div class="panel-body">
+        <div class="table-wrapper">
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th class="col-invoice-no">Số HĐ</th>
+                <th class="col-date">Ngày</th>
+                <th class="col-customer">Khách hàng</th>
+                <th class="col-amount">Tổng tiền</th>
+                <th class="col-vat">Thuế GTGT</th>
+                <th class="col-status">TT</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let inv of taxInvoices; trackBy: trackByInvoice"
+                  [class.row-matched]="inv.reconcileStatus === 'MATCHED'"
+                  [class.row-unmatched]="inv.reconcileStatus === 'UNMATCHED'"
+                  [class.row-mismatch]="inv.reconcileStatus === 'MISMATCH'">
+                <td>{{ inv.invoiceNo }}</td>
+                <td>{{ formatDate(inv.issueDate) }}</td>
+                <td class="col-customer-name" [title]="inv.customerName + ' - ' + inv.customerTaxCode">
+                  {{ inv.customerName }}
+                </td>
+                <td class="number-col">{{ formatCurrency(inv.totalAmount) }}</td>
+                <td class="number-col">{{ formatCurrency(inv.vatAmount) }}</td>
+                <td>
+                  <span class="status-dot" [ngClass]="getStatusClass(inv.reconcileStatus)"
+                        [title]="getStatusLabel(inv.reconcileStatus)"></span>
+                </td>
+              </tr>
+
+              <!-- No data -->
+              <tr *ngIf="taxInvoices.length === 0 && !loadingTax">
+                <td colspan="6" class="no-data">Chưa có dữ liệu từ trang thuế</td>
+              </tr>
+
+              <!-- Loading -->
+              <tr *ngIf="loadingTax">
+                <td colspan="6" class="loading-data">
+                  <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="panel-footer" *ngIf="taxInvoices.length > 0">
+          <button class="btn btn-sm" (click)="prevTaxPage()" [disabled]="!taxPagination.hasPrev || loadingTax">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <button class="btn btn-sm" (click)="nextTaxPage()" [disabled]="!taxPagination.hasNext || loadingTax">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- Panel Phải: HÓA ĐƠN TỪ KIOTVIET -->
+    <!-- ======================================== -->
+    <div class="panel">
+      <div class="panel-header panel-header-local">
+        <h3><i class="fa-solid fa-store"></i> Hóa đơn từ KiotViet</h3>
+        <div class="panel-info">
+          <span class="invoice-count">{{ localPagination.count }} hóa đơn</span>
+        </div>
+      </div>
+
+      <div class="panel-body">
+        <div class="table-wrapper">
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th class="col-invoice-no">Số HĐ</th>
+                <th class="col-date">Ngày</th>
+                <th class="col-customer">Khách hàng</th>
+                <th class="col-amount">Tổng tiền</th>
+                <th class="col-vat">Thuế GTGT</th>
+                <th class="col-status">TT</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let inv of localInvoices; trackBy: trackByInvoice"
+                  [class.row-matched]="inv.reconcileStatus === 'MATCHED'"
+                  [class.row-unmatched]="inv.reconcileStatus === 'UNMATCHED'"
+                  [class.row-mismatch]="inv.reconcileStatus === 'MISMATCH'">
+                <td>{{ inv.invoiceNo }}</td>
+                <td>{{ formatDate(inv.issueDate) }}</td>
+                <td class="col-customer-name" [title]="inv.customerName">
+                  {{ inv.customerName }}
+                </td>
+                <td class="number-col">{{ formatCurrency(inv.totalAmount) }}</td>
+                <td class="number-col">{{ formatCurrency(inv.vatAmount) }}</td>
+                <td>
+                  <span class="status-dot" [ngClass]="getStatusClass(inv.reconcileStatus)"
+                        [title]="getStatusLabel(inv.reconcileStatus)"></span>
+                </td>
+              </tr>
+
+              <!-- No data -->
+              <tr *ngIf="localInvoices.length === 0 && !loadingLocal">
+                <td colspan="6" class="no-data">Chưa có dữ liệu từ KiotViet</td>
+              </tr>
+
+              <!-- Loading -->
+              <tr *ngIf="loadingLocal">
+                <td colspan="6" class="loading-data">
+                  <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="panel-footer" *ngIf="localInvoices.length > 0 || allLocalInvoices.length > 0">
+          <button class="btn btn-sm" (click)="prevLocalPage()" [disabled]="!localPagination.hasPrev || loadingLocal">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <span class="page-info">
+            Trang {{ localCurrentPage + 1 }}/{{ getTotalLocalPages() }}
+            ({{ localInvoices.length }}/{{ allLocalInvoices.length }})
+          </span>
+          <button class="btn btn-sm" (click)="nextLocalPage()" [disabled]="!localPagination.hasNext || loadingLocal">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

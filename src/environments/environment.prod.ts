@@ -4,7 +4,7 @@
  */
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://api.taphoa39.com/api',  // Production API
+  domainUrl: 'https://api.taphoa39.com/api',  // Production API
   appName: 'Kế Toán Doanh Nghiệp',
   version: '1.0.0'
 };

@@ -5,7 +5,7 @@
  */
 
 import { Injectable } from '@angular/core';
-import { IndexedDBService } from '../../../services/indexed-db.service';
+import { IndexedDBService } from '../../services/indexed-db.service';
 import { Invoice, InvoiceFilter, Pagination, ReconciliationSummary, Supplier } from './invoice.service.v2';
 import { OutputInvoice, OutputInvoiceFilter, OutputPagination, OutputReconciliationSummary } from './output-invoice.service.v2';
 
