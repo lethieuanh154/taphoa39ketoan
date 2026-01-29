@@ -41,6 +41,7 @@ import { UserRolesPageComponent } from './components/user-roles-page/user-roles-
 import { SystemSettingsPageComponent } from './components/system-settings-page/system-settings-page.component';
 import { Ledger8DongBoHoaDonV2Component } from './components/accountant-pages/ledger-8-dong-bo-hoa-don-v2/ledger-8-dong-bo-hoa-don-v2.component';
 import { Ledger9DongBoHoaDonDauRaComponent } from './components/accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra/ledger-9-dong-bo-hoa-don-dau-ra.component';
+import { PurchaseInvoicePageComponent } from './components/accountant-pages/purchase-invoice-page/purchase-invoice-page.component';
 
 /**
  * TAPHOA39KETOAN ROUTES
@@ -94,7 +95,7 @@ export const routes: Routes = [
       // ═══════════════════════════════════════════════════════════════════
       // 4. MUA HÀNG & CÔNG NỢ PHẢI TRẢ
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'mua-hang/hoa-don-mua-vao', component: InvoicePageComponent, data: { type: 'INPUT' } },
+      { path: 'mua-hang/hoa-don-mua-vao', component: PurchaseInvoicePageComponent },
       { path: 'mua-hang/cong-no-331', component: PayableLedgerPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
