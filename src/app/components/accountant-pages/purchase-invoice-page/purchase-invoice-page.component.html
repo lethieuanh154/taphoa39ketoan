@@ -168,7 +168,7 @@
         </thead>
         <tbody>
           @for (invoice of paginatedInvoices(); track invoice.id; let i = $index) {
-            <tr [class]="getStatusClass(invoice)">
+            <tr [class]="getStatusClass(invoice)" class="clickable-row" (click)="onInvoiceClick(invoice)">
               <td class="col-stt">{{ startIndex() + i + 1 }}</td>
               <td class="col-date">{{ formatDate(invoice.tdlap) }}</td>
               <td class="col-symbol">{{ getInvoiceSymbol(invoice) }}</td>
@@ -241,3 +241,13 @@
     </div>
   }
 </div>
+
+<!-- Invoice Detail Modal -->
+@if (showDetailModal()) {
+  <app-invoice-detail-modal
+    [invoice]="selectedInvoiceDetail()"
+    [loading]="detailLoading()"
+    [error]="detailError()"
+    (closeModal)="onCloseModal()"
+  />
+}

@@ -305,6 +305,14 @@
   background: #f8f9fa;
 }
 
+.invoice-table tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+.invoice-table tbody tr.clickable-row:hover {
+  background: #e3f2fd;
+}
+
 /* Row highlight theo trạng thái */
 .invoice-table tbody tr.status-was-replaced {
   background: #e8eaf6;

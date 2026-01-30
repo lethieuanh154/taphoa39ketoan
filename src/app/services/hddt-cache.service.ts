@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
-import { HddtInvoice } from './hddt.service';
+import { HddtInvoice, HddtInvoiceDetail } from './hddt.service';
 
 const DB_NAME = 'TapHoa39HddtDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // Tăng version để thêm store mới
 const STORE_INVOICES = 'purchase_invoices';
+const STORE_INVOICE_DETAILS = 'invoice_details';
 const STORE_METADATA = 'metadata';
 
 export interface CacheMetadata {
@@ -57,6 +58,12 @@ export class HddtCacheService {
           invoiceStore.createIndex('tdlap', 'tdlap', { unique: false });
           invoiceStore.createIndex('nbmst', 'nbmst', { unique: false });
           invoiceStore.createIndex('shdon', 'shdon', { unique: false });
+        }
+
+        // Store cho chi tiết hóa đơn
+        if (!db.objectStoreNames.contains(STORE_INVOICE_DETAILS)) {
+          const detailStore = db.createObjectStore(STORE_INVOICE_DETAILS, { keyPath: 'id' });
+          detailStore.createIndex('nbmst_khhdon_shdon', ['nbmst', 'khhdon', 'shdon'], { unique: true });
         }
 
         // Store cho metadata (thông tin cache)
@@ -301,6 +308,169 @@ export class HddtCacheService {
       request.onerror = () => {
         resolve(0);
       };
+    });
+  }
+
+  // ==================== INVOICE DETAIL CACHE ====================
+
+  /**
+   * Tạo cache key cho chi tiết hóa đơn
+   */
+  private createDetailCacheKey(nbmst: string, khhdon: string, shdon: number, khmshdon: number): string {
+    return `${nbmst}_${khhdon}_${shdon}_${khmshdon}`;
+  }
+
+  /**
+   * Lưu chi tiết hóa đơn vào cache
+   */
+  async saveInvoiceDetail(detail: HddtInvoiceDetail): Promise<void> {
+    const ready = await this.ensureDB();
+    if (!ready || !this.db) return;
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(STORE_INVOICE_DETAILS, 'readwrite');
+      const store = transaction.objectStore(STORE_INVOICE_DETAILS);
+
+      // Thêm timestamp để biết khi nào được cache
+      const detailWithTimestamp = {
+        ...detail,
+        _cachedAt: Date.now()
+      };
+
+      store.put(detailWithTimestamp);
+
+      transaction.oncomplete = () => {
+        console.log(`Đã cache chi tiết hóa đơn: ${detail.khhdon}-${detail.shdon}`);
+        resolve();
+      };
+
+      transaction.onerror = () => {
+        console.error('Lỗi khi lưu chi tiết hóa đơn:', transaction.error);
+        reject(transaction.error);
+      };
+    });
+  }
+
+  /**
+   * Lấy chi tiết hóa đơn từ cache theo ID
+   */
+  async getInvoiceDetailById(id: string): Promise<HddtInvoiceDetail | null> {
+    const ready = await this.ensureDB();
+    if (!ready || !this.db) return null;
+
+    return new Promise((resolve) => {
+      const transaction = this.db!.transaction(STORE_INVOICE_DETAILS, 'readonly');
+      const store = transaction.objectStore(STORE_INVOICE_DETAILS);
+      const request = store.get(id);
+
+      request.onsuccess = () => {
+        resolve(request.result || null);
+      };
+
+      request.onerror = () => {
+        resolve(null);
+      };
+    });
+  }
+
+  /**
+   * Lấy chi tiết hóa đơn từ cache theo params (nbmst, khhdon, shdon, khmshdon)
+   */
+  async getInvoiceDetailByParams(
+    nbmst: string,
+    khhdon: string,
+    shdon: number,
+    khmshdon: number
+  ): Promise<HddtInvoiceDetail | null> {
+    const ready = await this.ensureDB();
+    if (!ready || !this.db) return null;
+
+    return new Promise((resolve) => {
+      const transaction = this.db!.transaction(STORE_INVOICE_DETAILS, 'readonly');
+      const store = transaction.objectStore(STORE_INVOICE_DETAILS);
+      const index = store.index('nbmst_khhdon_shdon');
+      const request = index.get([nbmst, khhdon, shdon]);
+
+      request.onsuccess = () => {
+        const result = request.result;
+        // Kiểm tra khmshdon vì index chỉ có 3 field
+        if (result && result.khmshdon === khmshdon) {
+          resolve(result);
+        } else {
+          resolve(null);
+        }
+      };
+
+      request.onerror = () => {
+        resolve(null);
+      };
+    });
+  }
+
+  /**
+   * Kiểm tra chi tiết hóa đơn đã được cache chưa
+   */
+  async hasInvoiceDetail(
+    nbmst: string,
+    khhdon: string,
+    shdon: number,
+    khmshdon: number
+  ): Promise<boolean> {
+    const detail = await this.getInvoiceDetailByParams(nbmst, khhdon, shdon, khmshdon);
+    return detail !== null;
+  }
+
+  /**
+   * Xóa chi tiết hóa đơn khỏi cache
+   */
+  async deleteInvoiceDetail(id: string): Promise<void> {
+    const ready = await this.ensureDB();
+    if (!ready || !this.db) return;
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(STORE_INVOICE_DETAILS, 'readwrite');
+      const store = transaction.objectStore(STORE_INVOICE_DETAILS);
+      store.delete(id);
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }
+
+  /**
+   * Xóa tất cả chi tiết hóa đơn trong cache
+   */
+  async clearInvoiceDetails(): Promise<void> {
+    const ready = await this.ensureDB();
+    if (!ready || !this.db) return;
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(STORE_INVOICE_DETAILS, 'readwrite');
+      const store = transaction.objectStore(STORE_INVOICE_DETAILS);
+      store.clear();
+
+      transaction.oncomplete = () => {
+        console.log('Đã xóa cache chi tiết hóa đơn');
+        resolve();
+      };
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }
+
+  /**
+   * Lấy số lượng chi tiết hóa đơn đã cache
+   */
+  async getInvoiceDetailCount(): Promise<number> {
+    const ready = await this.ensureDB();
+    if (!ready || !this.db) return 0;
+
+    return new Promise((resolve) => {
+      const transaction = this.db!.transaction(STORE_INVOICE_DETAILS, 'readonly');
+      const store = transaction.objectStore(STORE_INVOICE_DETAILS);
+      const request = store.count();
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(0);
     });
   }
 }

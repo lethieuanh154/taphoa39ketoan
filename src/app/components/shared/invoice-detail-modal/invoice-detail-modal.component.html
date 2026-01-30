@@ -1,0 +1,197 @@
+<div class="modal-backdrop" (click)="onBackdropClick($event)">
+  <div class="modal-container">
+    <!-- Header -->
+    <div class="modal-header">
+      <h2>Chi tiết hóa đơn</h2>
+      <button class="close-btn" (click)="onClose()">&times;</button>
+    </div>
+
+    <!-- Loading -->
+    @if (loading) {
+      <div class="modal-loading">
+        <div class="loading-spinner"></div>
+        <p>Đang tải chi tiết hóa đơn...</p>
+      </div>
+    }
+
+    <!-- Error -->
+    @if (error) {
+      <div class="modal-error">
+        <span class="error-icon">!</span>
+        {{ error }}
+      </div>
+    }
+
+    <!-- Content -->
+    @if (!loading && !error && invoiceData()) {
+      <div class="modal-body">
+        <!-- Invoice Title -->
+        <div class="invoice-title-section">
+          <div class="invoice-type">{{ invoiceData()!.thdon || 'HÓA ĐƠN GIÁ TRỊ GIA TĂNG' }}</div>
+          <div class="invoice-date">Ngày {{ formatDate(invoiceData()!.tdlap) }}</div>
+          <div class="invoice-code">
+            <span>Mã CQT:</span> {{ invoiceData()!.mhdon }}
+          </div>
+          <div class="invoice-number">
+            <span>Ký hiệu:</span> {{ getInvoiceSymbol() }} &nbsp;&nbsp;
+            <span>Số:</span> {{ invoiceData()!.shdon }}
+          </div>
+        </div>
+
+        <!-- Seller Info -->
+        <div class="info-section">
+          <h3>Người bán</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <span class="label">Tên:</span>
+              <span class="value">{{ invoiceData()!.nbten }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Mã số thuế:</span>
+              <span class="value">{{ invoiceData()!.nbmst }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Địa chỉ:</span>
+              <span class="value">{{ invoiceData()!.nbdchi }}</span>
+            </div>
+            @if (invoiceData()!.nbsdthoai) {
+              <div class="info-row">
+                <span class="label">Điện thoại:</span>
+                <span class="value">{{ invoiceData()!.nbsdthoai }}</span>
+              </div>
+            }
+            @if (invoiceData()!.nbstkhoan) {
+              <div class="info-row">
+                <span class="label">Số tài khoản:</span>
+                <span class="value">{{ invoiceData()!.nbstkhoan }} - {{ invoiceData()!.nbtnhang }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Buyer Info -->
+        <div class="info-section">
+          <h3>Người mua</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <span class="label">Tên:</span>
+              <span class="value">{{ invoiceData()!.nmten }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Mã số thuế:</span>
+              <span class="value">{{ invoiceData()!.nmmst }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Địa chỉ:</span>
+              <span class="value">{{ invoiceData()!.nmdchi }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Hình thức TT:</span>
+              <span class="value">{{ invoiceData()!.thtttoan }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="items-section">
+          <h3>Danh sách hàng hóa/dịch vụ</h3>
+          <div class="items-table-container">
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th class="col-stt">STT</th>
+                  <th class="col-name">Tên hàng hóa, dịch vụ</th>
+                  <th class="col-unit">ĐVT</th>
+                  <th class="col-qty text-right">Số lượng</th>
+                  <th class="col-price text-right">Đơn giá</th>
+                  <th class="col-discount text-right">Chiết khấu</th>
+                  <th class="col-vat-rate text-right">Thuế suất</th>
+                  <th class="col-amount text-right">Thành tiền chưa thuế</th>
+                  <th class="col-vat text-right">Tiền thuế GTGT</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of items(); track item.id; let i = $index) {
+                  <tr>
+                    <td class="col-stt">{{ item.stt }}</td>
+                    <td class="col-name">{{ item.ten }}</td>
+                    <td class="col-unit">{{ item.dvtinh }}</td>
+                    <td class="col-qty text-right">{{ formatDecimal(item.sluong) }}</td>
+                    <td class="col-price text-right">{{ formatDecimal(item.dgia) }}</td>
+                    <td class="col-discount text-right">{{ formatCurrency(item.stckhau) }}</td>
+                    <td class="col-vat-rate text-right">{{ item.ltsuat }}</td>
+                    <td class="col-amount text-right">{{ formatCurrency(item.thtien) }}</td>
+                    <td class="col-vat text-right">{{ formatCurrency(getItemVat(item)) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- VAT Summary -->
+        <div class="vat-summary-section">
+          <h3>Tổng hợp thuế suất</h3>
+          <table class="vat-summary-table">
+            <thead>
+              <tr>
+                <th>Thuế suất</th>
+                <th class="text-right">Tổng tiền chưa thuế</th>
+                <th class="text-right">Tổng tiền thuế</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (vat of vatRates(); track vat.tsuat) {
+                <tr>
+                  <td>{{ vat.tsuat }}</td>
+                  <td class="text-right">{{ formatCurrency(vat.thtien) }}</td>
+                  <td class="text-right">{{ formatCurrency(vat.tthue) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Total Summary -->
+        <div class="total-section">
+          <div class="total-row">
+            <span class="total-label">Tổng tiền chưa thuế:</span>
+            <span class="total-value">{{ formatCurrency(invoiceData()!.tgtcthue) }}</span>
+          </div>
+          <div class="total-row">
+            <span class="total-label">Tổng tiền thuế GTGT:</span>
+            <span class="total-value">{{ formatCurrency(invoiceData()!.tgtthue) }}</span>
+          </div>
+          <div class="total-row grand-total">
+            <span class="total-label">Tổng tiền thanh toán:</span>
+            <span class="total-value">{{ formatCurrency(invoiceData()!.tgtttbso) }}</span>
+          </div>
+          <div class="total-text">
+            <span>Số tiền viết bằng chữ:</span> {{ invoiceData()!.tgtttbchu }}
+          </div>
+        </div>
+
+        <!-- Status & Signature -->
+        <div class="status-section">
+          <div class="status-info">
+            <span class="status-label">Trạng thái:</span>
+            <span class="status-badge" [class]="getStatusClass()">{{ getStatusText() }}</span>
+            @if (getPaymentStatus()) {
+              <span class="payment-status">{{ getPaymentStatus() }}</span>
+            }
+          </div>
+          @if (invoiceData()!.nky) {
+            <div class="signature-info">
+              <span>Ký điện tử:</span> {{ formatDateTime(invoiceData()!.nky) }}
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="onClose()">Đóng</button>
+      </div>
+    }
+  </div>
+</div>

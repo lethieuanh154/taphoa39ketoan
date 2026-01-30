@@ -1,12 +1,13 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HddtService, HddtInvoice } from '../../../services/hddt.service';
+import { HddtService, HddtInvoice, HddtInvoiceDetail } from '../../../services/hddt.service';
+import { InvoiceDetailModalComponent } from '../../shared/invoice-detail-modal/invoice-detail-modal.component';
 
 @Component({
   selector: 'app-purchase-invoice-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, InvoiceDetailModalComponent],
   templateUrl: './purchase-invoice-page.component.html',
   styleUrl: './purchase-invoice-page.component.css'
 })
@@ -29,6 +30,12 @@ export class PurchaseInvoicePageComponent implements OnInit {
 
   // Cache info
   cacheInfo = signal<{ count: number; lastUpdated: number | null }>({ count: 0, lastUpdated: null });
+
+  // Modal state
+  showDetailModal = signal(false);
+  selectedInvoiceDetail = signal<HddtInvoiceDetail | null>(null);
+  detailLoading = signal(false);
+  detailError = signal<string | null>(null);
 
   // Computed - Pagination
   totalInvoices = computed(() => this.invoices().length);
@@ -221,5 +228,33 @@ export class PurchaseInvoicePageComponent implements OnInit {
 
   refreshToken(): void {
     window.open('https://hoadondientu.gdt.gov.vn/', '_blank');
+  }
+
+  // Modal methods
+  onInvoiceClick(invoice: HddtInvoice): void {
+    this.showDetailModal.set(true);
+    this.detailLoading.set(true);
+    this.detailError.set(null);
+    this.selectedInvoiceDetail.set(null);
+
+    this.hddtService.getInvoiceDetail(invoice).subscribe({
+      next: (detail) => {
+        this.selectedInvoiceDetail.set(detail);
+        this.detailLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Error loading invoice detail:', err);
+        this.detailError.set(err.status === 401
+          ? 'Token hết hạn. Vui lòng đăng nhập lại.'
+          : 'Không thể tải chi tiết hóa đơn. Vui lòng thử lại.');
+        this.detailLoading.set(false);
+      }
+    });
+  }
+
+  onCloseModal(): void {
+    this.showDetailModal.set(false);
+    this.selectedInvoiceDetail.set(null);
+    this.detailError.set(null);
   }
 }

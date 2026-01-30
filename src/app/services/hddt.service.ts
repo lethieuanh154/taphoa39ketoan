@@ -58,6 +58,72 @@ export interface HddtSearchParams {
   ttxly?: number;          // Trạng thái xử lý (5 = đã xử lý)
 }
 
+/**
+ * Interface cho chi tiết hàng hóa/dịch vụ trong hóa đơn
+ */
+export interface HddtInvoiceItem {
+  id: string;
+  idhdon: string;
+  stt: number;              // Số thứ tự
+  ten: string;              // Tên hàng hóa/dịch vụ
+  dvtinh: string;           // Đơn vị tính
+  sluong: number;           // Số lượng
+  dgia: number;             // Đơn giá
+  thtien: number;           // Thành tiền
+  ltsuat: string;           // Loại thuế suất
+  tsuat: number;            // Thuế suất
+  tthue: number | null;     // Tiền thuế
+  stckhau: number;          // Số tiền chiết khấu
+  tlckhau: number | null;   // Tỷ lệ chiết khấu
+  tchat: number;            // Tính chất
+  sxep: number;             // Số xếp
+  ttkhac: Array<{           // Thông tin khác
+    ttruong: string;
+    kdlieu: string;
+    dlieu: string | null;
+  }>;
+}
+
+/**
+ * Interface cho chi tiết hóa đơn
+ */
+export interface HddtInvoiceDetail {
+  id: string;
+  nbmst: string;            // MST người bán
+  nbten: string;            // Tên người bán
+  nbdchi: string;           // Địa chỉ người bán
+  nbsdthoai: string;        // SĐT người bán
+  nbstkhoan: string;        // Số tài khoản người bán
+  nbtnhang: string;         // Tên ngân hàng người bán
+  nmmst: string;            // MST người mua
+  nmten: string;            // Tên người mua
+  nmdchi: string;           // Địa chỉ người mua
+  khmshdon: number;         // Ký hiệu mẫu số hóa đơn
+  khhdon: string;           // Ký hiệu hóa đơn
+  shdon: number;            // Số hóa đơn
+  mhdon: string;            // Mã hóa đơn
+  tdlap: string;            // Thời điểm lập
+  thtttoan: string;         // Hình thức thanh toán
+  dvtte: string;            // Đơn vị tiền tệ
+  tgtcthue: number;         // Tổng tiền chưa thuế
+  tgtthue: number;          // Tổng tiền thuế
+  tgtttbso: number;         // Tổng tiền thanh toán bằng số
+  tgtttbchu: string;        // Tổng tiền thanh toán bằng chữ
+  tthai: number;            // Trạng thái hóa đơn
+  tchat: number;            // Tính chất
+  thdon: string;            // Tên hóa đơn
+  nky: string;              // Ngày ký
+  thttltsuat: VatRateInfo[]; // Thông tin thuế suất
+  hdhhdvu: HddtInvoiceItem[]; // Danh sách hàng hóa/dịch vụ
+  ttkhac: Array<{           // Thông tin khác
+    ttruong: string;
+    kdlieu: string;
+    dlieu: string | null;
+  }>;
+  gchu: string;             // Ghi chú
+  [key: string]: unknown;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -333,5 +399,72 @@ export class HddtService {
       case 3: return 'Hóa đơn điều chỉnh';
       default: return '';
     }
+  }
+
+  /**
+   * Lấy chi tiết hóa đơn
+   * Ưu tiên lấy từ cache, nếu không có mới gọi API
+   * GET /api/hddt/detail?nbmst=xxx&khhdon=xxx&shdon=xxx&khmshdon=xxx
+   */
+  getInvoiceDetail(invoice: HddtInvoice, forceRefresh = false): Observable<HddtInvoiceDetail> {
+    if (!this.hasToken()) {
+      return throwError(() => new Error('HDDT Token không tồn tại'));
+    }
+
+    // Nếu force refresh, gọi API trực tiếp
+    if (forceRefresh) {
+      return this.fetchAndCacheInvoiceDetail(invoice);
+    }
+
+    // Kiểm tra cache trước
+    return from(
+      this.cacheService.getInvoiceDetailByParams(
+        invoice.nbmst,
+        invoice.khhdon,
+        invoice.shdon,
+        invoice.khmshdon
+      )
+    ).pipe(
+      switchMap(cachedDetail => {
+        if (cachedDetail) {
+          console.log(`Lấy chi tiết hóa đơn ${invoice.khhdon}-${invoice.shdon} từ cache`);
+          return of(cachedDetail);
+        }
+        // Không có trong cache, gọi API
+        return this.fetchAndCacheInvoiceDetail(invoice);
+      })
+    );
+  }
+
+  /**
+   * Gọi API lấy chi tiết hóa đơn và lưu vào cache
+   */
+  private fetchAndCacheInvoiceDetail(invoice: HddtInvoice): Observable<HddtInvoiceDetail> {
+    const params = new HttpParams()
+      .set('nbmst', invoice.nbmst)
+      .set('khhdon', invoice.khhdon)
+      .set('shdon', invoice.shdon.toString())
+      .set('khmshdon', invoice.khmshdon.toString());
+
+    return this.http.get<HddtInvoiceDetail>(`${this.apiBase}/detail`, {
+      headers: this.getHeaders(),
+      params
+    }).pipe(
+      tap(detail => {
+        // Lưu vào cache
+        this.cacheService.saveInvoiceDetail(detail);
+      }),
+      catchError(error => {
+        console.error('Error fetching invoice detail:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  /**
+   * Lấy số lượng chi tiết hóa đơn đã cache
+   */
+  getInvoiceDetailCacheCount(): Observable<number> {
+    return from(this.cacheService.getInvoiceDetailCount());
   }
 }
