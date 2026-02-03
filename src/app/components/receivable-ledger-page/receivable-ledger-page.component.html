@@ -50,11 +50,18 @@
         <span class="card-value text-green">{{ formatCurrency(summary().totalCredit) }}</span>
       </div>
     </div>
-    <div class="summary-card card-closing">
+    <div class="summary-card card-closing-debit">
       <div class="card-icon">💰</div>
       <div class="card-content">
-        <span class="card-label">Dư cuối kỳ</span>
-        <span class="card-value text-orange">{{ formatCurrency(summary().totalClosingBalance) }}</span>
+        <span class="card-label">Dư Nợ cuối kỳ</span>
+        <span class="card-value text-blue">{{ formatCurrency(getDebitBalance(summary().totalClosingBalance)) }}</span>
+      </div>
+    </div>
+    <div class="summary-card card-closing-credit">
+      <div class="card-icon">💳</div>
+      <div class="card-content">
+        <span class="card-label">Dư Có cuối kỳ</span>
+        <span class="card-value text-green">{{ formatCurrency(getCreditBalance(summary().totalClosingBalance)) }}</span>
       </div>
     </div>
   </div>
@@ -113,7 +120,8 @@
             <th class="col-amount text-right">Dư đầu kỳ</th>
             <th class="col-amount text-right">PS Nợ</th>
             <th class="col-amount text-right">PS Có</th>
-            <th class="col-amount text-right">Dư cuối kỳ</th>
+            <th class="col-amount text-right">Dư Nợ</th>
+            <th class="col-amount text-right">Dư Có</th>
             <th class="col-action"></th>
           </tr>
         </thead>
@@ -126,8 +134,15 @@
               <td class="text-right">{{ formatCurrency(item.openingBalance) }}</td>
               <td class="text-right text-blue">{{ formatCurrency(item.totalDebit) }}</td>
               <td class="text-right text-green">{{ formatCurrency(item.totalCredit) }}</td>
-              <td class="text-right" [ngClass]="getBalanceClass(item.closingBalance)">
-                <strong>{{ formatCurrency(item.closingBalance) }}</strong>
+              <td class="text-right text-blue">
+                @if (item.closingBalance > 0) {
+                  <strong>{{ formatCurrency(item.closingBalance) }}</strong>
+                }
+              </td>
+              <td class="text-right text-green">
+                @if (item.closingBalance < 0) {
+                  <strong>{{ formatCurrency(-item.closingBalance) }}</strong>
+                }
               </td>
               <td>
                 <button class="btn-icon btn-view" title="Xem chi tiết" (click)="showDetail(item.customerId)">👁</button>
@@ -141,7 +156,8 @@
             <td class="text-right"><strong>{{ formatCurrency(summary().totalOpeningBalance) }}</strong></td>
             <td class="text-right text-blue"><strong>{{ formatCurrency(summary().totalDebit) }}</strong></td>
             <td class="text-right text-green"><strong>{{ formatCurrency(summary().totalCredit) }}</strong></td>
-            <td class="text-right text-orange"><strong>{{ formatCurrency(summary().totalClosingBalance) }}</strong></td>
+            <td class="text-right text-blue"><strong>{{ formatCurrency(getDebitBalance(summary().totalClosingBalance)) }}</strong></td>
+            <td class="text-right text-green"><strong>{{ formatCurrency(getCreditBalance(summary().totalClosingBalance)) }}</strong></td>
             <td></td>
           </tr>
         </tfoot>
@@ -175,7 +191,8 @@
             <th class="col-desc">Diễn giải</th>
             <th class="col-amount text-right">PS Nợ</th>
             <th class="col-amount text-right">PS Có</th>
-            <th class="col-amount text-right">Số dư</th>
+            <th class="col-amount text-right">Dư Nợ</th>
+            <th class="col-amount text-right">Dư Có</th>
           </tr>
         </thead>
         <tbody>
@@ -187,7 +204,16 @@
             <td><strong>Dư đầu kỳ</strong></td>
             <td class="text-right"></td>
             <td class="text-right"></td>
-            <td class="text-right"><strong>{{ formatCurrency(selectedCustomerData()!.openingBalance) }}</strong></td>
+            <td class="text-right text-blue">
+              @if (selectedCustomerData()!.openingBalance > 0) {
+                <strong>{{ formatCurrency(selectedCustomerData()!.openingBalance) }}</strong>
+              }
+            </td>
+            <td class="text-right text-green">
+              @if (selectedCustomerData()!.openingBalance < 0) {
+                <strong>{{ formatCurrency(-selectedCustomerData()!.openingBalance) }}</strong>
+              }
+            </td>
           </tr>
 
           <!-- Movement rows -->
@@ -211,7 +237,16 @@
               } @else {
                 <td class="text-right"></td>
               }
-              <td class="text-right">{{ formatCurrency(line.balance) }}</td>
+              <td class="text-right text-blue">
+                @if (line.balance > 0) {
+                  {{ formatCurrency(line.balance) }}
+                }
+              </td>
+              <td class="text-right text-green">
+                @if (line.balance < 0) {
+                  {{ formatCurrency(-line.balance) }}
+                }
+              </td>
             </tr>
           }
 
@@ -224,6 +259,7 @@
             <td class="text-right text-blue"><strong>{{ formatCurrency(selectedCustomerData()!.totalDebit) }}</strong></td>
             <td class="text-right text-green"><strong>{{ formatCurrency(selectedCustomerData()!.totalCredit) }}</strong></td>
             <td class="text-right"></td>
+            <td class="text-right"></td>
           </tr>
           <tr class="closing-row">
             <td></td>
@@ -232,7 +268,16 @@
             <td><strong>Dư cuối kỳ</strong></td>
             <td class="text-right"></td>
             <td class="text-right"></td>
-            <td class="text-right text-orange"><strong>{{ formatCurrency(selectedCustomerData()!.closingBalance) }}</strong></td>
+            <td class="text-right text-blue">
+              @if (selectedCustomerData()!.closingBalance > 0) {
+                <strong>{{ formatCurrency(selectedCustomerData()!.closingBalance) }}</strong>
+              }
+            </td>
+            <td class="text-right text-green">
+              @if (selectedCustomerData()!.closingBalance < 0) {
+                <strong>{{ formatCurrency(-selectedCustomerData()!.closingBalance) }}</strong>
+              }
+            </td>
           </tr>
         </tbody>
       </table>

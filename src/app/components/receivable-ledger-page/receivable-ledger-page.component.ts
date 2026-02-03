@@ -406,9 +406,10 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
     let csvContent: string;
 
     if (this.viewMode() === 'summary') {
-      const headers = ['STT', 'Mã KH', 'Tên khách hàng', 'Dư đầu kỳ', 'PS Nợ', 'PS Có', 'Dư cuối kỳ'];
+      const headers = ['STT', 'Mã KH', 'Tên khách hàng', 'Dư đầu kỳ', 'PS Nợ', 'PS Có', 'Dư Nợ', 'Dư Có'];
       const rows = this.customerReceivables().map((c, i) => [
-        i + 1, c.customerCode, c.customerName, c.openingBalance, c.totalDebit, c.totalCredit, c.closingBalance
+        i + 1, c.customerCode, c.customerName, c.openingBalance, c.totalDebit, c.totalCredit,
+        this.getDebitBalance(c.closingBalance) || '', this.getCreditBalance(c.closingBalance) || ''
       ]);
       const sum = this.summary();
 
@@ -419,14 +420,15 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
         headers.join(','),
         ...rows.map(r => r.join(',')),
         '',
-        `Tổng cộng,,,${sum.totalOpeningBalance},${sum.totalDebit},${sum.totalCredit},${sum.totalClosingBalance}`
+        `Tổng cộng,,,${sum.totalOpeningBalance},${sum.totalDebit},${sum.totalCredit},${this.getDebitBalance(sum.totalClosingBalance) || ''},${this.getCreditBalance(sum.totalClosingBalance) || ''}`
       ].join('\n');
     } else {
       const c = this.selectedCustomerData()!;
-      const headers = ['Ngày', 'Số CT', 'Loại', 'Diễn giải', 'PS Nợ', 'PS Có', 'Số dư'];
+      const headers = ['Ngày', 'Số CT', 'Loại', 'Diễn giải', 'PS Nợ', 'PS Có', 'Dư Nợ', 'Dư Có'];
       const rows = c.lines.map(l => [
         this.formatDate(l.date), l.voucherNo, this.getVoucherTypeLabel(l.voucherType),
-        `"${l.description}"`, l.debitAmount || '', l.creditAmount || '', l.balance
+        `"${l.description}"`, l.debitAmount || '', l.creditAmount || '',
+        l.balance > 0 ? l.balance : '', l.balance < 0 ? -l.balance : ''
       ]);
 
       csvContent = [
@@ -434,9 +436,9 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
         `Kỳ: ${this.formatDate(this.fromDate())} - ${this.formatDate(this.toDate())}`,
         '',
         headers.join(','),
-        `${this.formatDate(this.fromDate())},,,"Dư đầu kỳ",,,"${c.openingBalance}"`,
+        `${this.formatDate(this.fromDate())},,,"Dư đầu kỳ",,,,${c.openingBalance > 0 ? c.openingBalance : ''},${c.openingBalance < 0 ? -c.openingBalance : ''}`,
         ...rows.map(r => r.join(',')),
-        `${this.formatDate(this.toDate())},,,"Dư cuối kỳ",,,"${c.closingBalance}"`
+        `${this.formatDate(this.toDate())},,,"Dư cuối kỳ",,,,${c.closingBalance > 0 ? c.closingBalance : ''},${c.closingBalance < 0 ? -c.closingBalance : ''}`
       ].join('\n');
     }
 
@@ -485,5 +487,15 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
     if (balance > 0) return 'balance-debit';
     if (balance < 0) return 'balance-credit';
     return '';
+  }
+
+  /** Trả về giá trị Dư Nợ (balance > 0), ngược lại 0 */
+  getDebitBalance(balance: number): number {
+    return balance > 0 ? balance : 0;
+  }
+
+  /** Trả về giá trị Dư Có (balance < 0, đổi dấu), ngược lại 0 */
+  getCreditBalance(balance: number): number {
+    return balance < 0 ? -balance : 0;
   }
 }

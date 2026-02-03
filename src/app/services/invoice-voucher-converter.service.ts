@@ -79,6 +79,9 @@ export class InvoiceVoucherConverterService {
   /**
    * Chuyển đổi hóa đơn mua vào thành phiếu chi
    * Phiếu chi: Nợ 331 (Phải trả NCC) / Có 111 (Tiền mặt)
+   *
+   * QUAN TRỌNG: Công nợ TK 331 ghi nhận theo TỔNG GIÁ THANH TOÁN (bao gồm thuế GTGT)
+   * amount = tiền hàng + thuế GTGT (tổng thanh toán)
    */
   convertPurchaseToPaymentVoucher(
     invoice: HddtInvoice,
@@ -88,31 +91,30 @@ export class InvoiceVoucherConverterService {
     const invoiceSymbol = `${invoice.khmshdon}${invoice.khhdon}`;
 
     // Tạo lines từ chi tiết hóa đơn
+    // amount = tiền hàng + thuế GTGT (tổng thanh toán trên HĐ)
     const lines: Omit<VoucherLine, 'id'>[] = [];
 
     if (detail?.hdhhdvu && detail.hdhhdvu.length > 0) {
-      // Có chi tiết hàng hóa
       detail.hdhhdvu.forEach((item, idx) => {
         lines.push({
           lineNo: idx + 1,
           description: item.ten,
-          accountCode: '331', // Phải trả người bán
+          accountCode: '331',
           accountName: 'Phải trả người bán',
-          amount: item.thtien || 0,
+          amount: (item.thtien || 0) + (item.tthue || 0), // Tiền hàng + Thuế GTGT
           taxRate: item.tsuat || 0,
-          taxAmount: item.tthue || 0
+          taxAmount: 0
         });
       });
     } else {
-      // Không có chi tiết, tạo 1 dòng tổng
       lines.push({
         lineNo: 1,
         description: `Thanh toán HĐ ${invoiceSymbol}-${invoice.shdon}`,
         accountCode: '331',
         accountName: 'Phải trả người bán',
-        amount: invoice.tgtcthue,
-        taxRate: invoice.tgtthue > 0 ? Math.round((invoice.tgtthue / invoice.tgtcthue) * 100) : 0,
-        taxAmount: invoice.tgtthue
+        amount: invoice.tgtttbso, // Tổng giá thanh toán (đã bao gồm thuế)
+        taxRate: 0,
+        taxAmount: 0
       });
     }
 
@@ -130,8 +132,8 @@ export class InvoiceVoucherConverterService {
       originalVoucherNo: `${invoiceSymbol}-${invoice.shdon}`,
       originalVoucherDate: invoiceDate,
       lines,
-      totalAmount: invoice.tgtcthue,
-      taxAmount: invoice.tgtthue,
+      totalAmount: invoice.tgtttbso,
+      taxAmount: 0,
       grandTotal: invoice.tgtttbso,
       invoiceSymbol,
       invoiceNo: invoice.shdon
@@ -208,6 +210,9 @@ export class InvoiceVoucherConverterService {
   /**
    * Chuyển đổi hóa đơn bán ra thành phiếu thu
    * Phiếu thu: Nợ 111 (Tiền mặt) / Có 131 (Phải thu KH)
+   *
+   * QUAN TRỌNG: Công nợ TK 131 ghi nhận theo TỔNG GIÁ THANH TOÁN (bao gồm thuế GTGT)
+   * amount = tiền hàng + thuế GTGT (tổng thanh toán)
    */
   convertSaleToReceiptVoucher(
     invoice: HddtSoldInvoice,
@@ -220,6 +225,7 @@ export class InvoiceVoucherConverterService {
     const buyerName = invoice.nmten || invoice.nmtnmua || 'Khách lẻ';
     const buyerTaxCode = invoice.nmmst || '';
 
+    // amount = tiền hàng + thuế GTGT (tổng thanh toán trên HĐ)
     const lines: Omit<VoucherLine, 'id'>[] = [];
 
     if (detail?.hdhhdvu && detail.hdhhdvu.length > 0) {
@@ -229,9 +235,9 @@ export class InvoiceVoucherConverterService {
           description: item.ten,
           accountCode: '131',
           accountName: 'Phải thu khách hàng',
-          amount: item.thtien || 0,
+          amount: (item.thtien || 0) + (item.tthue || 0), // Tiền hàng + Thuế GTGT
           taxRate: item.tsuat || 0,
-          taxAmount: item.tthue || 0
+          taxAmount: 0
         });
       });
     } else {
@@ -240,9 +246,9 @@ export class InvoiceVoucherConverterService {
         description: `Thu tiền HĐ ${invoiceSymbol}-${invoice.shdon}`,
         accountCode: '131',
         accountName: 'Phải thu khách hàng',
-        amount: invoice.tgtcthue,
-        taxRate: invoice.tgtthue > 0 ? Math.round((invoice.tgtthue / invoice.tgtcthue) * 100) : 0,
-        taxAmount: invoice.tgtthue
+        amount: invoice.tgtttbso, // Tổng giá thanh toán (đã bao gồm thuế)
+        taxRate: 0,
+        taxAmount: 0
       });
     }
 
@@ -260,8 +266,8 @@ export class InvoiceVoucherConverterService {
       originalVoucherNo: `${invoiceSymbol}-${invoice.shdon}`,
       originalVoucherDate: invoiceDate,
       lines,
-      totalAmount: invoice.tgtcthue,
-      taxAmount: invoice.tgtthue,
+      totalAmount: invoice.tgtttbso,
+      taxAmount: 0,
       grandTotal: invoice.tgtttbso,
       invoiceSymbol,
       invoiceNo: invoice.shdon
