@@ -424,18 +424,33 @@
   padding: 16px 20px;
   border-top: 1px solid #e0e0e0;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .btn {
-  padding: 10px 20px;
+  padding: 10px 16px;
   border: none;
-  border-radius: 4px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-icon {
+  font-size: 16px;
 }
 
 .btn-secondary {
@@ -446,6 +461,46 @@
 
 .btn-secondary:hover {
   background: #e0e0e0;
+}
+
+.btn-payment {
+  background: linear-gradient(135deg, #f44336, #e91e63);
+  color: white;
+}
+
+.btn-payment:hover {
+  background: linear-gradient(135deg, #d32f2f, #c2185b);
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+}
+
+.btn-receipt {
+  background: linear-gradient(135deg, #4caf50, #8bc34a);
+  color: white;
+}
+
+.btn-receipt:hover {
+  background: linear-gradient(135deg, #43a047, #7cb342);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.btn-warehouse-receipt {
+  background: linear-gradient(135deg, #2196f3, #03a9f4);
+  color: white;
+}
+
+.btn-warehouse-receipt:hover {
+  background: linear-gradient(135deg, #1976d2, #0288d1);
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+.btn-warehouse-issue {
+  background: linear-gradient(135deg, #ff9800, #ffc107);
+  color: white;
+}
+
+.btn-warehouse-issue:hover {
+  background: linear-gradient(135deg, #f57c00, #ffa000);
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
 }
 
 /* Responsive */
@@ -496,5 +551,19 @@
   .grand-total .total-label,
   .grand-total .total-value {
     font-size: 14px;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+
+  .footer-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-secondary {
+    width: 100%;
+    justify-content: center;
   }
 }

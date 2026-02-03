@@ -1,0 +1,209 @@
+@if (isOpen) {
+<div class="modal-overlay" (click)="onClose()">
+  <div class="modal-container" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="modal-header" [class.payment]="voucherType === 'PAYMENT'" [class.receipt]="voucherType === 'RECEIPT'" [class.warehouse-receipt]="voucherType === 'WAREHOUSE_RECEIPT'" [class.warehouse-issue]="voucherType === 'WAREHOUSE_ISSUE'">
+      <div class="header-title">
+        <span class="header-icon">{{ voucherIcon }}</span>
+        <h3>{{ modalTitle }}</h3>
+      </div>
+      <button class="close-btn" (click)="onClose()">&times;</button>
+    </div>
+
+    <!-- Body -->
+    <div class="modal-body">
+      @if (error) {
+        <div class="error-message">{{ error }}</div>
+      }
+
+      <!-- Thông tin hóa đơn gốc -->
+      <div class="section">
+        <h4 class="section-title">Thông tin Hóa đơn gốc</h4>
+        <div class="info-grid">
+          @if (cashVoucher) {
+            <div class="info-item">
+              <span class="label">Số HĐ:</span>
+              <span class="value">{{ cashVoucher.invoiceSymbol }}-{{ cashVoucher.invoiceNo }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Ngày HĐ:</span>
+              <span class="value">{{ formatDate(cashVoucher.originalVoucherDate) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">{{ voucherType === 'PAYMENT' ? 'Nhà cung cấp:' : 'Khách hàng:' }}</span>
+              <span class="value">{{ cashVoucher.relatedObjectName }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">MST:</span>
+              <span class="value">{{ cashVoucher.relatedObjectCode || '-' }}</span>
+            </div>
+          }
+          @if (warehouseVoucher) {
+            <div class="info-item">
+              <span class="label">Số HĐ:</span>
+              <span class="value">{{ warehouseVoucher.invoiceSymbol }}-{{ warehouseVoucher.invoiceNo }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Ngày HĐ:</span>
+              <span class="value">{{ formatDate(warehouseVoucher.refVoucherDate) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">{{ voucherType === 'WAREHOUSE_RECEIPT' ? 'Nhà cung cấp:' : 'Khách hàng:' }}</span>
+              <span class="value">{{ warehouseVoucher.partnerName }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">MST:</span>
+              <span class="value">{{ warehouseVoucher.partnerCode || '-' }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Form tạo phiếu -->
+      <div class="section">
+        <h4 class="section-title">Thông tin phiếu</h4>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Ngày phiếu</label>
+            <input type="date" [(ngModel)]="editableVoucherDate" class="form-control" />
+          </div>
+
+          @if (isCashVoucher) {
+            <div class="form-group">
+              <label>Phương thức thanh toán</label>
+              <select [(ngModel)]="editablePaymentMethod" class="form-control">
+                <option value="CASH">Tiền mặt</option>
+                <option value="BANK_TRANSFER">Chuyển khoản</option>
+              </select>
+            </div>
+          }
+
+          @if (isWarehouseVoucher) {
+            <div class="form-group">
+              <label>Kho</label>
+              <select [(ngModel)]="editableWarehouseCode" class="form-control">
+                <option value="KHO1">Kho chính</option>
+                <option value="KHO2">Kho phụ</option>
+              </select>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Chi tiết phiếu -->
+      <div class="section">
+        <h4 class="section-title">Chi tiết</h4>
+
+        @if (isCashVoucher && cashVoucher) {
+          <div class="detail-table-container">
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th>STT</th>
+                  <th>Diễn giải</th>
+                  <th>TK đối ứng</th>
+                  <th class="text-right">Số tiền</th>
+                  <th class="text-right">Thuế</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (line of cashVoucher.lines; track line.lineNo) {
+                  <tr>
+                    <td class="text-center">{{ line.lineNo }}</td>
+                    <td>{{ line.description }}</td>
+                    <td>{{ line.accountCode }}</td>
+                    <td class="text-right">{{ formatCurrency(line.amount) }}</td>
+                    <td class="text-right">{{ formatCurrency(line.taxAmount || 0) }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr class="total-row">
+                  <td colspan="3" class="text-right"><strong>Tổng cộng:</strong></td>
+                  <td class="text-right"><strong>{{ formatCurrency(cashVoucher.totalAmount) }}</strong></td>
+                  <td class="text-right"><strong>{{ formatCurrency(cashVoucher.taxAmount) }}</strong></td>
+                </tr>
+                <tr class="grand-total-row">
+                  <td colspan="3" class="text-right"><strong>Thành tiền (đã có thuế):</strong></td>
+                  <td colspan="2" class="text-right"><strong>{{ formatCurrency(cashVoucher.grandTotal) }} VNĐ</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="voucher-summary">
+            <div class="summary-item">
+              <span>TK tiền:</span>
+              <strong>{{ editablePaymentMethod === 'CASH' ? '1111 - Tiền mặt' : '1121 - Tiền gửi NH' }}</strong>
+            </div>
+            <div class="summary-item">
+              <span>Lý do:</span>
+              <strong>{{ cashVoucher.reason }}</strong>
+            </div>
+          </div>
+        }
+
+        @if (isWarehouseVoucher && warehouseVoucher) {
+          <div class="detail-table-container">
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th>STT</th>
+                  <th>Tên hàng hóa</th>
+                  <th>ĐVT</th>
+                  <th class="text-right">SL</th>
+                  <th class="text-right">Đơn giá</th>
+                  <th class="text-right">Thành tiền</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (line of warehouseVoucher.lines; track line.lineNo) {
+                  <tr>
+                    <td class="text-center">{{ line.lineNo }}</td>
+                    <td>{{ line.productName }}</td>
+                    <td>{{ line.unit }}</td>
+                    <td class="text-right">{{ line.quantity }}</td>
+                    <td class="text-right">{{ formatCurrency(line.unitPrice) }}</td>
+                    <td class="text-right">{{ formatCurrency(line.amount) }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr class="total-row">
+                  <td colspan="3" class="text-right"><strong>Tổng cộng:</strong></td>
+                  <td class="text-right"><strong>{{ warehouseVoucher.totalQuantity }}</strong></td>
+                  <td></td>
+                  <td class="text-right"><strong>{{ formatCurrency(warehouseVoucher.totalAmount) }}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="voucher-summary">
+            <div class="summary-item">
+              <span>Bút toán:</span>
+              <strong>Nợ {{ warehouseVoucher.debitAccount }} / Có {{ warehouseVoucher.creditAccount }}</strong>
+            </div>
+            <div class="summary-item">
+              <span>Kho:</span>
+              <strong>{{ warehouseVoucher.warehouseName }}</strong>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-footer">
+      <button class="btn btn-cancel" (click)="onClose()">Hủy</button>
+      <button class="btn btn-save" (click)="onSave()" [disabled]="isSaving">
+        @if (isSaving) {
+          <span class="spinner"></span> Đang lưu...
+        } @else {
+          Tạo phiếu
+        }
+      </button>
+    </div>
+  </div>
+</div>
+}

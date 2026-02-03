@@ -190,6 +190,24 @@
 
       <!-- Footer -->
       <div class="modal-footer">
+        <div class="footer-actions">
+          @if (isPurchaseInvoice) {
+            <button class="btn btn-payment" (click)="onCreateVoucher('PAYMENT')" title="Tạo phiếu chi từ hóa đơn này">
+              <span class="btn-icon">💸</span> Tạo Phiếu Chi
+            </button>
+            <button class="btn btn-warehouse-receipt" (click)="onCreateVoucher('WAREHOUSE_RECEIPT')" title="Tạo phiếu nhập kho từ hóa đơn này">
+              <span class="btn-icon">📦</span> Tạo Phiếu Nhập Kho
+            </button>
+          }
+          @if (isSalesInvoice) {
+            <button class="btn btn-receipt" (click)="onCreateVoucher('RECEIPT')" title="Tạo phiếu thu từ hóa đơn này">
+              <span class="btn-icon">💰</span> Tạo Phiếu Thu
+            </button>
+            <button class="btn btn-warehouse-issue" (click)="onCreateVoucher('WAREHOUSE_ISSUE')" title="Tạo phiếu xuất kho từ hóa đơn này">
+              <span class="btn-icon">📤</span> Tạo Phiếu Xuất Kho
+            </button>
+          }
+        </div>
         <button class="btn btn-secondary" (click)="onClose()">Đóng</button>
       </div>
     }

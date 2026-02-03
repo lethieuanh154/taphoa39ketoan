@@ -2,7 +2,7 @@ import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { HddtService, HddtInvoice, HddtInvoiceDetail } from '../../../services/hddt.service';
+import { HddtService, HddtSoldInvoice, HddtInvoiceDetail } from '../../../services/hddt.service';
 import { InvoiceDetailModalComponent, VoucherActionType } from '../../shared/invoice-detail-modal/invoice-detail-modal.component';
 import { CreateVoucherFromInvoiceModalComponent, VoucherCreationType } from '../../shared/create-voucher-from-invoice-modal/create-voucher-from-invoice-modal.component';
 import { InvoiceVoucherConverterService, CashVoucherFromInvoice, WarehouseVoucherFromInvoice } from '../../../services/invoice-voucher-converter.service';
@@ -11,16 +11,16 @@ import { WarehouseService } from '../../../services/warehouse.service';
 import { CreateVoucherDTO } from '../../../models/cash-voucher.models';
 
 @Component({
-  selector: 'app-purchase-invoice-page',
+  selector: 'app-sales-invoice-page',
   standalone: true,
   imports: [CommonModule, FormsModule, InvoiceDetailModalComponent, CreateVoucherFromInvoiceModalComponent],
-  templateUrl: './purchase-invoice-page.component.html',
-  styleUrl: './purchase-invoice-page.component.css'
+  templateUrl: './sales-invoice-page.component.html',
+  styleUrl: './sales-invoice-page.component.css'
 })
-export class PurchaseInvoicePageComponent implements OnInit {
+export class SalesInvoicePageComponent implements OnInit {
   // State
-  invoices = signal<HddtInvoice[]>([]);
-  allInvoices = signal<HddtInvoice[]>([]); // Lưu tất cả hóa đơn để search
+  invoices = signal<HddtSoldInvoice[]>([]);
+  allInvoices = signal<HddtSoldInvoice[]>([]);
   loading = signal(false);
   error = signal<string | null>(null);
 
@@ -40,13 +40,13 @@ export class PurchaseInvoicePageComponent implements OnInit {
   // Modal state
   showDetailModal = signal(false);
   selectedInvoiceDetail = signal<HddtInvoiceDetail | null>(null);
-  selectedInvoice = signal<HddtInvoice | null>(null);
+  selectedInvoice = signal<HddtSoldInvoice | null>(null);
   detailLoading = signal(false);
   detailError = signal<string | null>(null);
 
   // Create voucher modal state
   showCreateVoucherModal = signal(false);
-  createVoucherType = signal<VoucherCreationType>('PAYMENT');
+  createVoucherType = signal<VoucherCreationType>('RECEIPT');
   savingVoucher = signal(false);
   saveError = signal<string | null>(null);
   saveSuccess = signal<string | null>(null);
@@ -136,7 +136,7 @@ export class PurchaseInvoicePageComponent implements OnInit {
     const from = new Date(this.fromDate());
     const to = new Date(this.toDate());
 
-    this.hddtService.getPurchaseInvoicesInRange(from, to, forceRefresh).subscribe({
+    this.hddtService.getSoldInvoicesInRange(from, to, forceRefresh).subscribe({
       next: (data) => {
         this.allInvoices.set(data);
         this.invoices.set(data);
@@ -144,7 +144,7 @@ export class PurchaseInvoicePageComponent implements OnInit {
         this.loadCacheInfo();
       },
       error: (err) => {
-        console.error('Error loading invoices:', err);
+        console.error('Error loading sold invoices:', err);
         this.error.set(err.status === 401
           ? 'Token hết hạn. Vui lòng đăng nhập lại hoadondientu.gdt.gov.vn và cập nhật token.'
           : 'Không thể tải dữ liệu hóa đơn. Vui lòng thử lại.');
@@ -154,7 +154,7 @@ export class PurchaseInvoicePageComponent implements OnInit {
   }
 
   loadCacheInfo(): void {
-    this.hddtService.getCacheInfo().subscribe({
+    this.hddtService.getSoldCacheInfo().subscribe({
       next: (info) => this.cacheInfo.set(info)
     });
   }
@@ -170,13 +170,11 @@ export class PurchaseInvoicePageComponent implements OnInit {
     this.currentPage.set(1);
 
     if (!query) {
-      // Reset về danh sách gốc
       this.invoices.set(this.allInvoices());
       return;
     }
 
-    // Tìm kiếm trong cache
-    this.hddtService.searchInvoicesInCache(query).subscribe({
+    this.hddtService.searchSoldInvoicesInCache(query).subscribe({
       next: (results) => {
         this.invoices.set(results);
       }
@@ -224,11 +222,21 @@ export class PurchaseInvoicePageComponent implements OnInit {
     return new Intl.NumberFormat('vi-VN').format(amount);
   }
 
-  getInvoiceSymbol(invoice: HddtInvoice): string {
-    return this.hddtService.getInvoiceSymbol(invoice);
+  getInvoiceSymbol(invoice: HddtSoldInvoice): string {
+    return `${invoice.khmshdon}${invoice.khhdon}`;
   }
 
-  getStatusClass(invoice: HddtInvoice): string {
+  // Lấy tên người mua (ưu tiên nmten, fallback nmtnmua)
+  getBuyerName(invoice: HddtSoldInvoice): string {
+    return invoice.nmten || invoice.nmtnmua || 'Khách lẻ';
+  }
+
+  // Lấy MST người mua
+  getBuyerTaxCode(invoice: HddtSoldInvoice): string {
+    return invoice.nmmst || '-';
+  }
+
+  getStatusClass(invoice: HddtSoldInvoice): string {
     switch (invoice.tthai) {
       case 1: return 'status-new';
       case 2: return 'status-replaced';
@@ -240,12 +248,8 @@ export class PurchaseInvoicePageComponent implements OnInit {
     }
   }
 
-  getStatusText(invoice: HddtInvoice): string {
-    return this.hddtService.getInvoiceStatus(invoice);
-  }
-
-  getNatureText(invoice: HddtInvoice): string {
-    return this.hddtService.getInvoiceNature(invoice);
+  getStatusText(invoice: HddtSoldInvoice): string {
+    return this.hddtService.getInvoiceStatus(invoice as any);
   }
 
   refreshToken(): void {
@@ -253,20 +257,20 @@ export class PurchaseInvoicePageComponent implements OnInit {
   }
 
   // Modal methods
-  onInvoiceClick(invoice: HddtInvoice): void {
+  onInvoiceClick(invoice: HddtSoldInvoice): void {
     this.selectedInvoice.set(invoice);
     this.showDetailModal.set(true);
     this.detailLoading.set(true);
     this.detailError.set(null);
     this.selectedInvoiceDetail.set(null);
 
-    this.hddtService.getInvoiceDetail(invoice).subscribe({
+    this.hddtService.getSoldInvoiceDetail(invoice).subscribe({
       next: (detail) => {
         this.selectedInvoiceDetail.set(detail);
         this.detailLoading.set(false);
       },
       error: (err) => {
-        console.error('Error loading invoice detail:', err);
+        console.error('Error loading sold invoice detail:', err);
         this.detailError.set(err.status === 401
           ? 'Token hết hạn. Vui lòng đăng nhập lại.'
           : 'Không thể tải chi tiết hóa đơn. Vui lòng thử lại.');
@@ -298,7 +302,7 @@ export class PurchaseInvoicePageComponent implements OnInit {
     this.saveError.set(null);
     this.saveSuccess.set(null);
 
-    if (voucherType === 'PAYMENT') {
+    if (voucherType === 'RECEIPT') {
       const cashVoucher = voucher as CashVoucherFromInvoice;
       const dto: CreateVoucherDTO = {
         voucherType: cashVoucher.voucherType,
@@ -319,22 +323,21 @@ export class PurchaseInvoicePageComponent implements OnInit {
       this.cashVoucherService.createVoucher(dto).subscribe({
         next: (created) => {
           this.savingVoucher.set(false);
-          this.saveSuccess.set(`Đã tạo phiếu chi ${created.voucherNo} thành công!`);
+          this.saveSuccess.set(`Đã tạo phiếu thu ${created.voucherNo} thành công!`);
           this.showCreateVoucherModal.set(false);
           this.showDetailModal.set(false);
-          // Show success message briefly then clear
           setTimeout(() => this.saveSuccess.set(null), 3000);
         },
         error: (err) => {
           this.savingVoucher.set(false);
-          this.saveError.set(err.message || 'Lỗi tạo phiếu chi');
+          this.saveError.set(err.message || 'Lỗi tạo phiếu thu');
         }
       });
-    } else if (voucherType === 'WAREHOUSE_RECEIPT') {
+    } else if (voucherType === 'WAREHOUSE_ISSUE') {
       const whVoucher = voucher as WarehouseVoucherFromInvoice;
       this.warehouseService.createVoucher({
         voucherType: whVoucher.voucherType,
-        receiptType: whVoucher.receiptType,
+        issueType: whVoucher.issueType,
         voucherDate: whVoucher.voucherDate,
         warehouseCode: whVoucher.warehouseCode,
         warehouseName: whVoucher.warehouseName,
@@ -353,14 +356,14 @@ export class PurchaseInvoicePageComponent implements OnInit {
       }).subscribe({
         next: (created) => {
           this.savingVoucher.set(false);
-          this.saveSuccess.set(`Đã tạo phiếu nhập kho ${created.voucherNo} thành công!`);
+          this.saveSuccess.set(`Đã tạo phiếu xuất kho ${created.voucherNo} thành công!`);
           this.showCreateVoucherModal.set(false);
           this.showDetailModal.set(false);
           setTimeout(() => this.saveSuccess.set(null), 3000);
         },
         error: (err) => {
           this.savingVoucher.set(false);
-          this.saveError.set(err.message || 'Lỗi tạo phiếu nhập kho');
+          this.saveError.set(err.message || 'Lỗi tạo phiếu xuất kho');
         }
       });
     }

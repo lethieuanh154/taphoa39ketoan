@@ -67,21 +67,27 @@
 .report-title p { margin: 8px 0 0 0; font-size: 14px; color: #64748b; }
 .report-title .customer-info { font-size: 16px; font-weight: 600; color: #3b82f6; margin-top: 4px; }
 
-.data-table { width: 100%; border-collapse: collapse; }
+.data-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .data-table th { padding: 12px 10px; text-align: left; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; background: #f8fafc; white-space: nowrap; }
 .data-table td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #334155; }
 .data-table tr:hover { background: #f8fafc; }
-.text-right { text-align: right; }
+.text-right { text-align: right !important; }
 
-.col-no { width: 50px; }
-.col-code { width: 100px; }
-.col-name { min-width: 200px; }
-.col-date { width: 90px; }
-.col-voucher { width: 130px; }
-.col-type { width: 90px; }
-.col-desc { min-width: 180px; }
-.col-amount { width: 120px; }
-.col-action { width: 50px; }
+.col-no { width: 50px; text-align: center; }
+.col-code { width: 120px; }
+.col-name { width: auto; }
+.col-date { width: 100px; }
+.col-voucher { width: 140px; }
+.col-type { width: 100px; }
+.col-desc { width: auto; }
+.col-amount { width: 130px; text-align: right; }
+.col-action { width: 50px; text-align: center; }
+
+/* Force right align for amount columns */
+.data-table th.col-amount,
+.data-table td.col-amount,
+.data-table th.text-right,
+.data-table td.text-right { text-align: right !important; }
 
 .customer-code { font-weight: 600; color: #3b82f6; }
 .voucher-no { font-weight: 500; color: #3b82f6; }

@@ -2,6 +2,8 @@ import { Component, Input, Output, EventEmitter, signal, computed } from '@angul
 import { CommonModule } from '@angular/common';
 import { HddtInvoiceDetail, HddtInvoiceItem, VatRateInfo } from '../../../services/hddt.service';
 
+export type VoucherActionType = 'PAYMENT' | 'RECEIPT' | 'WAREHOUSE_RECEIPT' | 'WAREHOUSE_ISSUE';
+
 @Component({
   selector: 'app-invoice-detail-modal',
   standalone: true,
@@ -15,7 +17,9 @@ export class InvoiceDetailModalComponent {
   }
   @Input() loading = false;
   @Input() error: string | null = null;
+  @Input() invoiceType: 'PURCHASE' | 'SALES' = 'PURCHASE';
   @Output() closeModal = new EventEmitter<void>();
+  @Output() createVoucher = new EventEmitter<VoucherActionType>();
 
   private _invoice = signal<HddtInvoiceDetail | null>(null);
 
@@ -117,5 +121,17 @@ export class InvoiceDetailModalComponent {
       return parseFloat(vatInfo.dlieu);
     }
     return item.tthue || 0;
+  }
+
+  onCreateVoucher(type: VoucherActionType): void {
+    this.createVoucher.emit(type);
+  }
+
+  get isPurchaseInvoice(): boolean {
+    return this.invoiceType === 'PURCHASE';
+  }
+
+  get isSalesInvoice(): boolean {
+    return this.invoiceType === 'SALES';
   }
 }

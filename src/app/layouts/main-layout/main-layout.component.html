@@ -356,10 +356,54 @@
       </div>
     </nav>
 
+    <!-- HDDT Profile Footer -->
+    <div class="sidebar-footer">
+      <div class="hddt-profile" (click)="toggleProfileMenu()" [class.connected]="isHddtConnected">
+        <div class="hddt-avatar">
+          <i class="fa-solid" [class.fa-link]="isHddtConnected" [class.fa-link-slash]="!isHddtConnected"></i>
+        </div>
+        <div class="hddt-info" *ngIf="!isSidebarCollapsed">
+          @if (isHddtConnected && hddtProfileName) {
+            <span class="hddt-name">{{ hddtProfileName }}</span>
+            <span class="hddt-mst">{{ hddtUsername }}</span>
+          } @else {
+            <span class="hddt-name hddt-disconnected">Chua ket noi HDDT</span>
+          }
+        </div>
+      </div>
+
+      <!-- Dropdown menu -->
+      @if (showProfileMenu && !isSidebarCollapsed) {
+        <div class="profile-dropdown">
+          @if (isHddtConnected) {
+            <div class="dropdown-header">
+              <span class="dropdown-label">Hoa don dien tu</span>
+              <span class="dropdown-value">{{ hddtProfileName }}</span>
+              <span class="dropdown-mst">MST: {{ hddtUsername }}</span>
+            </div>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" (click)="openLoginDialog()">
+              <i class="fa-solid fa-rotate"></i> Doi tai khoan
+            </button>
+            <button class="dropdown-item dropdown-logout" (click)="hddtLogout()">
+              <i class="fa-solid fa-right-from-bracket"></i> Ngat ket noi
+            </button>
+          } @else {
+            <button class="dropdown-item" (click)="openLoginDialog()">
+              <i class="fa-solid fa-right-to-bracket"></i> Dang nhap HDDT
+            </button>
+          }
+        </div>
+      }
+    </div>
+
   </aside>
 
   <!-- Main Content -->
-  <main class="main-content">
+  <main class="main-content" (click)="showProfileMenu = false">
     <router-outlet></router-outlet>
   </main>
+
+  <!-- HDDT Token Dialog -->
+  <app-hddt-token-dialog #tokenDialog (tokenSaved)="onTokenSaved()"></app-hddt-token-dialog>
 </div>

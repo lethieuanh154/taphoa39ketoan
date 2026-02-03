@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { CashVoucherService } from '../../services/cash-voucher.service';
 import {
@@ -91,11 +92,20 @@ export class CashVoucherPageComponent implements OnInit, OnDestroy {
     { value: 'OTHER', label: 'Khác' }
   ];
 
-  constructor(private voucherService: CashVoucherService) { }
+  constructor(
+    private voucherService: CashVoucherService,
+    private route: ActivatedRoute
+  ) { }
 
   ngOnInit(): void {
-    this.loadVouchers();
-    this.loadStatistics();
+    // Get voucher type from route data
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe(data => {
+      if (data['type'] === 'PAYMENT' || data['type'] === 'RECEIPT') {
+        this.activeTab = data['type'] as VoucherType;
+      }
+      this.loadVouchers();
+      this.loadStatistics();
+    });
   }
 
   ngOnDestroy(): void {

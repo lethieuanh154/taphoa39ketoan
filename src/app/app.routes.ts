@@ -42,6 +42,7 @@ import { SystemSettingsPageComponent } from './components/system-settings-page/s
 import { Ledger8DongBoHoaDonV2Component } from './components/accountant-pages/ledger-8-dong-bo-hoa-don-v2/ledger-8-dong-bo-hoa-don-v2.component';
 import { Ledger9DongBoHoaDonDauRaComponent } from './components/accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra/ledger-9-dong-bo-hoa-don-dau-ra.component';
 import { PurchaseInvoicePageComponent } from './components/accountant-pages/purchase-invoice-page/purchase-invoice-page.component';
+import { SalesInvoicePageComponent } from './components/accountant-pages/sales-invoice-page/sales-invoice-page.component';
 
 /**
  * TAPHOA39KETOAN ROUTES
@@ -89,7 +90,7 @@ export const routes: Routes = [
       // ═══════════════════════════════════════════════════════════════════
       // 3. BÁN HÀNG & CÔNG NỢ PHẢI THU
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'ban-hang/hoa-don-ban-ra', component: InvoicePageComponent, data: { type: 'OUTPUT' } },
+      { path: 'ban-hang/hoa-don-ban-ra', component: SalesInvoicePageComponent },
       { path: 'ban-hang/cong-no-131', component: ReceivableLedgerPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════

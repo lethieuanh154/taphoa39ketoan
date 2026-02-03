@@ -1,7 +1,7 @@
-<div class="purchase-invoice-page">
+<div class="sales-invoice-page">
   <div class="page-header">
-    <h2>Hóa Đơn Mua Vào</h2>
-    <p class="subtitle">Danh sách hóa đơn điện tử mua vào từ hoadondientu.gdt.gov.vn</p>
+    <h2>Hóa Đơn Bán Ra</h2>
+    <p class="subtitle">Danh sách hóa đơn điện tử bán ra từ hoadondientu.gdt.gov.vn</p>
   </div>
 
   <!-- Filter Section -->
@@ -50,7 +50,7 @@
           (ngModelChange)="searchQuery.set($event)"
           (keyup.enter)="onSearch()"
           class="search-input"
-          placeholder="Nhập tên/MST người bán, số hóa đơn..."
+          placeholder="Nhập tên/MST người mua, số hóa đơn, mã hóa đơn..."
         />
       </div>
       <button class="btn btn-search" (click)="onSearch()">
@@ -89,7 +89,7 @@
       <div class="summary-value">{{ formatCurrency(totalVat()) }}</div>
     </div>
     <div class="summary-card highlight">
-      <div class="summary-label">Tổng thanh toán</div>
+      <div class="summary-label">Tổng doanh thu</div>
       <div class="summary-value">{{ formatCurrency(totalAmount()) }}</div>
     </div>
   </div>
@@ -158,8 +158,8 @@
             <th class="col-date">Ngày HĐ</th>
             <th class="col-symbol">Ký hiệu</th>
             <th class="col-number">Số HĐ</th>
-            <th class="col-seller">Người bán</th>
-            <th class="col-tax-code">MST người bán</th>
+            <th class="col-buyer">Người mua</th>
+            <th class="col-tax-code">MST người mua</th>
             <th class="col-amount text-right">Tiền trước thuế</th>
             <th class="col-vat text-right">Tiền thuế</th>
             <th class="col-total text-right">Tổng tiền</th>
@@ -173,10 +173,10 @@
               <td class="col-date">{{ formatDate(invoice.tdlap) }}</td>
               <td class="col-symbol">{{ getInvoiceSymbol(invoice) }}</td>
               <td class="col-number">{{ invoice.shdon }}</td>
-              <td class="col-seller" [title]="invoice.nbten">
-                {{ invoice.nbten }}
+              <td class="col-buyer" [title]="getBuyerName(invoice)">
+                {{ getBuyerName(invoice) }}
               </td>
-              <td class="col-tax-code">{{ invoice.nbmst }}</td>
+              <td class="col-tax-code">{{ getBuyerTaxCode(invoice) }}</td>
               <td class="col-amount text-right">{{ formatCurrency(invoice.tgtcthue) }}</td>
               <td class="col-vat text-right">{{ formatCurrency(invoice.tgtthue) }}</td>
               <td class="col-total text-right">{{ formatCurrency(invoice.tgtttbso) }}</td>
@@ -184,9 +184,6 @@
                 <span class="status-badge" [class]="getStatusClass(invoice)">
                   {{ getStatusText(invoice) }}
                 </span>
-                @if (getNatureText(invoice)) {
-                  <br><small class="nature-text">{{ getNatureText(invoice) }}</small>
-                }
               </td>
             </tr>
           }
@@ -237,7 +234,7 @@
     <div class="empty-state">
       <div class="empty-icon">📄</div>
       <h3>Không có hóa đơn</h3>
-      <p>Không tìm thấy hóa đơn mua vào trong khoảng thời gian đã chọn.</p>
+      <p>Không tìm thấy hóa đơn bán ra trong khoảng thời gian đã chọn.</p>
     </div>
   }
 </div>
@@ -248,7 +245,7 @@
     [invoice]="selectedInvoiceDetail()"
     [loading]="detailLoading()"
     [error]="detailError()"
-    [invoiceType]="'PURCHASE'"
+    [invoiceType]="'SALES'"
     (closeModal)="onCloseModal()"
     (createVoucher)="onCreateVoucher($event)"
   />
@@ -259,7 +256,7 @@
   <app-create-voucher-from-invoice-modal
     [isOpen]="showCreateVoucherModal()"
     [voucherType]="createVoucherType()"
-    [purchaseInvoice]="selectedInvoice()"
+    [salesInvoice]="selectedInvoice()"
     [invoiceDetail]="selectedInvoiceDetail()"
     (closeModal)="onCloseCreateVoucherModal()"
     (createVoucher)="onVoucherCreated($event)"

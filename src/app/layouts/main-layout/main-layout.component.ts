@@ -1,6 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, inject, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, RouterOutlet } from '@angular/router';
+import { HddtService } from '../../services/hddt.service';
+import { HddtTokenDialogComponent } from '../../components/shared/hddt-token-dialog/hddt-token-dialog.component';
 
 /**
  * MAIN LAYOUT COMPONENT
@@ -12,14 +14,20 @@ import { RouterModule, RouterOutlet } from '@angular/router';
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule, RouterOutlet],
+  imports: [CommonModule, RouterModule, RouterOutlet, HddtTokenDialogComponent],
   templateUrl: './main-layout.component.html',
   styleUrl: './main-layout.component.css',
 })
 export class MainLayoutComponent {
+  private hddtService = inject(HddtService);
+
+  @ViewChild('tokenDialog') tokenDialog!: HddtTokenDialogComponent;
 
   // Sidebar collapse state
   isSidebarCollapsed: boolean = false;
+
+  // HDDT profile dropdown
+  showProfileMenu = false;
 
   // Expanded groups state
   expandedGroups: { [key: string]: boolean } = {
@@ -37,6 +45,20 @@ export class MainLayoutComponent {
     heThong: true
   };
 
+  get hddtProfileName(): string {
+    const profile = this.hddtService.getProfile();
+    return profile?.name || '';
+  }
+
+  get hddtUsername(): string {
+    const profile = this.hddtService.getProfile();
+    return profile?.username || profile?.id || '';
+  }
+
+  get isHddtConnected(): boolean {
+    return this.hddtService.hasToken();
+  }
+
   toggleSidebar(): void {
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
   }
@@ -48,11 +70,26 @@ export class MainLayoutComponent {
     this.expandedGroups[groupKey] = !this.expandedGroups[groupKey];
   }
 
-  exportCurrentMonth(): void {
-    alert('Chức năng xuất dữ liệu sẽ được cập nhật.');
+  toggleProfileMenu(): void {
+    this.showProfileMenu = !this.showProfileMenu;
   }
 
-  printCurrentMonth(): void {
-    alert('Chức năng in sẽ được cập nhật.');
+  openLoginDialog(): void {
+    this.showProfileMenu = false;
+    if (this.tokenDialog) {
+      this.tokenDialog.openDialog();
+    }
+  }
+
+  hddtLogout(): void {
+    this.showProfileMenu = false;
+    this.hddtService.clearToken();
+    if (this.tokenDialog) {
+      this.tokenDialog.openDialog();
+    }
+  }
+
+  onTokenSaved(): void {
+    this.showProfileMenu = false;
   }
 }

@@ -6,6 +6,46 @@ import { environment } from '../../environments/environment';
 import { HddtCacheService } from './hddt-cache.service';
 
 const HDDT_TOKEN_KEY = 'hddt_token';
+const HDDT_PROFILE_KEY = 'hddt_profile';
+
+/**
+ * Interface cho captcha response
+ */
+export interface HddtCaptchaResponse {
+  key: string;
+  content: string;    // SVG content
+  solved: string;     // Captcha đã giải tự động
+}
+
+/**
+ * Interface cho login request
+ */
+export interface HddtLoginRequest {
+  username: string;
+  password: string;
+  ckey: string;
+  cvalue: string;
+}
+
+/**
+ * Interface cho login response
+ */
+export interface HddtLoginResponse {
+  token: string;
+  profile: HddtProfile | null;
+}
+
+/**
+ * Interface cho GDT user profile
+ */
+export interface HddtProfile {
+  username: string;
+  name: string;
+  id: string;
+  type: number;
+  groupId: string;
+  [key: string]: unknown;
+}
 
 /**
  * Interface cho hóa đơn từ API GDT
@@ -56,6 +96,47 @@ export interface HddtSearchParams {
   size?: number;
   sort?: string;
   ttxly?: number;          // Trạng thái xử lý (5 = đã xử lý)
+}
+
+/**
+ * Interface cho hóa đơn bán ra (sold invoice)
+ * Dựa trên response từ /sco-query/invoices/sold
+ */
+export interface HddtSoldInvoice {
+  id: string;
+  nbmst: string;           // MST người bán (chính là công ty mình)
+  nbten: string;           // Tên người bán
+  nbdchi: string;          // Địa chỉ người bán
+  nbsdthoai: string;       // SĐT người bán
+  nmmst: string | null;    // MST người mua (có thể null với khách lẻ)
+  nmten: string | null;    // Tên người mua
+  nmtnmua: string;         // Tên người mua (nếu không có MST)
+  nmdchi: string | null;   // Địa chỉ người mua
+  khmshdon: number;        // Ký hiệu mẫu số hóa đơn
+  khhdon: string;          // Ký hiệu hóa đơn
+  shdon: number;           // Số hóa đơn
+  mhdon: string;           // Mã hóa đơn
+  tdlap: string;           // Thời điểm lập (ISO date)
+  nky: string;             // Ngày ký
+  tgtcthue: number;        // Tổng giá trị chưa thuế
+  tgtthue: number;         // Tổng giá trị thuế
+  tgtttbso: number;        // Tổng giá trị thanh toán bằng số
+  tgtttbchu: string;       // Tổng giá trị thanh toán bằng chữ
+  tthai: number;           // Trạng thái hóa đơn
+  ttxly: number;           // Trạng thái xử lý
+  thdon: string;           // Tên hóa đơn
+  thtttoan: string;        // Hình thức thanh toán
+  tchat: number;           // Tính chất (1: gốc, 3: điều chỉnh)
+  thttltsuat: VatRateInfo[]; // Thông tin thuế suất
+  mtdtchieu: string;       // Mã tra cứu điện tử
+  [key: string]: unknown;
+}
+
+export interface HddtSoldApiResponse {
+  datas: HddtSoldInvoice[];
+  state?: string;
+  total?: number;
+  time?: number;
 }
 
 /**
@@ -134,6 +215,62 @@ export class HddtService {
     private http: HttpClient,
     private cacheService: HddtCacheService
   ) {}
+
+  // ==================== LOGIN & TOKEN ====================
+
+  /**
+   * Lấy captcha từ GDT (qua backend proxy)
+   * Backend tự động giải captcha SVG
+   */
+  getCaptcha(): Observable<HddtCaptchaResponse> {
+    return this.http.get<HddtCaptchaResponse>(`${this.apiBase}/captcha`).pipe(
+      catchError(error => {
+        console.error('Error fetching captcha:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  /**
+   * Đăng nhập GDT và lấy token
+   */
+  login(loginData: HddtLoginRequest): Observable<HddtLoginResponse> {
+    return this.http.post<HddtLoginResponse>(`${this.apiBase}/login`, loginData).pipe(
+      tap(response => {
+        if (response.token) {
+          sessionStorage.setItem(HDDT_TOKEN_KEY, response.token);
+        }
+        if (response.profile) {
+          sessionStorage.setItem(HDDT_PROFILE_KEY, JSON.stringify(response.profile));
+        }
+      }),
+      catchError(error => {
+        console.error('Error logging in:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  /**
+   * Lấy profile đã lưu
+   */
+  getProfile(): HddtProfile | null {
+    const raw = sessionStorage.getItem(HDDT_PROFILE_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Xóa token và profile (logout)
+   */
+  clearToken(): void {
+    sessionStorage.removeItem(HDDT_TOKEN_KEY);
+    sessionStorage.removeItem(HDDT_PROFILE_KEY);
+  }
 
   /**
    * Lấy token từ session storage
@@ -466,5 +603,195 @@ export class HddtService {
    */
   getInvoiceDetailCacheCount(): Observable<number> {
     return from(this.cacheService.getInvoiceDetailCount());
+  }
+
+  // ==================== SOLD INVOICES (HÓA ĐƠN BÁN RA) ====================
+
+  /**
+   * Build search query string cho sold invoices
+   * Không dùng ttxly vì sold API có format khác
+   */
+  private buildSoldSearchQuery(params: HddtSearchParams): string {
+    const { fromDate, toDate } = params;
+    // Format: tdlap=ge=02/01/2026T00:00:00;tdlap=le=01/02/2026T23:59:59
+    return `tdlap=ge=${fromDate}T00:00:00;tdlap=le=${toDate}T23:59:59`;
+  }
+
+  /**
+   * API: Lấy hóa đơn bán ra
+   * Gọi qua proxy: GET /api/hddt/sold
+   */
+  getSoldInvoices(params: HddtSearchParams): Observable<HddtSoldApiResponse> {
+    if (!this.hasToken()) {
+      return throwError(() => new Error('HDDT Token không tồn tại'));
+    }
+
+    const { size = 50, sort = 'tdlap:desc' } = params;
+    const search = this.buildSoldSearchQuery(params);
+
+    const httpParams = new HttpParams()
+      .set('sort', sort)
+      .set('size', size.toString())
+      .set('search', search);
+
+    return this.http.get<HddtSoldApiResponse>(`${this.apiBase}/sold`, {
+      headers: this.getHeaders(),
+      params: httpParams
+    }).pipe(
+      catchError(error => {
+        console.error('Error fetching sold invoices:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  /**
+   * Lấy hóa đơn bán ra trong khoảng thời gian
+   * Ưu tiên lấy từ cache, nếu không có mới gọi API
+   */
+  getSoldInvoicesInRange(fromDate?: Date, toDate?: Date, forceRefresh = false): Observable<HddtSoldInvoice[]> {
+    const to = toDate || new Date();
+    const fromD = fromDate || new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const fromDateStr = this.formatDateForApi(fromD);
+    const toDateStr = this.formatDateForApi(to);
+
+    // Nếu force refresh, gọi API trực tiếp
+    if (forceRefresh) {
+      return this.fetchAndCacheSoldInvoices(fromDateStr, toDateStr);
+    }
+
+    // Kiểm tra cache trước
+    return from(this.cacheService.isSoldCacheValid()).pipe(
+      switchMap(isValid => {
+        if (isValid) {
+          // Lấy từ cache
+          return from(this.cacheService.getSoldInvoicesByDateRange(fromDateStr, toDateStr)).pipe(
+            switchMap(cachedInvoices => {
+              if (cachedInvoices.length > 0) {
+                console.log(`Lấy ${cachedInvoices.length} hóa đơn bán ra từ cache`);
+                return of(cachedInvoices);
+              }
+              // Cache rỗng, gọi API
+              return this.fetchAndCacheSoldInvoices(fromDateStr, toDateStr);
+            })
+          );
+        }
+        // Cache không hợp lệ, gọi API
+        return this.fetchAndCacheSoldInvoices(fromDateStr, toDateStr);
+      })
+    );
+  }
+
+  /**
+   * Gọi API lấy hóa đơn bán ra và lưu vào cache
+   */
+  private fetchAndCacheSoldInvoices(fromDate: string, toDate: string): Observable<HddtSoldInvoice[]> {
+    return this.getSoldInvoices({
+      fromDate,
+      toDate,
+      size: 50  // API GDT giới hạn tối đa 50
+    }).pipe(
+      map(response => {
+        const invoices = response.datas || [];
+        // Sắp xếp theo ngày lập giảm dần
+        return invoices.sort((a, b) =>
+          new Date(b.tdlap).getTime() - new Date(a.tdlap).getTime()
+        );
+      }),
+      tap(invoices => {
+        // Lưu vào cache
+        this.cacheService.saveSoldInvoices(invoices, fromDate, toDate);
+      })
+    );
+  }
+
+  /**
+   * Tìm kiếm hóa đơn bán ra trong cache
+   */
+  searchSoldInvoicesInCache(query: string): Observable<HddtSoldInvoice[]> {
+    return from(this.cacheService.searchSoldInvoices(query));
+  }
+
+  /**
+   * Xóa cache hóa đơn bán ra và tải lại dữ liệu
+   */
+  refreshSoldCache(fromDate?: Date, toDate?: Date): Observable<HddtSoldInvoice[]> {
+    return from(this.cacheService.clearSoldCache()).pipe(
+      switchMap(() => this.getSoldInvoicesInRange(fromDate, toDate, true))
+    );
+  }
+
+  /**
+   * Lấy thông tin cache hóa đơn bán ra
+   */
+  getSoldCacheInfo(): Observable<{ count: number; lastUpdated: number | null }> {
+    return from(Promise.all([
+      this.cacheService.getSoldInvoiceCount(),
+      this.cacheService.getSoldMetadata()
+    ])).pipe(
+      map(([count, metadata]) => ({
+        count,
+        lastUpdated: metadata?.lastUpdated || null
+      }))
+    );
+  }
+
+  /**
+   * Lấy chi tiết hóa đơn bán ra
+   * GET /api/hddt/sold-detail?nbmst=xxx&khhdon=xxx&shdon=xxx&khmshdon=xxx
+   */
+  getSoldInvoiceDetail(invoice: HddtSoldInvoice, forceRefresh = false): Observable<HddtInvoiceDetail> {
+    if (!this.hasToken()) {
+      return throwError(() => new Error('HDDT Token không tồn tại'));
+    }
+
+    // Nếu force refresh, gọi API trực tiếp
+    if (forceRefresh) {
+      return this.fetchAndCacheSoldInvoiceDetail(invoice);
+    }
+
+    // Kiểm tra cache trước
+    return from(
+      this.cacheService.getSoldInvoiceDetailByParams(
+        invoice.nbmst,
+        invoice.khhdon,
+        invoice.shdon,
+        invoice.khmshdon
+      )
+    ).pipe(
+      switchMap(cachedDetail => {
+        if (cachedDetail) {
+          console.log(`Lấy chi tiết hóa đơn bán ra ${invoice.khhdon}-${invoice.shdon} từ cache`);
+          return of(cachedDetail);
+        }
+        // Không có trong cache, gọi API
+        return this.fetchAndCacheSoldInvoiceDetail(invoice);
+      })
+    );
+  }
+
+  /**
+   * Gọi API lấy chi tiết hóa đơn bán ra và lưu vào cache
+   */
+  private fetchAndCacheSoldInvoiceDetail(invoice: HddtSoldInvoice): Observable<HddtInvoiceDetail> {
+    const params = new HttpParams()
+      .set('nbmst', invoice.nbmst)
+      .set('khhdon', invoice.khhdon)
+      .set('shdon', invoice.shdon.toString())
+      .set('khmshdon', invoice.khmshdon.toString());
+
+    return this.http.get<HddtInvoiceDetail>(`${this.apiBase}/sold-detail`, {
+      headers: this.getHeaders(),
+      params
+    }).pipe(
+      tap(detail => {
+        // Lưu vào cache
+        this.cacheService.saveSoldInvoiceDetail(detail);
+      }),
+      catchError(error => {
+        console.error('Error fetching sold invoice detail:', error);
+        return throwError(() => error);
+      })
+    );
   }
 }

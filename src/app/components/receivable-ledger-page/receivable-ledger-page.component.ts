@@ -1,26 +1,35 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { Subject, forkJoin, from, of } from 'rxjs';
+import { takeUntil, catchError } from 'rxjs/operators';
 
-import { CustomerService } from '../../services/customer.service';
-import { Customer } from '../../models/customer.models';
+import { HddtSoldInvoice } from '../../services/hddt.service';
+import { HddtCacheService } from '../../services/hddt-cache.service';
+import { CashVoucherService } from '../../services/cash-voucher.service';
+import { CashVoucher } from '../../models/cash-voucher.models';
 
+/**
+ * Dòng chi tiết công nợ phải thu
+ */
 interface ReceivableLine {
   date: Date;
   voucherNo: string;
-  voucherType: string;
+  voucherType: 'INVOICE' | 'RECEIPT' | 'RETURN' | 'OTHER';
   description: string;
-  debitAmount: number;  // Phát sinh Nợ (tăng công nợ)
-  creditAmount: number; // Phát sinh Có (giảm công nợ)
+  debitAmount: number;  // Phát sinh Nợ (tăng công nợ - bán hàng)
+  creditAmount: number; // Phát sinh Có (giảm công nợ - thu tiền)
   balance: number;
 }
 
+/**
+ * Công nợ theo từng Khách hàng
+ */
 interface CustomerReceivable {
-  customerId: string;
-  customerCode: string;
+  customerId: string;       // MST làm ID (hoặc tên nếu không có MST)
+  customerCode: string;     // MST
   customerName: string;
+  customerAddress: string;
   openingBalance: number;
   totalDebit: number;
   totalCredit: number;
@@ -28,6 +37,9 @@ interface CustomerReceivable {
   lines: ReceivableLine[];
 }
 
+/**
+ * Tổng hợp công nợ
+ */
 interface ReceivableSummary {
   totalCustomers: number;
   totalOpeningBalance: number;
@@ -36,6 +48,16 @@ interface ReceivableSummary {
   totalClosingBalance: number;
 }
 
+/**
+ * SỔ CHI TIẾT TÀI KHOẢN 131 - PHẢI THU KHÁCH HÀNG
+ *
+ * Nguồn dữ liệu:
+ * - Hóa đơn bán ra (từ HDDT/IndexedDB): Ghi Nợ TK131 (tăng công nợ)
+ * - Phiếu thu (từ Backend API): Ghi Có TK131 (giảm công nợ)
+ *
+ * Công thức: Dư cuối kỳ = Dư đầu kỳ + PS Nợ - PS Có
+ * (TK131 có số dư bên Nợ = số tiền còn phải thu KH)
+ */
 @Component({
   selector: 'app-receivable-ledger-page',
   standalone: true,
@@ -46,40 +68,62 @@ interface ReceivableSummary {
 export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
-  // Data
-  customers: Customer[] = [];
-  customerReceivables: CustomerReceivable[] = [];
-  selectedCustomerData: CustomerReceivable | null = null;
+  // Services
+  private hddtCacheService = inject(HddtCacheService);
+  private cashVoucherService = inject(CashVoucherService);
+
+  // Raw data (loaded once from IndexedDB/API)
+  private allSalesInvoices: HddtSoldInvoice[] = [];
+  private allReceiptVouchers: CashVoucher[] = [];
+
+  // Processed data
+  customerReceivables = signal<CustomerReceivable[]>([]);
+  selectedCustomerData = signal<CustomerReceivable | null>(null);
 
   // Filter
-  selectedCustomerId = '';
-  fromDate: Date;
-  toDate: Date;
+  selectedCustomerId = signal('');
+  fromDate = signal<Date>(new Date(new Date().getFullYear(), 0, 1)); // Đầu năm
+  toDate = signal<Date>(new Date()); // Hôm nay
 
   // Summary
-  summary: ReceivableSummary = {
+  summary = signal<ReceivableSummary>({
     totalCustomers: 0,
     totalOpeningBalance: 0,
     totalDebit: 0,
     totalCredit: 0,
     totalClosingBalance: 0
-  };
+  });
 
   // View mode
-  viewMode: 'summary' | 'detail' = 'summary';
+  viewMode = signal<'summary' | 'detail'>('summary');
 
   // Loading
-  isLoading = false;
+  isLoading = signal(false);
+  errorMessage = signal<string | null>(null);
+  dataLoaded = signal(false);
 
-  constructor(private customerService: CustomerService) {
-    const now = new Date();
-    this.fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    this.toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  }
+  // Cache info
+  invoiceCount = signal(0);
+  voucherCount = signal(0);
+
+  // Computed: Danh sách KH từ dữ liệu
+  customers = computed(() => {
+    return this.customerReceivables().map(c => ({
+      id: c.customerId,
+      code: c.customerCode,
+      name: c.customerName
+    }));
+  });
 
   ngOnInit(): void {
-    this.loadCustomers();
-    this.loadData();
+    this.loadAllData();
+  }
+
+  /**
+   * Tải lại dữ liệu (gọi từ template)
+   */
+  loadData(): void {
+    this.loadAllData();
   }
 
   ngOnDestroy(): void {
@@ -88,93 +132,203 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // DATA LOADING
+  // DATA LOADING - Load once from IndexedDB/API
   // ═══════════════════════════════════════════════════════════════════
 
-  private loadCustomers(): void {
-    this.customerService.getCustomers()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(customers => {
-        this.customers = customers.filter(c => c.status === 'ACTIVE');
-      });
+  loadAllData(): void {
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+
+    // Load song song: Hóa đơn bán ra từ IndexedDB + Phiếu thu từ API
+    forkJoin({
+      salesInvoices: from(this.hddtCacheService.getAllSoldInvoices()).pipe(
+        catchError(err => {
+          console.error('Lỗi load hóa đơn bán ra từ IndexedDB:', err);
+          return of([] as HddtSoldInvoice[]);
+        })
+      ),
+      receiptVouchers: this.cashVoucherService.getVouchers({ voucherType: 'RECEIPT' }).pipe(
+        catchError(err => {
+          console.error('Lỗi load phiếu thu từ API:', err);
+          return of([] as CashVoucher[]);
+        })
+      )
+    }).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe({
+      next: ({ salesInvoices, receiptVouchers }) => {
+        // Store raw data
+        this.allSalesInvoices = salesInvoices;
+        this.allReceiptVouchers = receiptVouchers;
+
+        // Update counts
+        this.invoiceCount.set(salesInvoices.length);
+        this.voucherCount.set(receiptVouchers.length);
+
+        console.log('=== SỔ CÔNG NỢ 131 ===');
+        console.log('Tổng số hóa đơn bán ra trong IndexedDB:', salesInvoices.length);
+        console.log('Tổng số phiếu thu trong Firebase:', receiptVouchers.length);
+
+        // Process with current filter
+        this.processData();
+        this.dataLoaded.set(true);
+        this.isLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Lỗi tải dữ liệu sổ công nợ 131:', err);
+        this.errorMessage.set('Lỗi tải dữ liệu. Vui lòng thử lại.');
+        this.isLoading.set(false);
+      }
+    });
   }
 
-  loadData(): void {
-    this.isLoading = true;
+  /**
+   * Xử lý dữ liệu: Filter và gom nhóm theo Khách hàng (MST hoặc tên)
+   * Gọi khi thay đổi date range - KHÔNG load lại từ DB
+   */
+  processData(): void {
+    const fromD = new Date(this.fromDate());
+    fromD.setHours(0, 0, 0, 0);
 
-    // In real app, this would query from invoices and cash vouchers
-    // For demo, generate sample data
-    this.customerService.getCustomers()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(customers => {
-        this.generateReceivableData(customers.filter(c => c.status === 'ACTIVE'));
-        this.isLoading = false;
-      });
-  }
+    const toD = new Date(this.toDate());
+    toD.setHours(23, 59, 59, 999);
 
-  private generateReceivableData(customers: Customer[]): void {
-    const now = new Date();
+    console.log('Filter khoảng thời gian:', fromD.toLocaleDateString('vi-VN'), '-', toD.toLocaleDateString('vi-VN'));
 
-    this.customerReceivables = customers.map(c => {
-      const openingBalance = Math.floor(Math.random() * 50000000);
-      const debit1 = Math.floor(Math.random() * 30000000);
-      const debit2 = Math.floor(Math.random() * 20000000);
-      const credit1 = Math.floor(Math.random() * 25000000);
+    // Map theo ID khách hàng (MST hoặc tên nếu không có MST)
+    const customerMap = new Map<string, CustomerReceivable>();
 
-      let balance = openingBalance;
-      const lines: ReceivableLine[] = [
-        {
-          date: new Date(now.getFullYear(), now.getMonth(), 5),
-          voucherNo: `HD-${c.code}-001`,
-          voucherType: 'INVOICE',
-          description: 'Bán hàng - HĐ GTGT',
-          debitAmount: debit1,
-          creditAmount: 0,
-          balance: balance += debit1
-        },
-        {
-          date: new Date(now.getFullYear(), now.getMonth(), 12),
-          voucherNo: `PT-${c.code}-001`,
-          voucherType: 'RECEIPT',
-          description: 'Thu tiền khách hàng',
-          debitAmount: 0,
-          creditAmount: credit1,
-          balance: balance -= credit1
-        },
-        {
-          date: new Date(now.getFullYear(), now.getMonth(), 20),
-          voucherNo: `HD-${c.code}-002`,
-          voucherType: 'INVOICE',
-          description: 'Bán hàng - HĐ GTGT',
-          debitAmount: debit2,
-          creditAmount: 0,
-          balance: balance += debit2
-        }
-      ];
-
-      return {
-        customerId: c.id,
-        customerCode: c.code,
-        customerName: c.name,
-        openingBalance,
-        totalDebit: debit1 + debit2,
-        totalCredit: credit1,
-        closingBalance: balance,
-        lines
-      };
+    // 1. Xử lý hóa đơn bán ra -> Ghi Nợ TK131 (tăng công nợ)
+    const filteredInvoices = this.allSalesInvoices.filter(inv => {
+      const invDate = new Date(inv.tdlap);
+      const inRange = invDate >= fromD && invDate <= toD;
+      const isActive = inv.tthai === 1;
+      return inRange && isActive;
     });
 
+    console.log('Số hóa đơn bán ra trong kỳ:', filteredInvoices.length);
+
+    filteredInvoices.forEach(inv => {
+      // ID khách hàng: ưu tiên MST, nếu không có thì dùng tên
+      const customerId = inv.nmmst || inv.nmten || inv.nmtnmua || 'KHACH_LE';
+      const customerName = inv.nmten || inv.nmtnmua || 'Khách lẻ';
+      const customerCode = inv.nmmst || '';
+
+      if (!customerMap.has(customerId)) {
+        customerMap.set(customerId, {
+          customerId,
+          customerCode,
+          customerName,
+          customerAddress: inv.nmdchi || '',
+          openingBalance: 0,
+          totalDebit: 0,
+          totalCredit: 0,
+          closingBalance: 0,
+          lines: []
+        });
+      }
+
+      const customer = customerMap.get(customerId)!;
+      const invoiceSymbol = `${inv.khmshdon}${inv.khhdon}`;
+
+      customer.lines.push({
+        date: new Date(inv.tdlap),
+        voucherNo: `${invoiceSymbol}-${inv.shdon}`,
+        voucherType: 'INVOICE',
+        description: `Bán hàng - HĐ ${invoiceSymbol} số ${inv.shdon}`,
+        debitAmount: inv.tgtttbso, // Tổng thanh toán (bao gồm thuế)
+        creditAmount: 0,
+        balance: 0
+      });
+
+      customer.totalDebit += inv.tgtttbso;
+    });
+
+    // 2. Xử lý phiếu thu -> Ghi Có TK131 (giảm công nợ)
+    const filteredReceipts = this.allReceiptVouchers.filter(rcpt => {
+      const rcptDate = new Date(rcpt.voucherDate);
+      return rcptDate >= fromD && rcptDate <= toD &&
+        rcpt.status !== 'CANCELLED' &&
+        rcpt.relatedObjectType === 'CUSTOMER';
+    });
+
+    console.log('Số phiếu thu trong kỳ (từ KH):', filteredReceipts.length);
+
+    filteredReceipts.forEach(rcpt => {
+      // ID khách hàng: ưu tiên MST, nếu không có thì dùng tên
+      const customerId = rcpt.relatedObjectCode || rcpt.relatedObjectName || 'KHACH_LE';
+      const customerName = rcpt.relatedObjectName || 'Khách lẻ';
+      const customerCode = rcpt.relatedObjectCode || '';
+
+      if (!customerMap.has(customerId)) {
+        customerMap.set(customerId, {
+          customerId,
+          customerCode,
+          customerName,
+          customerAddress: rcpt.address || '',
+          openingBalance: 0,
+          totalDebit: 0,
+          totalCredit: 0,
+          closingBalance: 0,
+          lines: []
+        });
+      }
+
+      const customer = customerMap.get(customerId)!;
+
+      customer.lines.push({
+        date: new Date(rcpt.voucherDate),
+        voucherNo: rcpt.voucherNo,
+        voucherType: 'RECEIPT',
+        description: rcpt.reason || `Thu tiền từ ${rcpt.relatedObjectName}`,
+        debitAmount: 0,
+        creditAmount: rcpt.grandTotal,
+        balance: 0
+      });
+
+      customer.totalCredit += rcpt.grandTotal;
+    });
+
+    // 3. Tính số dư và sắp xếp
+    const receivables: CustomerReceivable[] = [];
+
+    customerMap.forEach(customer => {
+      // Sắp xếp lines theo ngày
+      customer.lines.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+      // Tính số dư lũy kế (TK131: Nợ tăng, Có giảm)
+      let balance = customer.openingBalance;
+      customer.lines.forEach(line => {
+        balance = balance + line.debitAmount - line.creditAmount;
+        line.balance = balance;
+      });
+
+      customer.closingBalance = balance;
+      receivables.push(customer);
+    });
+
+    // Sắp xếp theo tên KH
+    receivables.sort((a, b) => a.customerName.localeCompare(b.customerName));
+
+    this.customerReceivables.set(receivables);
     this.calculateSummary();
+
+    // Cập nhật selected customer nếu đang xem detail
+    if (this.selectedCustomerId()) {
+      const selected = receivables.find(c => c.customerId === this.selectedCustomerId());
+      this.selectedCustomerData.set(selected || null);
+    }
   }
 
   private calculateSummary(): void {
-    this.summary = {
-      totalCustomers: this.customerReceivables.length,
-      totalOpeningBalance: this.customerReceivables.reduce((sum, c) => sum + c.openingBalance, 0),
-      totalDebit: this.customerReceivables.reduce((sum, c) => sum + c.totalDebit, 0),
-      totalCredit: this.customerReceivables.reduce((sum, c) => sum + c.totalCredit, 0),
-      totalClosingBalance: this.customerReceivables.reduce((sum, c) => sum + c.closingBalance, 0)
-    };
+    const receivables = this.customerReceivables();
+    this.summary.set({
+      totalCustomers: receivables.length,
+      totalOpeningBalance: receivables.reduce((sum, c) => sum + c.openingBalance, 0),
+      totalDebit: receivables.reduce((sum, c) => sum + c.totalDebit, 0),
+      totalCredit: receivables.reduce((sum, c) => sum + c.totalCredit, 0),
+      totalClosingBalance: receivables.reduce((sum, c) => sum + c.closingBalance, 0)
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -182,27 +336,29 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
   // ═══════════════════════════════════════════════════════════════════
 
   showSummary(): void {
-    this.viewMode = 'summary';
-    this.selectedCustomerId = '';
-    this.selectedCustomerData = null;
+    this.viewMode.set('summary');
+    this.selectedCustomerId.set('');
+    this.selectedCustomerData.set(null);
   }
 
   showDetail(customerId: string): void {
-    this.selectedCustomerId = customerId;
-    this.selectedCustomerData = this.customerReceivables.find(c => c.customerId === customerId) || null;
-    this.viewMode = 'detail';
+    this.selectedCustomerId.set(customerId);
+    const customer = this.customerReceivables().find(c => c.customerId === customerId);
+    this.selectedCustomerData.set(customer || null);
+    this.viewMode.set('detail');
   }
 
   onCustomerChange(): void {
-    if (this.selectedCustomerId) {
-      this.showDetail(this.selectedCustomerId);
+    const id = this.selectedCustomerId();
+    if (id) {
+      this.showDetail(id);
     } else {
       this.showSummary();
     }
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // DATE RANGE
+  // DATE RANGE - Filter on client, no API call
   // ═══════════════════════════════════════════════════════════════════
 
   setDateRange(range: 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'thisYear'): void {
@@ -210,25 +366,36 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
 
     switch (range) {
       case 'thisMonth':
-        this.fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        this.toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        this.fromDate.set(new Date(now.getFullYear(), now.getMonth(), 1));
+        this.toDate.set(new Date(now.getFullYear(), now.getMonth() + 1, 0));
         break;
       case 'lastMonth':
-        this.fromDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        this.toDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        this.fromDate.set(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+        this.toDate.set(new Date(now.getFullYear(), now.getMonth(), 0));
         break;
       case 'thisQuarter':
         const quarter = Math.floor(now.getMonth() / 3);
-        this.fromDate = new Date(now.getFullYear(), quarter * 3, 1);
-        this.toDate = new Date(now.getFullYear(), quarter * 3 + 3, 0);
+        this.fromDate.set(new Date(now.getFullYear(), quarter * 3, 1));
+        this.toDate.set(new Date(now.getFullYear(), quarter * 3 + 3, 0));
         break;
       case 'thisYear':
-        this.fromDate = new Date(now.getFullYear(), 0, 1);
-        this.toDate = new Date(now.getFullYear(), 11, 31);
+        this.fromDate.set(new Date(now.getFullYear(), 0, 1));
+        this.toDate.set(new Date(now.getFullYear(), 11, 31));
         break;
     }
 
-    this.loadData();
+    // Re-process with new filter (no API call)
+    this.processData();
+  }
+
+  onFromDateChange(dateString: string): void {
+    this.fromDate.set(new Date(dateString));
+    this.processData(); // Filter on client
+  }
+
+  onToDateChange(dateString: string): void {
+    this.toDate.set(new Date(dateString));
+    this.processData(); // Filter on client
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -238,37 +405,38 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
   exportToExcel(): void {
     let csvContent: string;
 
-    if (this.viewMode === 'summary') {
+    if (this.viewMode() === 'summary') {
       const headers = ['STT', 'Mã KH', 'Tên khách hàng', 'Dư đầu kỳ', 'PS Nợ', 'PS Có', 'Dư cuối kỳ'];
-      const rows = this.customerReceivables.map((c, i) => [
+      const rows = this.customerReceivables().map((c, i) => [
         i + 1, c.customerCode, c.customerName, c.openingBalance, c.totalDebit, c.totalCredit, c.closingBalance
       ]);
+      const sum = this.summary();
 
       csvContent = [
         'SỔ CHI TIẾT TÀI KHOẢN 131 - PHẢI THU KHÁCH HÀNG',
-        `Kỳ: ${this.formatDate(this.fromDate)} - ${this.formatDate(this.toDate)}`,
+        `Kỳ: ${this.formatDate(this.fromDate())} - ${this.formatDate(this.toDate())}`,
         '',
         headers.join(','),
         ...rows.map(r => r.join(',')),
         '',
-        `Tổng cộng,,,${this.summary.totalOpeningBalance},${this.summary.totalDebit},${this.summary.totalCredit},${this.summary.totalClosingBalance}`
+        `Tổng cộng,,,${sum.totalOpeningBalance},${sum.totalDebit},${sum.totalCredit},${sum.totalClosingBalance}`
       ].join('\n');
     } else {
-      const c = this.selectedCustomerData!;
+      const c = this.selectedCustomerData()!;
       const headers = ['Ngày', 'Số CT', 'Loại', 'Diễn giải', 'PS Nợ', 'PS Có', 'Số dư'];
       const rows = c.lines.map(l => [
         this.formatDate(l.date), l.voucherNo, this.getVoucherTypeLabel(l.voucherType),
-        l.description, l.debitAmount || '', l.creditAmount || '', l.balance
+        `"${l.description}"`, l.debitAmount || '', l.creditAmount || '', l.balance
       ]);
 
       csvContent = [
         `SỔ CHI TIẾT TK 131 - ${c.customerCode} - ${c.customerName}`,
-        `Kỳ: ${this.formatDate(this.fromDate)} - ${this.formatDate(this.toDate)}`,
+        `Kỳ: ${this.formatDate(this.fromDate())} - ${this.formatDate(this.toDate())}`,
         '',
         headers.join(','),
-        `${this.formatDate(this.fromDate)},,,"Dư đầu kỳ",,,"${c.openingBalance}"`,
+        `${this.formatDate(this.fromDate())},,,"Dư đầu kỳ",,,"${c.openingBalance}"`,
         ...rows.map(r => r.join(',')),
-        `${this.formatDate(this.toDate)},,,"Dư cuối kỳ",,,"${c.closingBalance}"`
+        `${this.formatDate(this.toDate())},,,"Dư cuối kỳ",,,"${c.closingBalance}"`
       ].join('\n');
     }
 
@@ -295,6 +463,10 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
     return new Date(date).toLocaleDateString('vi-VN');
   }
 
+  formatDateForInput(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
+
   formatDateForFile(date: Date): string {
     return date.toISOString().split('T')[0].replace(/-/g, '');
   }
@@ -313,19 +485,5 @@ export class ReceivableLedgerPageComponent implements OnInit, OnDestroy {
     if (balance > 0) return 'balance-debit';
     if (balance < 0) return 'balance-credit';
     return '';
-  }
-
-  parseDate(dateString: string): Date {
-    return new Date(dateString);
-  }
-
-  onFromDateChange(dateString: string): void {
-    this.fromDate = this.parseDate(dateString);
-    this.loadData();
-  }
-
-  onToDateChange(dateString: string): void {
-    this.toDate = this.parseDate(dateString);
-    this.loadData();
   }
 }
