@@ -13,7 +13,7 @@ export const environment = {
     appId: "1:343799939126:web:ebe361ff99b03eb268d897",
     measurementId: "G-NJ3ZPEZ260"
   },
-  domainUrl: 'https://taphoa39backend.onrender.com',  // Production API
+  domainUrl: 'https://songminhketoanbackend.onrender.com',  // Production API
   apiUrl: 'https://api.taphoa39.com/api',  // Backend API base URL (HDDT proxy)
   appName: 'Kế Toán Doanh Nghiệp',
   version: '1.0.0'
