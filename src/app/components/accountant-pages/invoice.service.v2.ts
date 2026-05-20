@@ -57,6 +57,18 @@ export interface Invoice {
   // Items (chỉ có với AI_PDF)
   items?: InvoiceItem[];
 
+  // Portal & Email metadata (từ Phase 2 — internal_invoices)
+  portalUrl?: string;
+  portalPdfUrl?: string;
+  invoiceProvider?: string;
+  portalCredentials?: Record<string, string>;
+  sourceTab?: string;
+  gmailFrom?: string;
+  gmailMessageId?: string;
+  gmailDate?: string;
+  processingMethod?: string;
+  attachmentType?: string;
+
   // Metadata
   createdAt: string;
   updatedAt?: string;
@@ -244,6 +256,29 @@ export interface RecentAiInvoice {
   createdAt: string;
 }
 
+export interface PortalLink {
+  gmailId: string;
+  invoiceNo: string;
+  supplierName: string;
+  supplierTaxCode: string;
+  issueDate: string;
+  invoiceProvider: string;
+  portalUrl: string;
+  portalPdfUrl: string;
+  portalCredentials: Record<string, string>;
+  gmailFrom: string;
+  gmailSubject: string;
+  attachments: string[];
+}
+
+export interface PortalLinksResponse {
+  success: boolean;
+  portalLinks: PortalLink[];
+  total: number;
+  fetchedFromGmail: number;
+  parseErrors: number;
+}
+
 // ============================================================================
 // SERVICE
 // ============================================================================
@@ -252,7 +287,8 @@ export interface RecentAiInvoice {
   providedIn: 'root'
 })
 export class InvoiceServiceV2 {
-  private readonly apiUrl = `${environment.domainUrl}/api/v2/invoices`;
+  private readonly apiUrl = `${(environment as any).ketoanBackendUrl}/api/v2/invoices`;
+  private readonly ketoanApiUrl = `${(environment as any).ketoanBackendUrl}/api/invoices`;
 
   // Cache suppliers
   private suppliersCache$ = new BehaviorSubject<Supplier[]>([]);
@@ -637,6 +673,81 @@ export class InvoiceServiceV2 {
       years.push(y);
     }
     return years;
+  }
+
+  // ==========================================================================
+  // INTERNAL INVOICE METHODS (KeToanBackEnd — taphoa39-supplies-invoices)
+  // ==========================================================================
+
+  /**
+   * Query internal invoices from KeToanBackEnd (reads from supplies-invoices Firestore)
+   */
+  getInternalInvoices(filter: InvoiceFilter = {}): Observable<InvoiceQueryResult> {
+    let params = new HttpParams();
+
+    if (filter.year) params = params.set('year', filter.year.toString());
+    if (filter.monthKey) params = params.set('monthKey', filter.monthKey);
+    if (filter.fromDate) params = params.set('fromDate', filter.fromDate);
+    if (filter.toDate) params = params.set('toDate', filter.toDate);
+    if (filter.supplierTaxCode) params = params.set('supplierTaxCode', filter.supplierTaxCode);
+    if (filter.pageSize) params = params.set('pageSize', filter.pageSize.toString());
+    if (filter.cursor) params = params.set('cursor', filter.cursor);
+    if (filter.direction) params = params.set('direction', filter.direction);
+
+    return this.http.get<InvoiceQueryResult>(`${this.ketoanApiUrl}/internal`, { params }).pipe(
+      tap(result => console.log(`📊 Internal invoices: ${result.invoices.length}`)),
+      catchError(this.handleError)
+    );
+  }
+
+  /**
+   * Get list of unique invoice providers from internal_invoices
+   */
+  getInternalProviders(): Observable<{ providers: { name: string; count: number }[] }> {
+    return this.http.get<{ providers: { name: string; count: number }[] }>(
+      `${this.ketoanApiUrl}/providers`
+    ).pipe(catchError(this.handleError));
+  }
+
+  /**
+   * Get suppliers from internal_invoices (KeToanBackEnd)
+   */
+  getInternalSuppliers(search?: string, limit: number = 50): Observable<Supplier[]> {
+    let params = new HttpParams().set('limit', limit.toString());
+    if (search) params = params.set('search', search);
+
+    return this.http.get<{ suppliers: Supplier[]; count: number }>(
+      `${this.ketoanApiUrl}/suppliers`,
+      { params }
+    ).pipe(
+      map(res => res.suppliers),
+      catchError(this.handleError)
+    );
+  }
+
+  // ==========================================================================
+  // GMAIL PORTAL LINKS (direct from Gmail)
+  // ==========================================================================
+
+  getPortalLinksFromGmail(params: {
+    uid?: string;
+    labelId?: string;
+    labelName?: string;
+    daysBack?: number;
+    pageSize?: number;
+  }): Observable<PortalLinksResponse> {
+    const gmailUrl = `${(environment as any).ketoanBackendUrl}/api/gmail/portal-links`;
+    let httpParams = new HttpParams();
+    if (params.uid) httpParams = httpParams.set('uid', params.uid);
+    if (params.labelId) httpParams = httpParams.set('label_id', params.labelId);
+    if (params.labelName) httpParams = httpParams.set('label_name', params.labelName);
+    if (params.daysBack) httpParams = httpParams.set('days_back', params.daysBack.toString());
+    if (params.pageSize) httpParams = httpParams.set('page_size', params.pageSize.toString());
+
+    return this.http.get<PortalLinksResponse>(gmailUrl, { params: httpParams }).pipe(
+      tap(r => console.log(`[Gmail portal-links] ${r.total} results, ${r.parseErrors || 0} errors`)),
+      catchError(this.handleError)
+    );
   }
 
   /**

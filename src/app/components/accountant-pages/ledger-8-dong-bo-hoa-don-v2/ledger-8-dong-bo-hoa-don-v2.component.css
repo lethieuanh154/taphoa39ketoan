@@ -1310,6 +1310,92 @@
   font-size: 10px;
 }
 
+/* ============================================ */
+/* PROVIDER BADGES */
+/* ============================================ */
+
+.provider-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.provider-viettel { background-color: #e74c3c; }
+.provider-vnpt { background-color: #2980b9; }
+.provider-misa { background-color: #27ae60; }
+.provider-vinhoadon { background-color: #8e44ad; }
+.provider-kiotviet { background-color: #f39c12; color: #333; }
+.provider-mobifone { background-color: #1abc9c; }
+.provider-einvoice { background-color: #34495e; }
+.provider-ehoadon { background-color: #d35400; }
+.provider-asiainvoice { background-color: #16a085; }
+.provider-minvoice { background-color: #2c3e50; }
+.provider-wininvoice { background-color: #c0392b; }
+.provider-default { background-color: #95a5a6; }
+
+.source-tab-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  background-color: #ecf0f1;
+  color: #2c3e50;
+}
+
+.btn-xs {
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 1.2;
+  border-radius: 3px;
+}
+
+.btn-portal {
+  background-color: #3498db;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-portal:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.btn-portal:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.provider-filter {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-left: 8px;
+  background: #fff;
+}
+
+.col-provider {
+  width: 80px;
+  text-align: center;
+}
+
+.col-source-tab {
+  width: 55px;
+  text-align: center;
+}
+
+.col-portal {
+  width: 50px;
+  text-align: center;
+}
+
 /* Responsive Compare Modal */
 @media (max-width: 1024px) {
   .compare-columns {
@@ -1319,4 +1405,198 @@
   .compare-modal-content {
     max-width: 95%;
   }
+}
+
+/* ========================================
+   MAIN TAB BAR
+   ======================================== */
+.main-tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 0;
+}
+
+.main-tab {
+  padding: 8px 20px;
+  border: 1px solid #ddd;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: #f5f5f5;
+  color: #555;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: -2px;
+}
+
+.main-tab:hover {
+  background: #e8f4f8;
+  color: #2980b9;
+}
+
+.main-tab.active {
+  background: #fff;
+  color: #2980b9;
+  border-color: #ddd;
+  border-bottom-color: #fff;
+  font-weight: 600;
+}
+
+/* ========================================
+   GDT DIRECT FETCH
+   ======================================== */
+.btn-gdt {
+  background-color: #16a085;
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-gdt:hover:not(:disabled) {
+  background-color: #1abc9c;
+}
+
+.btn-gdt:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gdt-count {
+  color: #16a085;
+  font-weight: 600;
+}
+
+.gdt-error {
+  background: #fdecea;
+  color: #c0392b;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  margin: 0 0 6px 0;
+}
+
+.gdt-mode-banner {
+  background: #e8f8f5;
+  color: #16a085;
+  border: 1px solid #a8e6d5;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 11px;
+  margin: 0 0 6px 0;
+}
+
+.badge-gdt {
+  background: #16a085;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+/* ========================================
+   PORTAL LINKS TAB
+   ======================================== */
+.portal-section {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.portal-filter-bar {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.portal-filter-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+}
+
+.portal-filter-group label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 3px;
+}
+
+.portal-count {
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.portal-table-wrapper {
+  overflow-x: auto;
+}
+
+.portal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.portal-table th {
+  background: #2980b9;
+  color: #fff;
+  padding: 7px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.portal-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+
+.portal-table tr:hover td {
+  background: #f0f7ff;
+}
+.portal-row-clickable {
+  cursor: pointer;
+}
+
+.portal-table .inv-no-col { white-space: nowrap; font-weight: 600; }
+.portal-table .date-col { white-space: nowrap; }
+.portal-table .supplier-col { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.portal-table .mst-col { font-family: monospace; font-size: 11px; }
+.portal-table .creds-col { font-size: 11px; color: #555; max-width: 200px; }
+.portal-table .creds-text { font-family: monospace; }
+.portal-table .link-col { text-align: center; white-space: nowrap; }
+
+.portal-pagination {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.text-muted { color: #aaa; }
+
+.btn-outline-secondary {
+  background: #fff;
+  border: 1px solid #95a5a6;
+  color: #555;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-outline-secondary:hover {
+  background: #ecf0f1;
 }

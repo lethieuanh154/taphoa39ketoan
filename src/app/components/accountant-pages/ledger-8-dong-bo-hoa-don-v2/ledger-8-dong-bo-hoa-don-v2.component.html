@@ -7,6 +7,23 @@
   <!-- Page Title -->
   <h2 class="page-title">ĐỒNG BỘ HÓA ĐƠN ĐẦU VÀO</h2>
 
+  <!-- Main Tab Bar -->
+  <div class="main-tab-bar">
+    <button class="main-tab" [class.active]="activeMainTab === 'reconcile'"
+            (click)="switchMainTab('reconcile')">
+      <i class="fa-solid fa-balance-scale"></i> Đối chiếu HĐ
+    </button>
+    <button class="main-tab" [class.active]="activeMainTab === 'portal'"
+            (click)="switchMainTab('portal')">
+      <i class="fa-solid fa-link"></i> Links HĐ Gốc (Gmail)
+    </button>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- RECONCILE TAB -->
+  <!-- ============================================ -->
+  <ng-container *ngIf="activeMainTab === 'reconcile'">
+
   <!-- ============================================ -->
   <!-- FILTER SECTION -->
   <!-- ============================================ -->
@@ -14,78 +31,27 @@
     <h3 class="section-title">Bộ lọc</h3>
 
     <form [formGroup]="filterForm" class="filter-form">
-      <!-- Row 1: Filter Type + Date Filters -->
       <div class="filter-row">
-        <!-- Filter Type -->
+        <!-- Từ ngày -->
         <div class="filter-group">
-          <label>Lọc theo</label>
-          <select formControlName="filterType" class="filter-input">
-            <option value="all">Tất cả</option>
-            <option value="month">Tháng</option>
-            <option value="year">Năm</option>
-            <option value="range">Khoảng ngày</option>
-          </select>
-        </div>
-
-        <!-- Month (khi filterType = month) -->
-        <div class="filter-group" *ngIf="filterForm.get('filterType')?.value === 'month'">
-          <label>Tháng</label>
-          <select formControlName="monthKey" class="filter-input">
-            <option *ngFor="let opt of monthOptions" [value]="opt.value">{{ opt.label }}</option>
-          </select>
-        </div>
-
-        <!-- Year (khi filterType = year) -->
-        <div class="filter-group" *ngIf="filterForm.get('filterType')?.value === 'year'">
-          <label>Năm</label>
-          <select formControlName="year" class="filter-input">
-            <option *ngFor="let y of yearOptions" [value]="y">{{ y }}</option>
-          </select>
-        </div>
-
-        <!-- Date Range (khi filterType = range) - Format dd/mm/yyyy -->
-        <div class="filter-group" *ngIf="filterForm.get('filterType')?.value === 'range'">
           <label>Từ ngày</label>
-          <input type="text"
-                 formControlName="fromDate"
-                 class="filter-input"
-                 placeholder="dd/mm/yyyy"
-                 maxlength="10"
-                 (blur)="validateDateInput('fromDate')">
-        </div>
-        <div class="filter-group" *ngIf="filterForm.get('filterType')?.value === 'range'">
-          <label>Đến ngày</label>
-          <input type="text"
-                 formControlName="toDate"
-                 class="filter-input"
-                 placeholder="dd/mm/yyyy"
-                 maxlength="10"
-                 (blur)="validateDateInput('toDate')">
-        </div>
-      </div>
-
-      <!-- Row 2: Supplier + Status + Page Size + Actions -->
-      <div class="filter-row">
-        <!-- Supplier -->
-        <div class="filter-group filter-group-wide">
-          <label>Nhà cung cấp</label>
-          <select formControlName="supplierTaxCode" class="filter-input">
-            <option value="">Tất cả NCC</option>
-            <option *ngFor="let s of suppliers" [value]="s.taxCode">
-              {{ s.name }} ({{ s.taxCode }})
-            </option>
-          </select>
+          <input type="date" formControlName="fromDate" class="filter-input">
         </div>
 
-        <!-- Reconcile Status -->
+        <!-- Đến ngày -->
         <div class="filter-group">
-          <label>Trạng thái</label>
-          <select formControlName="reconcileStatus" class="filter-input">
-            <option value="">Tất cả</option>
-            <option value="PENDING">Chưa đối chiếu</option>
-            <option value="MATCHED">Khớp</option>
-            <option value="UNMATCHED">Thiếu</option>
-            <option value="MISMATCH">Sai số</option>
+          <label>Đến ngày</label>
+          <input type="date" formControlName="toDate" class="filter-input">
+        </div>
+
+        <!-- Nhà cung cấp (Gmail labels) -->
+        <div class="filter-group filter-group-wide">
+          <label>Nhà cung cấp <span *ngIf="loadingLabels" class="loading-inline">...</span></label>
+          <select formControlName="gmailLabel" class="filter-input">
+            <option value="">Tất cả NCC</option>
+            <option *ngFor="let label of gmailLabels" [value]="label.name">
+              {{ label.displayName }}
+            </option>
           </select>
         </div>
 
@@ -103,10 +69,13 @@
         <div class="filter-group">
           <label>&nbsp;</label>
           <div class="button-group">
-            <button type="button" class="btn btn-primary" (click)="applyFilter()" [disabled]="loading">
+            <button type="button" class="btn btn-primary" (click)="applyFilter()" [disabled]="loadingAi">
               <i class="fa-solid fa-search"></i> Tìm kiếm
             </button>
-            <button type="button" class="btn btn-outline-primary" (click)="forceReload()" [disabled]="loading" title="Tải lại từ server (bỏ qua cache)">
+            <button type="button" class="btn btn-outline-secondary" (click)="resetFilter()">
+              <i class="fa-solid fa-rotate-left"></i> Đặt lại
+            </button>
+            <button type="button" class="btn btn-outline-primary" (click)="forceReload()" [disabled]="loadingAi" title="Tải lại từ server (bỏ qua cache)">
               <i class="fa-solid fa-sync"></i> Tải lại
             </button>
           </div>
@@ -658,8 +627,28 @@
       <div class="panel-header">
         <h3><i class="fa-solid fa-building-columns"></i> Hóa đơn từ Trang thuế</h3>
         <div class="panel-info">
-          <span class="invoice-count">{{ taxPagination.count }} hóa đơn</span>
+          <span class="invoice-count" *ngIf="!gdtMode">{{ taxPagination.count }} hóa đơn (Firestore)</span>
+          <span class="invoice-count gdt-count" *ngIf="gdtMode">{{ hddtInvoices.length }} hóa đơn (GDT trực tiếp)</span>
+          <button class="btn btn-sm btn-gdt" (click)="fetchFromGdt()" [disabled]="fetchingGdt || loadingTax" title="Tải từ hoadondientu.gdt.gov.vn theo filter hiện tại">
+            <i class="fa-solid fa-cloud-arrow-down" *ngIf="!fetchingGdt"></i>
+            <i class="fa-solid fa-spinner fa-spin" *ngIf="fetchingGdt"></i>
+            {{ fetchingGdt ? 'Đang tải...' : 'Tải từ GDT' }}
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" *ngIf="gdtMode" (click)="resetGdtMode()" title="Về lại dữ liệu Firestore">
+            <i class="fa-solid fa-database"></i> Firestore
+          </button>
         </div>
+      </div>
+
+      <!-- GDT error -->
+      <div class="gdt-error" *ngIf="gdtError">
+        <i class="fa-solid fa-triangle-exclamation"></i> {{ gdtError }}
+      </div>
+
+      <!-- GDT mode badge -->
+      <div class="gdt-mode-banner" *ngIf="gdtMode">
+        <i class="fa-solid fa-circle-info"></i>
+        Đang hiển thị dữ liệu trực tiếp từ Trang thuế GDT — chưa lưu vào Firestore
       </div>
 
       <div class="panel-body">
@@ -675,7 +664,9 @@
                 <th class="col-status">TT</th>
               </tr>
             </thead>
-            <tbody>
+
+            <!-- Firestore mode -->
+            <tbody *ngIf="!gdtMode">
               <tr *ngFor="let inv of taxInvoices; trackBy: trackByInvoice"
                   [class.row-matched]="inv.reconcileStatus === 'MATCHED'"
                   [class.row-unmatched]="inv.reconcileStatus === 'UNMATCHED'"
@@ -692,24 +683,44 @@
                         [title]="getStatusLabel(inv.reconcileStatus)"></span>
                 </td>
               </tr>
-
-              <!-- No data -->
               <tr *ngIf="taxInvoices.length === 0 && !loadingTax">
                 <td colspan="6" class="no-data">Chưa có dữ liệu từ trang thuế</td>
               </tr>
-
-              <!-- Loading -->
               <tr *ngIf="loadingTax">
                 <td colspan="6" class="loading-data">
                   <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
                 </td>
               </tr>
             </tbody>
+
+            <!-- GDT direct mode -->
+            <tbody *ngIf="gdtMode">
+              <tr *ngFor="let inv of hddtInvoices">
+                <td>{{ getHddtInvoiceNo(inv) }}</td>
+                <td>{{ formatDate(inv.tdlap) }}</td>
+                <td class="col-supplier-name" [title]="inv.nbten + ' - ' + inv.nbmst">
+                  {{ inv.nbten }}
+                </td>
+                <td class="number-col">{{ formatCurrency(inv.tgtttbso) }}</td>
+                <td class="number-col">{{ formatCurrency(inv.tgtthue) }}</td>
+                <td>
+                  <span class="badge-gdt" [title]="'ttxly=' + inv.ttxly">GDT</span>
+                </td>
+              </tr>
+              <tr *ngIf="hddtInvoices.length === 0 && !loadingTax">
+                <td colspan="6" class="no-data">Không có hóa đơn từ GDT theo filter này</td>
+              </tr>
+              <tr *ngIf="loadingTax">
+                <td colspan="6" class="loading-data">
+                  <i class="fa-solid fa-spinner fa-spin"></i> Đang tải từ GDT...
+                </td>
+              </tr>
+            </tbody>
           </table>
         </div>
 
-        <!-- Pagination -->
-        <div class="panel-footer" *ngIf="taxInvoices.length > 0">
+        <!-- Pagination (Firestore mode only) -->
+        <div class="panel-footer" *ngIf="!gdtMode && taxInvoices.length > 0">
           <button class="btn btn-sm" (click)="prevTaxPage()" [disabled]="!taxPagination.hasPrev || loadingTax">
             <i class="fa-solid fa-chevron-left"></i>
           </button>
@@ -725,9 +736,14 @@
     <!-- ======================================== -->
     <div class="panel">
       <div class="panel-header panel-header-ai">
-        <h3><i class="fa-solid fa-robot"></i> Hóa đơn từ AI (PDF)</h3>
+        <h3><i class="fa-solid fa-robot"></i> Hóa đơn từ AI (PDF/Email)</h3>
         <div class="panel-info">
           <span class="invoice-count">{{ aiPagination.count }} hóa đơn</span>
+          <!-- Provider filter -->
+          <select class="provider-filter" [(ngModel)]="selectedProvider" (change)="filterByProvider(selectedProvider)">
+            <option value="">Tất cả NCC Portal</option>
+            <option *ngFor="let p of providerOptions" [value]="p.name">{{ p.name }} ({{ p.count }})</option>
+          </select>
         </div>
       </div>
 
@@ -740,8 +756,9 @@
                 <th class="col-date">Ngày</th>
                 <th class="col-supplier">Nhà cung cấp</th>
                 <th class="col-amount">Tổng tiền</th>
-                <th class="col-vat">Thuế GTGT</th>
-                <th class="col-status">TT</th>
+                <th class="col-provider">NCC Portal</th>
+                <th class="col-source-tab">Nguồn</th>
+                <th class="col-portal">HĐ gốc</th>
               </tr>
             </thead>
             <tbody>
@@ -751,25 +768,36 @@
                   [class.row-mismatch]="inv.reconcileStatus === 'MISMATCH'">
                 <td>{{ inv.invoiceSymbol ? inv.invoiceSymbol + '-' : '' }}{{ inv.invoiceNo }}</td>
                 <td>{{ formatDate(inv.issueDate) }}</td>
-                <td class="col-supplier-name" [title]="inv.supplierName + ' - ' + inv.supplierTaxCode">
+                <td class="col-supplier-name" [title]="(inv.supplierName || '') + ' - ' + (inv.supplierTaxCode || '')">
                   {{ inv.supplierName }}
                 </td>
                 <td class="number-col">{{ formatCurrency(inv.totalAmount) }}</td>
-                <td class="number-col">{{ formatCurrency(inv.vatAmount) }}</td>
                 <td>
-                  <span class="status-dot" [ngClass]="getStatusClass(inv.reconcileStatus)"
-                        [title]="getStatusLabel(inv.reconcileStatus)"></span>
+                  <span *ngIf="inv.invoiceProvider" class="provider-badge" [ngClass]="getProviderClass(inv.invoiceProvider)">
+                    {{ inv.invoiceProvider }}
+                  </span>
+                </td>
+                <td>
+                  <span *ngIf="inv.sourceTab" class="source-tab-badge">{{ getSourceTabLabel(inv.sourceTab) }}</span>
+                </td>
+                <td>
+                  <button class="btn btn-xs btn-portal"
+                          (click)="openPortalUrl(inv); $event.stopPropagation()"
+                          [disabled]="!inv.portalUrl"
+                          [title]="inv.portalUrl ? 'Xem HĐ gốc trên portal NCC' : 'Không có link portal'">
+                    <i class="fa-solid fa-external-link-alt"></i>
+                  </button>
                 </td>
               </tr>
 
               <!-- No data -->
               <tr *ngIf="aiInvoices.length === 0 && !loadingAi">
-                <td colspan="6" class="no-data">Chưa có dữ liệu từ AI/PDF</td>
+                <td colspan="7" class="no-data">Chưa có dữ liệu từ AI/PDF</td>
               </tr>
 
               <!-- Loading -->
               <tr *ngIf="loadingAi">
-                <td colspan="6" class="loading-data">
+                <td colspan="7" class="loading-data">
                   <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
                 </td>
               </tr>
@@ -789,4 +817,138 @@
       </div>
     </div>
   </div>
+
+  </ng-container><!-- end reconcile tab -->
+
+  <!-- ============================================ -->
+  <!-- PORTAL LINKS TAB — Links HĐ Gốc (Gmail) -->
+  <!-- ============================================ -->
+  <ng-container *ngIf="activeMainTab === 'portal'">
+    <div class="portal-section">
+
+      <!-- Filter bar -->
+      <div class="portal-filter-bar">
+        <div class="portal-filter-group">
+          <label>Gmail Label (NCC)</label>
+          <select class="filter-input" [(ngModel)]="portalLinksLabelId">
+            <option value="">Tất cả email</option>
+            <option *ngFor="let label of gmailLabels" [value]="label.id">
+              {{ label.displayName }}
+            </option>
+          </select>
+        </div>
+        <div class="portal-filter-group">
+          <label>Từ ngày</label>
+          <input type="date" class="filter-input" [(ngModel)]="portalLinksFromDate">
+        </div>
+        <div class="portal-filter-group">
+          <label>Đến ngày</label>
+          <input type="date" class="filter-input" [(ngModel)]="portalLinksToDate">
+        </div>
+        <div class="portal-filter-group">
+          <label>Tìm số HĐ / tên NCC</label>
+          <input type="text" class="filter-input" [(ngModel)]="portalLinksSearchNo"
+                 placeholder="Nhập để lọc..." (input)="applyPortalLinksSearch()">
+        </div>
+        <div class="portal-filter-group">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" (click)="loadPortalLinks()" [disabled]="loadingPortalLinks">
+            <i class="fa-solid fa-search" *ngIf="!loadingPortalLinks"></i>
+            <i class="fa-solid fa-spinner fa-spin" *ngIf="loadingPortalLinks"></i>
+            Tìm kiếm
+          </button>
+        </div>
+      </div>
+
+      <!-- Count -->
+      <div class="portal-count" *ngIf="portalLinks.length > 0 || loadingPortalLinks">
+        <span *ngIf="!loadingPortalLinks">
+          {{ portalLinksFiltered.length }} hóa đơn
+          <span *ngIf="portalLinksFiltered.length !== portalLinks.length">
+            (lọc từ {{ portalLinks.length }})
+          </span>
+        </span>
+        <span *ngIf="loadingPortalLinks"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</span>
+      </div>
+
+      <!-- Table -->
+      <div class="portal-table-wrapper">
+        <table class="portal-table">
+          <thead>
+            <tr>
+              <th>Số HĐ</th>
+              <th>Ngày HĐ</th>
+              <th>Nhà cung cấp</th>
+              <th>MST</th>
+              <th>Provider</th>
+              <th>Email gửi</th>
+              <th>Mã tra cứu</th>
+              <th>Mã bí mật</th>
+              <th>Link HĐ gốc</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let inv of portalLinksFiltered" (dblclick)="openGmailMessage(inv)" class="portal-row-clickable">
+              <td class="inv-no-col">
+                {{ inv.invoiceSymbol ? inv.invoiceSymbol + '-' : '' }}{{ inv.invoiceNo }}
+              </td>
+              <td class="date-col">{{ formatDate(inv.issueDate || inv.createdAt) }}</td>
+              <td class="supplier-col" [title]="inv.supplierName">{{ inv.supplierName }}</td>
+              <td class="mst-col">{{ inv.supplierTaxCode }}</td>
+              <td>
+                <span *ngIf="inv.invoiceProvider" class="provider-badge" [ngClass]="getProviderClass(inv.invoiceProvider)">
+                  {{ inv.invoiceProvider }}
+                </span>
+                <span *ngIf="!inv.invoiceProvider" class="text-muted">—</span>
+              </td>
+              <td class="supplier-col" [title]="inv.gmailFrom || ''">
+                {{ inv.gmailFrom || '—' }}
+              </td>
+              <td class="creds-col">
+                <span *ngIf="getLookupCode(inv)" class="creds-text">{{ getLookupCode(inv) }}</span>
+                <span *ngIf="!getLookupCode(inv)" class="text-muted">—</span>
+              </td>
+              <td class="creds-col">
+                <span *ngIf="getSecretCode(inv)" class="creds-text">{{ getSecretCode(inv) }}</span>
+                <span *ngIf="!getSecretCode(inv)" class="text-muted">—</span>
+              </td>
+              <td class="link-col">
+                <button class="btn btn-xs btn-portal"
+                        (click)="openPortalUrl(inv)"
+                        [disabled]="!inv.portalUrl"
+                        [title]="inv.portalUrl || 'Không có link'">
+                  <i class="fa-solid fa-external-link-alt"></i> Mở
+                </button>
+              </td>
+            </tr>
+
+            <!-- No data -->
+            <tr *ngIf="portalLinksFiltered.length === 0 && !loadingPortalLinks">
+              <td colspan="9" class="no-data">
+                <span *ngIf="portalLinks.length === 0">Nhấn Tìm kiếm để tải danh sách</span>
+                <span *ngIf="portalLinks.length > 0">Không tìm thấy kết quả</span>
+              </td>
+            </tr>
+            <tr *ngIf="loadingPortalLinks">
+              <td colspan="9" class="loading-data">
+                <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="portal-pagination" *ngIf="portalLinks.length > 0">
+        <button class="btn btn-sm" (click)="prevPortalPage()" [disabled]="!portalLinksPagination.hasPrev || loadingPortalLinks">
+          <i class="fa-solid fa-chevron-left"></i> Trước
+        </button>
+        <button class="btn btn-sm" (click)="nextPortalPage()" [disabled]="!portalLinksPagination.hasNext || loadingPortalLinks">
+          Sau <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+
+    </div>
+  </ng-container><!-- end portal tab -->
+
 </div>

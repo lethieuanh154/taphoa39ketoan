@@ -1,4 +1,5 @@
-import { Component, OnInit, signal, output, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, output, inject } from '@angular/core';
+import { environment } from '../../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HddtService, HddtCaptchaResponse } from '../../../services/hddt.service';
@@ -41,7 +42,26 @@ const HDDT_TOKEN_KEY = 'hddt_token';
             <!-- Login Tab -->
             @if (activeTab() === 'login') {
               <div class="tab-content">
-                <!-- Profile info khi đã đăng nhập -->
+                <!-- Gmail connection (required) -->
+                <div class="gmail-section">
+                  <div class="gmail-section-label">
+                    Gmail
+                    @if (!gmailEmail()) { <span class="gmail-required">(bat buoc)</span> }
+                  </div>
+                  @if (gmailEmail()) {
+                    <div class="gmail-row connected">
+                      <span class="gmail-check">&#10003;</span>
+                      <span class="gmail-addr">{{ gmailEmail() }}</span>
+                      <button class="btn-gmail-disconnect" (click)="disconnectGmail()">Ngat</button>
+                    </div>
+                  } @else {
+                    <button class="btn-gmail" (click)="connectGmail()" [disabled]="gmailConnecting()">
+                      {{ gmailConnecting() ? 'Dang ket noi...' : 'Ket noi Gmail' }}
+                    </button>
+                  }
+                </div>
+
+                <!-- Profile info khi đã đăng nhập HDDT -->
                 @if (profileName()) {
                   <div class="profile-info">
                     <span class="profile-label">Da ket noi:</span>
@@ -170,7 +190,7 @@ const HDDT_TOKEN_KEY = 'hddt_token';
               >
                 {{ isLoggingIn() ? 'Dang dang nhap...' : 'Dang nhap' }}
               </button>
-            } @else {
+            } @else if (activeTab() === 'manual') {
               <button class="btn btn-primary" (click)="saveToken()" [disabled]="!tokenValue.trim()">
                 Luu Token
               </button>
@@ -501,14 +521,68 @@ const HDDT_TOKEN_KEY = 'hddt_token';
       border-radius: 3px;
       color: #c62828;
     }
+
+    /* Gmail section (inline in login tab) */
+    .gmail-section {
+      background: #f8f9fa;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+    }
+    .gmail-section-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .gmail-required { color: #e53935; font-weight: 400; margin-left: 4px; }
+    .gmail-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .gmail-row.connected { }
+    .gmail-check { color: #4caf50; font-size: 16px; flex-shrink: 0; }
+    .gmail-addr { flex: 1; font-size: 13px; font-weight: 500; color: #333; word-break: break-all; }
+    .btn-gmail-disconnect {
+      font-size: 12px;
+      padding: 3px 8px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      background: #fff;
+      color: #666;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .btn-gmail-disconnect:hover { background: #f5f5f5; color: #333; }
+    .btn-gmail {
+      background: #fff;
+      border: 1px solid #dadce0;
+      color: #3c4043;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-gmail:hover:not(:disabled) { background: #f8f9fa; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .btn-gmail:disabled { opacity: 0.6; cursor: not-allowed; }
   `]
 })
-export class HddtTokenDialogComponent implements OnInit {
+export class HddtTokenDialogComponent implements OnInit, OnDestroy {
   private hddtService = inject(HddtService);
 
   showDialog = signal(false);
   activeTab = signal<'login' | 'manual'>('login');
   profileName = signal('');
+
+  // Gmail connection state
+  gmailEmail = signal('');
+  gmailConnecting = signal(false);
+  private gmailMessageListener!: (e: MessageEvent) => void;
 
   // Login form
   username = '';
@@ -529,6 +603,22 @@ export class HddtTokenDialogComponent implements OnInit {
 
   ngOnInit(): void {
     this.checkToken();
+    const email = localStorage.getItem('gmail_email');
+    if (email) this.gmailEmail.set(email);
+    this.gmailMessageListener = (e: MessageEvent) => {
+      if (e.data?.type === 'GMAIL_AUTH_SUCCESS') {
+        const { uid, email: connectedEmail } = e.data;
+        localStorage.setItem('gmail_uid', uid);
+        localStorage.setItem('gmail_email', connectedEmail);
+        this.gmailEmail.set(connectedEmail);
+        this.gmailConnecting.set(false);
+      }
+    };
+    window.addEventListener('message', this.gmailMessageListener);
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('message', this.gmailMessageListener);
   }
 
   private checkToken(): void {
@@ -655,6 +745,28 @@ export class HddtTokenDialogComponent implements OnInit {
     this.loginError.set('');
     this.loginSuccess.set('');
     this.captchaValue = '';
+  }
+
+  connectGmail(): void {
+    this.gmailConnecting.set(true);
+    const url = `${environment.ketoanBackendUrl}/api/gmail/auth/url`;
+    const popup = window.open(url, 'gmail_auth', 'width=500,height=620,scrollbars=yes');
+    if (!popup) {
+      this.gmailConnecting.set(false);
+      return;
+    }
+    const check = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(check);
+        this.gmailConnecting.set(false);
+      }
+    }, 500);
+  }
+
+  disconnectGmail(): void {
+    localStorage.removeItem('gmail_uid');
+    localStorage.removeItem('gmail_email');
+    this.gmailEmail.set('');
   }
 
   static getToken(): string | null {

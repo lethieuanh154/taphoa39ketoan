@@ -11,7 +11,7 @@ import { OutputInvoice, OutputInvoiceFilter, OutputPagination, OutputReconciliat
 
 // Database config
 const DB_NAME = 'accountant_cache';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Store names
 const STORE_INVOICES = 'invoices';
@@ -24,8 +24,15 @@ const STORE_OUTPUT_INVOICES = 'output_invoices';
 const STORE_OUTPUT_CUSTOMERS = 'output_customers';
 const STORE_OUTPUT_SUMMARY = 'output_summary';
 
+// Lookup stores (gmail labels, providers)
+const STORE_GMAIL_LABELS = 'gmail_labels';
+const STORE_PROVIDERS = 'providers';
+
 // Cache expiry (30 phút)
 const CACHE_EXPIRY_MS = 30 * 60 * 1000;
+
+// Lookup cache expiry (24 giờ — labels/providers ít thay đổi)
+const LOOKUP_CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 export interface CachedInvoiceData {
   filterKey: string;
@@ -107,6 +114,14 @@ export class AccountantCacheService {
 
         if (!db.objectStoreNames.contains(STORE_OUTPUT_SUMMARY)) {
           db.createObjectStore(STORE_OUTPUT_SUMMARY, { keyPath: 'key' });
+        }
+
+        // Lookup stores
+        if (!db.objectStoreNames.contains(STORE_GMAIL_LABELS)) {
+          db.createObjectStore(STORE_GMAIL_LABELS, { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains(STORE_PROVIDERS)) {
+          db.createObjectStore(STORE_PROVIDERS, { keyPath: 'key' });
         }
       });
 
@@ -546,6 +561,76 @@ export class AccountantCacheService {
       console.log('🔄 Invalidated output cache for source:', source);
     } catch (error) {
       console.error('❌ Error invalidating output cache:', error);
+    }
+  }
+
+  // ==========================================================================
+  // GMAIL LABELS CACHE (24h expiry)
+  // ==========================================================================
+
+  async getCachedGmailLabels(): Promise<{id: string, name: string}[] | null> {
+    await this.init();
+    try {
+      const cached = await this.indexedDB.getByKey<{key: string, labels: {id: string, name: string}[], timestamp: number}>(
+        DB_NAME, DB_VERSION, STORE_GMAIL_LABELS, 'gmail_labels'
+      );
+      if (!cached) return null;
+      if (Date.now() - cached.timestamp > LOOKUP_CACHE_EXPIRY_MS) {
+        await this.indexedDB.delete(DB_NAME, DB_VERSION, STORE_GMAIL_LABELS, 'gmail_labels');
+        return null;
+      }
+      console.log('📦 Gmail labels cache hit:', cached.labels.length);
+      return cached.labels;
+    } catch (error) {
+      console.error('❌ Error getting cached gmail labels:', error);
+      return null;
+    }
+  }
+
+  async cacheGmailLabels(labels: {id: string, name: string}[]): Promise<void> {
+    await this.init();
+    try {
+      await this.indexedDB.put(DB_NAME, DB_VERSION, STORE_GMAIL_LABELS, {
+        key: 'gmail_labels', labels, timestamp: Date.now()
+      });
+      console.log('💾 Cached gmail labels:', labels.length);
+    } catch (error) {
+      console.error('❌ Error caching gmail labels:', error);
+    }
+  }
+
+  // ==========================================================================
+  // PROVIDERS CACHE (24h expiry)
+  // ==========================================================================
+
+  async getCachedProviders(): Promise<{name: string, count: number}[] | null> {
+    await this.init();
+    try {
+      const cached = await this.indexedDB.getByKey<{key: string, providers: {name: string, count: number}[], timestamp: number}>(
+        DB_NAME, DB_VERSION, STORE_PROVIDERS, 'providers'
+      );
+      if (!cached) return null;
+      if (Date.now() - cached.timestamp > LOOKUP_CACHE_EXPIRY_MS) {
+        await this.indexedDB.delete(DB_NAME, DB_VERSION, STORE_PROVIDERS, 'providers');
+        return null;
+      }
+      console.log('📦 Providers cache hit:', cached.providers.length);
+      return cached.providers;
+    } catch (error) {
+      console.error('❌ Error getting cached providers:', error);
+      return null;
+    }
+  }
+
+  async cacheProviders(providers: {name: string, count: number}[]): Promise<void> {
+    await this.init();
+    try {
+      await this.indexedDB.put(DB_NAME, DB_VERSION, STORE_PROVIDERS, {
+        key: 'providers', providers, timestamp: Date.now()
+      });
+      console.log('💾 Cached providers:', providers.length);
+    } catch (error) {
+      console.error('❌ Error caching providers:', error);
     }
   }
 }

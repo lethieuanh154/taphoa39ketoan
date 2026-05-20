@@ -13,7 +13,8 @@
 
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil, finalize } from 'rxjs/operators';
 
@@ -27,14 +28,17 @@ import {
   Supplier,
   ReconcileStatus,
   ReconciliationResult,
-  FieldDiff
+  FieldDiff,
+  PortalLink
 } from '../invoice.service.v2';
 import { AccountantCacheService } from '../accountant-cache.service';
+import { HddtService, HddtInvoice } from '../../../services/hddt.service';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-ledger-8-dong-bo-hoa-don-v2',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule],
   templateUrl: './ledger-8-dong-bo-hoa-don-v2.component.html',
   styleUrls: ['./ledger-8-dong-bo-hoa-don-v2.component.css']
 })
@@ -75,8 +79,10 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     count: 0
   };
 
-  // Suppliers for dropdown
-  suppliers: Supplier[] = [];
+  // Gmail labels for supplier filter
+  gmailLabels: {id: string, name: string, displayName: string}[] = [];
+  internalSuppliers: Supplier[] = [];
+  labelMappings: {labelId: string, labelName: string, displayName: string, supplierTaxCode: string, supplierName: string}[] = [];
 
   // Reconciliation summary
   summary: ReconciliationSummary | null = null;
@@ -98,7 +104,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   loading = false;
   loadingTax = false;       // Loading cho bảng TAX_PORTAL
   loadingAi = false;        // Loading cho bảng AI_PDF
-  loadingSuppliers = false;
+  loadingLabels = false;
   loadingSummary = false;
   reconciling = false;
   clearing = false;
@@ -108,52 +114,64 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   currentFilter: InvoiceFilter = {};
 
   // Options
-  yearOptions: number[] = [];
-  monthOptions: { value: string; label: string }[] = [];
+  providerOptions: { name: string; count: number }[] = [];
+  selectedProvider = '';
 
   // Destroy subject
   private destroy$ = new Subject<void>();
 
+  // === GDT Direct Fetch (Tax portal) ===
+  hddtInvoices: HddtInvoice[] = [];
+  fetchingGdt = false;
+  gdtError = '';
+  gdtMode = false;   // true = tax panel shows live GDT data
+
+  // === Main Tabs ===
+  activeMainTab: 'reconcile' | 'portal' = 'reconcile';
+
+  // === Portal Links Tab ===
+  portalLinks: Invoice[] = [];
+  portalLinksFiltered: Invoice[] = [];
+  loadingPortalLinks = false;
+  portalLinksPagination: Pagination = {
+    hasNext: false, hasPrev: false, firstDocId: null, lastDocId: null, pageSize: 50, count: 0
+  };
+  portalLinksCurrentFilter: InvoiceFilter = {};
+  portalLinksSupplierTaxCode = '';
+  portalLinksLabelId = '';
+  portalLinksFromDate = new Date().toISOString().split('T')[0];
+  portalLinksToDate = new Date().toISOString().split('T')[0];
+  portalLinksSearchNo = '';
+  expandedPortalLinkId: string | null = null;
+
   constructor(
     private fb: FormBuilder,
     private invoiceService: InvoiceServiceV2,
-    private cacheService: AccountantCacheService
+    private cacheService: AccountantCacheService,
+    private hddtService: HddtService,
+    private http: HttpClient
   ) {
-    const currentYear = new Date().getFullYear();
-    const today = this.formatDateToDisplay(new Date());
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
     this.filterForm = this.fb.group({
-      source: [''],           // '' = tất cả, 'TAX_PORTAL', 'AI_PDF'
-      filterType: ['all'],    // 'all', 'month', 'year', 'range' - Mặc định là tất cả để thấy data ngay
-      monthKey: [`${currentYear}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`],
-      year: [currentYear],
-      fromDate: [today],      // Giữ giá trị để khi user đổi qua 'range' thì có sẵn
-      toDate: [today],        // Giữ giá trị để khi user đổi qua 'range' thì có sẵn
-      supplierTaxCode: [''],
-      reconcileStatus: [''],  // '', 'PENDING', 'MATCHED', 'UNMATCHED', 'MISMATCH'
+      fromDate: [today],
+      toDate: [today],
+      gmailLabel: [''],
       pageSize: [25]
     });
-
-    // Generate options
-    this.yearOptions = this.invoiceService.getYearOptions();
-    this.monthOptions = this.invoiceService.getMonthOptions(currentYear);
   }
 
   ngOnInit(): void {
     console.log('Ledger 8 V2 initialized');
 
-    // Load suppliers for dropdown
-    this.loadSuppliers();
+    // Load Gmail labels for supplier filter
+    this.loadGmailLabels();
+
+    // Load providers for filter
+    this.loadProviders();
 
     // Load default data (30 ngày gần nhất)
     this.loadDefault();
-
-    // Listen to year changes to update month options
-    this.filterForm.get('year')?.valueChanges
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(year => {
-        this.monthOptions = this.invoiceService.getMonthOptions(year);
-      });
   }
 
   ngOnDestroy(): void {
@@ -179,50 +197,23 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
    */
   applyFilter(forceReload = false): void {
     const values = this.filterForm.value;
-    const baseFilter: InvoiceFilter = {
-      pageSize: values.pageSize
-    };
+    const baseFilter: InvoiceFilter = { pageSize: values.pageSize };
 
-    // Date filter based on type
-    switch (values.filterType) {
-      case 'all':
-        // Không filter theo ngày - lấy tất cả
-        break;
-      case 'month':
-        if (values.monthKey) {
-          baseFilter.monthKey = values.monthKey;
-        }
-        break;
-      case 'year':
-        if (values.year) {
-          baseFilter.year = values.year;
-        }
-        break;
-      case 'range':
-        // Convert dd/mm/yyyy -> yyyy-mm-dd cho API
-        if (values.fromDate) {
-          baseFilter.fromDate = this.parseDisplayDateToApi(values.fromDate);
-        }
-        if (values.toDate) {
-          baseFilter.toDate = this.parseDisplayDateToApi(values.toDate);
-        }
-        break;
-    }
+    if (values.fromDate) baseFilter.fromDate = values.fromDate;
+    if (values.toDate) baseFilter.toDate = values.toDate;
 
-    // Supplier filter
-    if (values.supplierTaxCode) {
-      baseFilter.supplierTaxCode = values.supplierTaxCode;
-    }
-
-    // Status filter
-    if (values.reconcileStatus) {
-      baseFilter.reconcileStatus = values.reconcileStatus as ReconcileStatus;
+    // Map gmail label → supplierTaxCode
+    if (values.gmailLabel) {
+      const mapping = this.labelMappings.find(m => m.labelName === values.gmailLabel);
+      if (mapping?.supplierTaxCode) {
+        baseFilter.supplierTaxCode = mapping.supplierTaxCode;
+      }
     }
 
     this.currentFilter = baseFilter;
+    console.log('🔍 applyFilter()', { forceReload, filter: baseFilter, gmailLabel: values.gmailLabel });
 
-    // Load cả 2 nguồn song song
-    this.loadTaxInvoices({ ...baseFilter, source: 'TAX_PORTAL' }, forceReload);
+    // Chỉ load AI invoices — Tax invoices load thủ công qua "Tải từ GDT"
     this.loadAiInvoices({ ...baseFilter, source: 'AI_PDF' }, forceReload);
     this.loadSummary(forceReload);
   }
@@ -269,6 +260,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
    */
   async loadAiInvoices(filter: InvoiceFilter, forceReload = false): Promise<void> {
     this.loadingAi = true;
+    console.log('📄 loadAiInvoices()', { forceReload, filter });
 
     // Thử lấy từ cache trước (nếu không force reload)
     if (!forceReload) {
@@ -277,27 +269,29 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
         this.aiInvoices = cached.invoices;
         this.aiPagination = cached.pagination;
         this.loadingAi = false;
-        console.log('📦 AI_PDF loaded from cache:', cached.invoices.length, 'invoices');
+        console.log('📦 AI_PDF from cache:', cached.invoices.length, 'invoices');
         return;
       }
     }
 
-    this.invoiceService.getInvoices(filter)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingAi = false)
-      )
+    // Use KeToanBackEnd to read from supplies-invoices Firestore directly
+    const internalFilter: InvoiceFilter = { ...filter };
+    delete (internalFilter as any).source;
+    if (this.selectedProvider) {
+      (internalFilter as any).invoiceProvider = this.selectedProvider;
+    }
+
+    console.log('🌐 loadAiInvoices → getInternalInvoices()', internalFilter);
+    this.invoiceService.getInternalInvoices(internalFilter)
+      .pipe(takeUntil(this.destroy$), finalize(() => this.loadingAi = false))
       .subscribe({
         next: async (result) => {
           this.aiInvoices = result.invoices;
           this.aiPagination = result.pagination;
-          console.log('✅ AI_PDF:', result.invoices.length, 'invoices');
-          // Lưu vào cache
+          console.log('✅ AI_PDF loaded:', result.invoices.length, 'invoices | hasNext:', result.pagination.hasNext);
           await this.cacheService.cacheInvoices(filter, result.invoices, result.pagination);
         },
-        error: (err) => {
-          console.error('Error loading AI invoices:', err);
-        }
+        error: (err) => console.error('❌ loadAiInvoices error:', err)
       });
   }
 
@@ -353,42 +347,25 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   nextAiPage(): void {
     if (!this.aiPagination.hasNext || !this.aiPagination.lastDocId) return;
 
+    console.log('⏭️ nextAiPage() cursor:', this.aiPagination.lastDocId);
     this.loadingAi = true;
-    const filter: InvoiceFilter = { ...this.currentFilter, source: 'AI_PDF' };
-
-    this.invoiceService.getNextPage(filter, this.aiPagination.lastDocId)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingAi = false)
-      )
+    this.invoiceService.getInternalInvoices({ ...this.currentFilter, cursor: this.aiPagination.lastDocId, direction: 'next' })
+      .pipe(takeUntil(this.destroy$), finalize(() => this.loadingAi = false))
       .subscribe({
-        next: (result) => {
-          this.aiInvoices = result.invoices;
-          this.aiPagination = result.pagination;
-        },
+        next: (result) => { this.aiInvoices = result.invoices; this.aiPagination = result.pagination; },
         error: (err) => console.error('Error:', err)
       });
   }
 
-  /**
-   * Load trang trước cho AI_PDF
-   */
   prevAiPage(): void {
     if (!this.aiPagination.hasPrev || !this.aiPagination.firstDocId) return;
 
+    console.log('⏮️ prevAiPage() cursor:', this.aiPagination.firstDocId);
     this.loadingAi = true;
-    const filter: InvoiceFilter = { ...this.currentFilter, source: 'AI_PDF' };
-
-    this.invoiceService.getPrevPage(filter, this.aiPagination.firstDocId)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingAi = false)
-      )
+    this.invoiceService.getInternalInvoices({ ...this.currentFilter, cursor: this.aiPagination.firstDocId, direction: 'prev' })
+      .pipe(takeUntil(this.destroy$), finalize(() => this.loadingAi = false))
       .subscribe({
-        next: (result) => {
-          this.aiInvoices = result.invoices;
-          this.aiPagination = result.pagination;
-        },
+        next: (result) => { this.aiInvoices = result.invoices; this.aiPagination = result.pagination; },
         error: (err) => console.error('Error:', err)
       });
   }
@@ -484,21 +461,66 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   }
 
   /**
-   * Load suppliers for dropdown
+   * Load Gmail labels from KeToanBackEnd for supplier filter
    */
-  loadSuppliers(): void {
-    this.loadingSuppliers = true;
+  async loadGmailLabels(): Promise<void> {
+    this.loadingLabels = true;
 
-    this.invoiceService.getSuppliers()
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingSuppliers = false)
-      )
+    // Try IndexedDB cache first (24h expiry)
+    const cached = await this.cacheService.getCachedGmailLabels();
+    if (cached && cached.length > 0) {
+      this.gmailLabels = cached.map(l => ({ id: l.id, name: l.name, displayName: l.name }));
+      this.loadingLabels = false;
+      console.log('📦 Gmail labels from cache:', this.gmailLabels.length);
+      this.loadLabelMappings();
+      return;
+    }
+
+    // Cache miss → call API
+    const gmailUid = localStorage.getItem('gmail_uid');
+    const url = `${environment.ketoanBackendUrl}/api/gmail/labels${gmailUid ? '?uid=' + gmailUid : ''}`;
+    console.log('🏷️ loadGmailLabels() → API', url);
+    this.http.get<{success: boolean, labels: {id: string, name: string}[]}>(url)
+      .pipe(takeUntil(this.destroy$), finalize(() => this.loadingLabels = false))
+      .subscribe({
+        next: (response) => {
+          const allLabels = response.labels || [];
+          this.gmailLabels = allLabels.map(l => ({ id: l.id, name: l.name, displayName: l.name }));
+          console.log('✅ Gmail labels from API:', this.gmailLabels.length);
+          this.cacheService.cacheGmailLabels(allLabels);
+          this.loadLabelMappings();
+        },
+        error: (err) => console.error('❌ loadGmailLabels error:', err)
+      });
+  }
+
+  /**
+   * Build label → supplierTaxCode mappings via name matching
+   */
+  loadLabelMappings(): void {
+    console.log('🔗 loadLabelMappings() — matching', this.gmailLabels.length, 'labels to suppliers');
+    this.invoiceService.getInternalSuppliers()
+      .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (suppliers) => {
-          this.suppliers = suppliers;
+          this.internalSuppliers = suppliers;
+          this.labelMappings = this.gmailLabels.map(label => {
+            const matched = suppliers.find(s =>
+              s.name.toLowerCase().includes(label.displayName.toLowerCase()) ||
+              label.displayName.toLowerCase().includes(s.name.toLowerCase())
+            );
+            return {
+              labelId: label.id,
+              labelName: label.name,
+              displayName: label.displayName,
+              supplierTaxCode: matched?.taxCode || '',
+              supplierName: matched?.name || label.displayName
+            };
+          });
+          const mapped = this.labelMappings.filter(m => m.supplierTaxCode).length;
+          console.log(`✅ labelMappings built: ${this.labelMappings.length} labels, ${mapped} matched to taxCode`);
         },
-        error: (err) => console.error('Error loading suppliers:', err)
+        error: (err) => console.error('❌ loadLabelMappings error:', err)
       });
   }
 
@@ -507,40 +529,27 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
    */
   async loadSummary(forceReload = false): Promise<void> {
     this.loadingSummary = true;
-    const values = this.filterForm.value;
+    console.log('📊 loadSummary()', { forceReload });
 
-    let monthKey: string | undefined;
-    let year: number | undefined;
-
-    if (values.filterType === 'month') {
-      monthKey = values.monthKey;
-    } else if (values.filterType === 'year') {
-      year = values.year;
-    }
-
-    // Thử lấy từ cache trước
     if (!forceReload) {
-      const cached = await this.cacheService.getCachedSummary(monthKey, year);
+      const cached = await this.cacheService.getCachedSummary(undefined, undefined);
       if (cached) {
         this.summary = cached;
         this.loadingSummary = false;
-        console.log('📦 Summary loaded from cache');
+        console.log('📦 summary from cache:', cached);
         return;
       }
     }
 
-    this.invoiceService.getReconciliationSummary(monthKey, year)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingSummary = false)
-      )
+    this.invoiceService.getReconciliationSummary(undefined, undefined)
+      .pipe(takeUntil(this.destroy$), finalize(() => this.loadingSummary = false))
       .subscribe({
         next: async (summary) => {
           this.summary = summary;
-          // Lưu vào cache
-          await this.cacheService.cacheSummary(summary, monthKey, year);
+          console.log('✅ summary loaded:', summary);
+          await this.cacheService.cacheSummary(summary, undefined, undefined);
         },
-        error: (err) => console.error('Error loading summary:', err)
+        error: (err) => console.error('❌ loadSummary error:', err)
       });
   }
 
@@ -579,7 +588,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
             // Invalidate cache và reload data
             await this.cacheService.invalidateBySource('TAX_PORTAL');
             // Reload suppliers để dropdown có data mới
-            this.loadSuppliers();
+            this.loadGmailLabels();
             this.applyFilter(true);
           },
           error: (err) => {
@@ -600,18 +609,12 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
    * Run reconciliation
    */
   runReconciliation(): void {
-    const values = this.filterForm.value;
-    const monthKey = values.filterType === 'month' ? values.monthKey : undefined;
+    if (!confirm('Bạn có muốn chạy đối chiếu cho tất cả hóa đơn?')) return;
 
-    const confirmMsg = monthKey
-      ? `Bạn có muốn chạy đối chiếu cho tháng ${monthKey}?`
-      : 'Bạn có muốn chạy đối chiếu cho tất cả hóa đơn?';
-
-    if (!confirm(confirmMsg)) return;
-
+    console.log('⚖️ runReconciliation() started');
     this.reconciling = true;
 
-    this.invoiceService.runReconciliation(monthKey)
+    this.invoiceService.runReconciliation(undefined)
       .pipe(
         takeUntil(this.destroy$),
         finalize(() => this.reconciling = false)
@@ -821,7 +824,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
           alert(`✅ Đã xóa ${result.deleted} hóa đơn từ ${label}`);
           await this.cacheService.clearAllCache();  // Xóa tất cả cache bao gồm summary
           this.applyFilter(true);
-          this.loadSuppliers();  // Reload suppliers dropdown
+          this.loadGmailLabels();  // Reload suppliers dropdown
         },
         error: (err) => {
           console.error('Error clearing:', err);
@@ -861,7 +864,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
           alert(`✅ Đã xóa ${result.taxDeleted} hóa đơn thuế + ${result.aiDeleted} hóa đơn AI`);
           await this.cacheService.clearAllCache();
           this.applyFilter(true);
-          this.loadSuppliers();  // Reload suppliers dropdown
+          this.loadGmailLabels();  // Reload suppliers dropdown
         },
         error: (err) => {
           console.error('Error clearing all:', err);
@@ -871,63 +874,97 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   }
 
   // ==========================================================================
-  // UTILITY METHODS
+  // PORTAL & PROVIDER METHODS
   // ==========================================================================
 
   /**
-   * Format Date object thành dd/mm/yyyy để hiển thị
+   * Load invoice providers from KeToanBackEnd
    */
-  formatDateToDisplay(date: Date): string {
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
+  async loadProviders(): Promise<void> {
+    // Try IndexedDB cache first (24h expiry)
+    const cached = await this.cacheService.getCachedProviders();
+    if (cached && cached.length > 0) {
+      this.providerOptions = cached;
+      console.log('📦 Providers from cache:', cached.length);
+      return;
+    }
 
-  /**
-   * Parse dd/mm/yyyy thành yyyy-mm-dd cho API
-   */
-  parseDisplayDateToApi(displayDate: string): string {
-    if (!displayDate) return '';
-    const parts = displayDate.split('/');
-    if (parts.length !== 3) return displayDate;
-    const [day, month, year] = parts;
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
-
-  /**
-   * Validate format dd/mm/yyyy
-   */
-  isValidDisplayDate(dateStr: string): boolean {
-    if (!dateStr) return false;
-    const regex = /^\d{2}\/\d{2}\/\d{4}$/;
-    if (!regex.test(dateStr)) return false;
-
-    const parts = dateStr.split('/');
-    const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10);
-    const year = parseInt(parts[2], 10);
-
-    if (month < 1 || month > 12) return false;
-    if (day < 1 || day > 31) return false;
-    if (year < 2000 || year > 2100) return false;
-
-    return true;
-  }
-
-  /**
-   * Validate date input khi blur
-   */
-  validateDateInput(fieldName: 'fromDate' | 'toDate'): void {
-    const value = this.filterForm.get(fieldName)?.value;
-    if (value && !this.isValidDisplayDate(value)) {
-      alert(`Ngày không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy`);
-      // Reset về hôm nay
-      this.filterForm.patchValue({
-        [fieldName]: this.formatDateToDisplay(new Date())
+    // Cache miss → call API
+    this.invoiceService.getInternalProviders()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (result) => {
+          this.providerOptions = result.providers;
+          console.log('✅ Providers from API:', result.providers.length);
+          this.cacheService.cacheProviders(result.providers);
+        },
+        error: (err) => console.error('Error loading providers:', err)
       });
+  }
+
+  /**
+   * Open portal URL in new tab to view original invoice
+   */
+  openPortalUrl(invoice: Invoice): void {
+    if (invoice.portalUrl) {
+      window.open(invoice.portalUrl, '_blank');
     }
   }
+
+  openGmailMessage(invoice: Invoice): void {
+    const threadId = (invoice as any).gmailThreadId || (invoice as any).gmailMessageId;
+    console.log('[openGmailMessage]', { threadId, gmailThreadId: (invoice as any).gmailThreadId, gmailMessageId: (invoice as any).gmailMessageId, invoice });
+    if (threadId) {
+      const url = `https://mail.google.com/mail/u/1/#all/${threadId}`;
+      console.log('[openGmailMessage] Opening:', url);
+      window.open(url, '_blank');
+    }
+  }
+
+  /**
+   * Filter by provider
+   */
+  filterByProvider(provider: string): void {
+    this.selectedProvider = provider;
+    this.applyFilter(true);
+  }
+
+  /**
+   * Get provider badge class
+   */
+  getProviderClass(provider: string): string {
+    const classes: Record<string, string> = {
+      'VIETTEL': 'provider-viettel',
+      'VNPT': 'provider-vnpt',
+      'MISA': 'provider-misa',
+      'VIN_HOADON': 'provider-vinhoadon',
+      'KIOTVIET': 'provider-kiotviet',
+      'MOBIFONE': 'provider-mobifone',
+      'EINVOICE': 'provider-einvoice',
+      'EHOADON': 'provider-ehoadon',
+      'ASIAINVOICE': 'provider-asiainvoice',
+      'MINVOICE': 'provider-minvoice',
+      'WININVOICE': 'provider-wininvoice'
+    };
+    return classes[provider] || 'provider-default';
+  }
+
+  /**
+   * Get source tab label
+   */
+  getSourceTabLabel(sourceTab: string): string {
+    const labels: Record<string, string> = {
+      'upload': 'XML',
+      'pdf': 'PDF',
+      'email': 'Email',
+      'clone_image': 'Clone'
+    };
+    return labels[sourceTab] || sourceTab || '';
+  }
+
+  // ==========================================================================
+  // UTILITY METHODS
+  // ==========================================================================
 
   formatCurrency(amount: number | undefined): string {
     return this.invoiceService.formatCurrency(amount);
@@ -953,23 +990,10 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
    * Reset filter to default
    */
   resetFilter(): void {
-    const currentYear = new Date().getFullYear();
-    const today = this.formatDateToDisplay(new Date());
-
-    this.filterForm.reset({
-      source: '',
-      filterType: 'all', // Reset về mặc định là tất cả để thấy data ngay
-      monthKey: `${currentYear}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`,
-      year: currentYear,
-      fromDate: today,
-      toDate: today,
-      supplierTaxCode: '',
-      reconcileStatus: '',
-      pageSize: 25
-    });
-
+    const today = new Date().toISOString().split('T')[0];
+    console.log('🔄 resetFilter() → today:', today);
+    this.filterForm.reset({ fromDate: today, toDate: today, gmailLabel: '', pageSize: 25 });
     this.applyFilter();
-    this.loadSuppliers();
   }
 
   /**
@@ -980,13 +1004,210 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     console.log('🔄 Force reloading data...');
     await this.cacheService.clearAllCache();  // Xóa tất cả cache bao gồm summary
     this.applyFilter(true);
-    this.loadSuppliers();  // Reload suppliers dropdown
+    this.loadGmailLabels();  // Reload suppliers dropdown
   }
 
   /**
    * Track by function for ngFor
    */
-  trackByInvoice(index: number, invoice: Invoice): string {
+  trackByInvoice(_index: number, invoice: Invoice): string {
     return invoice.id;
+  }
+
+  // ==========================================================================
+  // GDT DIRECT FETCH — Tax portal live data
+  // ==========================================================================
+
+  switchMainTab(tab: 'reconcile' | 'portal'): void {
+    this.activeMainTab = tab;
+  }
+
+  fetchFromGdt(): void {
+    if (!this.hddtService.hasToken()) {
+      alert('Chưa đăng nhập GDT. Vui lòng đăng nhập tại trang Hóa đơn mua vào trước.');
+      return;
+    }
+
+    const values = this.filterForm.value;
+    const today = new Date();
+    const fromDate = values.fromDate ? new Date(values.fromDate) : new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const toDate = values.toDate ? new Date(values.toDate) : today;
+    const mapping = this.labelMappings.find(m => m.labelName === values.gmailLabel);
+    const mst = mapping?.supplierTaxCode || '';
+    console.log('🏛️ fetchFromGdt()', { fromDate: values.fromDate, toDate: values.toDate, gmailLabel: values.gmailLabel, mst });
+
+    this.fetchingGdt = true;
+    this.gdtError = '';
+    this.loadingTax = true;
+
+    this.hddtService.getPurchaseInvoicesInRange(fromDate, toDate, true)
+      .pipe(takeUntil(this.destroy$), finalize(() => { this.fetchingGdt = false; this.loadingTax = false; }))
+      .subscribe({
+        next: (invoices) => {
+          this.hddtInvoices = mst ? invoices.filter(inv => inv.nbmst === mst) : invoices;
+          this.gdtMode = true;
+        },
+        error: (err) => {
+          this.gdtError = err.message || 'Lỗi tải từ GDT';
+        }
+      });
+  }
+
+  resetGdtMode(): void {
+    this.gdtMode = false;
+    this.hddtInvoices = [];
+    this.gdtError = '';
+    this.loadTaxInvoices({ ...this.currentFilter, source: 'TAX_PORTAL' });
+  }
+
+  getHddtInvoiceNo(inv: HddtInvoice): string {
+    return `${inv.khhdon}-${inv.shdon}`;
+  }
+
+  // ==========================================================================
+  // PORTAL LINKS TAB
+  // ==========================================================================
+
+  loadPortalLinks(): void {
+    this.loadingPortalLinks = true;
+
+    const gmailUid = localStorage.getItem('gmail_uid') || '';
+
+    // Calculate days_back from date filters
+    let daysBack = 30;
+    if (this.portalLinksFromDate) {
+      const from = new Date(this.portalLinksFromDate);
+      const now = new Date();
+      daysBack = Math.max(1, Math.ceil((now.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    }
+
+    const params = {
+      uid: gmailUid,
+      labelId: this.portalLinksLabelId || undefined,
+      daysBack,
+      pageSize: 50,
+    };
+
+    console.log('🔗 loadPortalLinks() → Gmail direct', params);
+
+    this.invoiceService.getPortalLinksFromGmail(params)
+      .pipe(takeUntil(this.destroy$), finalize(() => this.loadingPortalLinks = false))
+      .subscribe({
+        next: (response) => {
+          console.log('🔗 [PortalLinks] Gmail returned:', {
+            total: response.total,
+            withPortalUrl: response.portalLinks.filter(p => p.portalUrl).length,
+            withCredentials: response.portalLinks.filter(p => p.portalCredentials && Object.keys(p.portalCredentials).length > 0).length,
+            withProvider: response.portalLinks.filter(p => p.invoiceProvider).length,
+          });
+
+          // Map PortalLink[] to Invoice[] for template compatibility
+          this.portalLinks = response.portalLinks.map(pl => ({
+            id: pl.gmailId,
+            invoiceKey: pl.gmailId,
+            invoiceNo: pl.invoiceNo || '',
+            supplierName: pl.supplierName || pl.gmailFrom,
+            supplierTaxCode: pl.supplierTaxCode || '',
+            issueDate: pl.issueDate,
+            issueDateKey: pl.issueDate?.split('T')[0] || '',
+            monthKey: '',
+            year: 0,
+            totalBeforeVat: 0,
+            vatRate: 0,
+            vatAmount: 0,
+            totalAmount: 0,
+            source: 'AI_PDF' as InvoiceSource,
+            reconcileStatus: 'PENDING' as ReconcileStatus,
+            createdAt: pl.issueDate,
+            portalUrl: pl.portalUrl,
+            portalPdfUrl: pl.portalPdfUrl,
+            invoiceProvider: pl.invoiceProvider,
+            portalCredentials: pl.portalCredentials,
+            gmailFrom: pl.gmailFrom,
+            gmailMessageId: pl.gmailId,
+            gmailThreadId: (pl as any).gmailThreadId || pl.gmailId,
+          } as Invoice));
+
+          this.portalLinksPagination = {
+            hasNext: false, hasPrev: false,
+            firstDocId: null, lastDocId: null,
+            pageSize: 50, count: response.total
+          };
+          this.applyPortalLinksSearch();
+        },
+        error: (err) => console.error('Error loading portal links from Gmail:', err)
+      });
+  }
+
+  applyPortalLinksSearch(): void {
+    if (!this.portalLinksSearchNo.trim()) {
+      this.portalLinksFiltered = this.portalLinks;
+      return;
+    }
+    const q = this.portalLinksSearchNo.trim().toLowerCase();
+    this.portalLinksFiltered = this.portalLinks.filter(inv =>
+      inv.invoiceNo?.toLowerCase().includes(q) ||
+      inv.supplierName?.toLowerCase().includes(q) ||
+      inv.invoiceProvider?.toLowerCase().includes(q)
+    );
+  }
+
+  togglePortalCredentials(id: string): void {
+    this.expandedPortalLinkId = this.expandedPortalLinkId === id ? null : id;
+  }
+
+  getCredentialsDisplay(inv: Invoice): string {
+    if (!inv.portalCredentials) return '';
+    const c = inv.portalCredentials as Record<string, string>;
+    const parts: string[] = [];
+    if (c['secretCode']) parts.push(`Mã BM: ${c['secretCode']}`);
+    if (c['taxCode']) parts.push(`MST: ${c['taxCode']}`);
+    if (c['lookupCode']) parts.push(`Mã TC: ${c['lookupCode']}`);
+    return parts.join('  |  ');
+  }
+
+  getLookupCode(inv: Invoice): string {
+    if (!inv.portalCredentials) return '';
+    const c = inv.portalCredentials as Record<string, string>;
+    return c['lookupCode'] || '';
+  }
+
+  getSecretCode(inv: Invoice): string {
+    if (!inv.portalCredentials) return '';
+    const c = inv.portalCredentials as Record<string, string>;
+    const parts: string[] = [];
+    if (c['secretCode']) parts.push(c['secretCode']);
+    if (c['taxCode']) parts.push(`MST: ${c['taxCode']}`);
+    return parts.join(' | ');
+  }
+
+  nextPortalPage(): void {
+    if (!this.portalLinksPagination.hasNext || !this.portalLinksPagination.lastDocId) return;
+    this.loadingPortalLinks = true;
+    this.invoiceService.getNextPage(this.portalLinksCurrentFilter, this.portalLinksPagination.lastDocId)
+      .pipe(takeUntil(this.destroy$), finalize(() => this.loadingPortalLinks = false))
+      .subscribe({
+        next: (result) => {
+          this.portalLinks = result.invoices;
+          this.portalLinksPagination = result.pagination;
+          this.applyPortalLinksSearch();
+        },
+        error: (err) => console.error('Error:', err)
+      });
+  }
+
+  prevPortalPage(): void {
+    if (!this.portalLinksPagination.hasPrev || !this.portalLinksPagination.firstDocId) return;
+    this.loadingPortalLinks = true;
+    this.invoiceService.getPrevPage(this.portalLinksCurrentFilter, this.portalLinksPagination.firstDocId)
+      .pipe(takeUntil(this.destroy$), finalize(() => this.loadingPortalLinks = false))
+      .subscribe({
+        next: (result) => {
+          this.portalLinks = result.invoices;
+          this.portalLinksPagination = result.pagination;
+          this.applyPortalLinksSearch();
+        },
+        error: (err) => console.error('Error:', err)
+      });
   }
 }
