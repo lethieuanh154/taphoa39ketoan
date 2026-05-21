@@ -11,7 +11,7 @@
  * - IndexedDB cache để giảm API calls
  */
 
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
@@ -139,6 +139,8 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   portalLinksCurrentFilter: InvoiceFilter = {};
   portalLinksSupplierTaxCode = '';
   portalLinksLabelId = '';
+  portalLinksLabelSearch = '';
+  labelDropdownOpen = false;
   portalLinksFromDate = new Date().toISOString().split('T')[0];
   portalLinksToDate = new Date().toISOString().split('T')[0];
   portalLinksSearchNo = '';
@@ -932,6 +934,33 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   /**
    * Get provider badge class
    */
+  get filteredGmailLabels() {
+    if (!this.portalLinksLabelSearch.trim()) return this.gmailLabels;
+    const q = this.portalLinksLabelSearch.toLowerCase();
+    return this.gmailLabels.filter(l => l.displayName.toLowerCase().includes(q));
+  }
+
+  @HostListener('document:click')
+  closeLabelDropdown() {
+    this.labelDropdownOpen = false;
+  }
+
+  onLabelTriggerClick(e: Event) {
+    e.stopPropagation();
+    this.labelDropdownOpen = !this.labelDropdownOpen;
+    if (this.labelDropdownOpen) this.portalLinksLabelSearch = '';
+  }
+
+  selectPortalLabel(id: string) {
+    this.portalLinksLabelId = id;
+    this.labelDropdownOpen = false;
+  }
+
+  getSelectedLabelName(): string {
+    if (!this.portalLinksLabelId) return '';
+    return this.gmailLabels.find(l => l.id === this.portalLinksLabelId)?.displayName || '';
+  }
+
   getProviderClass(provider: string): string {
     const classes: Record<string, string> = {
       'VIETTEL': 'provider-viettel',

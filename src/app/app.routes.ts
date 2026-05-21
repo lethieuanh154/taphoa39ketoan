@@ -59,98 +59,98 @@ export const routes: Routes = [
       // ═══════════════════════════════════════════════════════════════════
       // DASHBOARD
       // ═══════════════════════════════════════════════════════════════════
-      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-      { path: 'dashboard', component: AccountantDashboardComponent },
+      { path: '', redirectTo: 'accountant-dashboard', pathMatch: 'full' },
+      { path: 'accountant-dashboard', component: AccountantDashboardComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 0. ĐỒNG BỘ HÓA ĐƠN
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'dong-bo/hoa-don-dau-vao', component: Ledger8DongBoHoaDonV2Component },
-      { path: 'dong-bo/hoa-don-dau-ra', component: Ledger9DongBoHoaDonDauRaComponent },
+      { path: 'accountant-pages/ledger-8-dong-bo-hoa-don-v2', component: Ledger8DongBoHoaDonV2Component },
+      { path: 'accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra', component: Ledger9DongBoHoaDonDauRaComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 1. DANH MỤC KẾ TOÁN
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'danh-muc/tai-khoan', component: ChartOfAccountsPageComponent },
-      { path: 'danh-muc/khach-hang', component: CustomerPageComponent },
-      { path: 'danh-muc/nha-cung-cap', component: SupplierPageComponent },
-      { path: 'danh-muc/nhan-vien', component: EmployeePageComponent },
-      { path: 'danh-muc/hang-hoa', component: ProductPageComponent },
-      { path: 'danh-muc/ngan-hang', component: BankPageComponent },
+      { path: 'chart-of-accounts-page', component: ChartOfAccountsPageComponent },
+      { path: 'customer-page', component: CustomerPageComponent },
+      { path: 'supplier-page', component: SupplierPageComponent },
+      { path: 'employee-page', component: EmployeePageComponent },
+      { path: 'product-page', component: ProductPageComponent },
+      { path: 'bank-page', component: BankPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 2. CHỨNG TỪ KẾ TOÁN
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'chung-tu/phieu-thu', component: CashVoucherPageComponent, data: { type: 'RECEIPT' } },
-      { path: 'chung-tu/phieu-chi', component: CashVoucherPageComponent, data: { type: 'PAYMENT' } },
-      { path: 'chung-tu/phieu-nhap-kho', component: WarehousePageComponent, data: { type: 'RECEIPT' } },
-      { path: 'chung-tu/phieu-xuat-kho', component: WarehousePageComponent, data: { type: 'ISSUE' } },
-      { path: 'chung-tu/chung-tu-khac', component: OtherVoucherPageComponent },
+      { path: 'cash-voucher-page/receipt', component: CashVoucherPageComponent, data: { type: 'RECEIPT' } },
+      { path: 'cash-voucher-page/payment', component: CashVoucherPageComponent, data: { type: 'PAYMENT' } },
+      { path: 'warehouse-page/receipt', component: WarehousePageComponent, data: { type: 'RECEIPT' } },
+      { path: 'warehouse-page/issue', component: WarehousePageComponent, data: { type: 'ISSUE' } },
+      { path: 'other-voucher-page', component: OtherVoucherPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 3. BÁN HÀNG & CÔNG NỢ PHẢI THU
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'ban-hang/hoa-don-ban-ra', component: SalesInvoicePageComponent },
-      { path: 'ban-hang/cong-no-131', component: ReceivableLedgerPageComponent },
+      { path: 'accountant-pages/sales-invoice-page', component: SalesInvoicePageComponent },
+      { path: 'receivable-ledger-page', component: ReceivableLedgerPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 4. MUA HÀNG & CÔNG NỢ PHẢI TRẢ
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'mua-hang/hoa-don-mua-vao', component: PurchaseInvoicePageComponent },
-      { path: 'mua-hang/cong-no-331', component: PayableLedgerPageComponent },
+      { path: 'accountant-pages/purchase-invoice-page', component: PurchaseInvoicePageComponent },
+      { path: 'payable-ledger-page', component: PayableLedgerPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 5. KHO & GIÁ VỐN
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'kho/the-kho', component: StockCardPageComponent },
-      { path: 'kho/nhap-xuat-ton', component: InventoryReportPageComponent },
-      { path: 'kho/gia-von-632', component: COGSPageComponent },
+      { path: 'stock-card-page', component: StockCardPageComponent },
+      { path: 'inventory-report-page', component: InventoryReportPageComponent },
+      { path: 'cogs-page', component: COGSPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 6. LƯƠNG & CÁC KHOẢN TRÍCH
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'luong/bang-luong', component: PayrollPageComponent },
-      { path: 'luong/thanh-toan-luong', component: SalaryPaymentPageComponent },
-      { path: 'luong/bao-hiem', component: InsurancePageComponent },
+      { path: 'payroll-page', component: PayrollPageComponent },
+      { path: 'salary-payment-page', component: SalaryPaymentPageComponent },
+      { path: 'insurance-page', component: InsurancePageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 7. TIỀN & NGÂN HÀNG
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'tien/quy-tien-mat', component: CashBookPageComponent },
-      { path: 'tien/tien-ngan-hang', component: BankBookPageComponent },
+      { path: 'cash-book-page', component: CashBookPageComponent },
+      { path: 'bank-book-page', component: BankBookPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 8. THUẾ
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'thue/gtgt', component: VATPageComponent },
-      { path: 'thue/tncn', component: PITPageComponent },
-      { path: 'thue/tndn', component: CITPageComponent },
+      { path: 'vat-page', component: VATPageComponent },
+      { path: 'pit-page', component: PITPageComponent },
+      { path: 'cit-page', component: CITPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 9. SỔ KẾ TOÁN TỔNG HỢP
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'so-tong-hop/nhat-ky-chung', component: JournalPageComponent },
-      { path: 'so-tong-hop/so-cai', component: LedgerPageComponent },
-      { path: 'so-tong-hop/bang-can-doi-tai-khoan', component: TrialBalancePageComponent },
+      { path: 'journal-page', component: JournalPageComponent },
+      { path: 'ledger-page', component: LedgerPageComponent },
+      { path: 'trial-balance-page', component: TrialBalancePageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 10. BÁO CÁO TÀI CHÍNH
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'bao-cao/bang-can-doi-ke-toan', component: BalanceSheetPageComponent },
-      { path: 'bao-cao/ket-qua-kinh-doanh', component: IncomeStatementPageComponent },
-      { path: 'bao-cao/luu-chuyen-tien-te', component: CashFlowPageComponent },
-      { path: 'bao-cao/thue', component: VATDeclarationPageComponent },
-      { path: 'bao-cao/quan-tri', component: ManagementReportsPageComponent },
+      { path: 'balance-sheet-page', component: BalanceSheetPageComponent },
+      { path: 'income-statement-page', component: IncomeStatementPageComponent },
+      { path: 'cash-flow-page', component: CashFlowPageComponent },
+      { path: 'vat-declaration-page', component: VATDeclarationPageComponent },
+      { path: 'management-reports-page', component: ManagementReportsPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
       // 11. HỆ THỐNG & QUẢN TRỊ
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'he-thong/khoa-so', component: PeriodLockPageComponent },
-      { path: 'he-thong/audit-trail', component: AuditTrailPageComponent },
-      { path: 'he-thong/phan-quyen', component: UserRolesPageComponent },
-      { path: 'he-thong/cai-dat', component: SystemSettingsPageComponent },
+      { path: 'period-lock-page', component: PeriodLockPageComponent },
+      { path: 'audit-trail-page', component: AuditTrailPageComponent },
+      { path: 'user-roles-page', component: UserRolesPageComponent },
+      { path: 'system-settings-page', component: SystemSettingsPageComponent },
     ],
   },
   // Catch-all redirect
-  { path: '**', redirectTo: 'dashboard' }
+  { path: '**', redirectTo: 'accountant-dashboard' }
 ];

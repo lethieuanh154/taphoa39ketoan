@@ -1,4 +1,4 @@
-# HANDOFF: Phase 3 Complete — TapHoa39KeToan + TapHoa39KeToanBackEnd
+# HANDOFF: Phase 4 Complete + Render Deploy — TapHoa39KeToan + TapHoa39KeToanBackEnd
 
 ## Architecture (FINAL)
 
@@ -333,7 +333,93 @@ Portal Links → KeToanBackEnd /api/gmail/portal-links → Gmail API (direct, no
 
 ---
 
-## Next Steps (Phase 5 ideas)
+## Phase 5 — Render Deployment (COMPLETE)
+
+### Render Service Config
+```
+Service:       songminhketoanbackend
+Runtime:       Python 3.12.3
+Build Command: chmod +x render-build.sh && ./render-build.sh
+Start Command: python main.py
+```
+
+### Files Created/Modified for Render
+
+| File | Action | Notes |
+|------|--------|-------|
+| `render-build.sh` | **NEW** | Custom build: `CARGO_HOME=/tmp/cargo`, `--only-binary=bcrypt,google-crc32c` |
+| `.python-version` | **NEW** | Pinned `3.12.3` (Render auto-detects) |
+| `main.py` | Modified | Render detection: `RENDER` env → `0.0.0.0`, `PORT` env → port, `reload=False` |
+| `app/config/settings.py` | Modified | Defaults kept `127.0.0.1:5000` for local dev. Render overrides via env vars |
+
+### Render Environment Variables (required)
+
+```
+# Firebase service accounts (JSON strings)
+FIREBASE_SERVICE_ACCOUNT_KETOAN={"type":"service_account",...}
+FIREBASE_SERVICE_ACCOUNT_SUPPLIES_INVOICES={"type":"service_account",...}
+FIREBASE_SERVICE_ACCOUNT_GMAIL={"type":"service_account",...}
+
+# Gmail OAuth
+GOOGLE_CLIENT_ID=245620111851-xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPXxxx
+GMAIL_UID=<firebase-uid>
+
+# CORS — MUST include FE production domain
+CORS_ORIGINS=http://localhost:4200,http://127.0.0.1:4200,<FE_PRODUCTION_DOMAIN>
+
+# Render auto-sets these:
+RENDER=true
+PORT=10000
+```
+
+### Render Host/Port Logic (main.py)
+```python
+if __name__ == "__main__":
+    is_render = bool(os.environ.get("RENDER"))
+    host = "0.0.0.0" if is_render else settings.host  # 0.0.0.0 on Render, 127.0.0.1 local
+    port = int(os.environ.get("PORT", settings.port))  # 10000 on Render, 5000 local
+    uvicorn.run("main:app", host=host, port=port, reload=not is_render)
+```
+
+### Google OAuth — Redirect URI
+Must add to Google Cloud Console → OAuth 2.0 Client ID → Authorized redirect URIs:
+```
+https://songminhketoanbackend.onrender.com/api/gmail/auth/callback
+```
+
+---
+
+## Bug Fixes (Phase 4 → 5)
+
+### EmailBodyParser fixes (`app/services/email_body_parser.py`)
+- **EINVOICE**: Fixed credentials extraction (portal URL + secretCode)
+- **VIETTEL**: Fixed URL extraction regex, added `taxCode` to `portalCredentials`
+- **MISA**: Fixed body extraction (HTML content was not being parsed correctly)
+- **EHOADON**: Fixed URL pattern matching
+- **Supplier name extraction**: Improved regex for extracting supplier name from email body/subject
+
+### Gmail routes fixes (`app/routes/gmail_routes.py`)
+- **Invoice number fallback**: If regex fails on subject, try extracting from email body
+- **Date filter defaults**: Fixed default `days_back` parameter handling
+- **401 TOKEN_EXPIRED**: Added auto-refresh logic — if Gmail API returns 401, refresh OAuth token and retry
+
+### CORS fix (settings.py)
+- `cors_origins` default: `http://localhost:4200,http://127.0.0.1:4200`
+- **Production**: Must set `CORS_ORIGINS` env var on Render to include FE domain
+- **Status**: PENDING — need FE production domain to complete
+
+---
+
+## Pending Issues
+
+1. **CORS on Render**: `CORS_ORIGINS` env var needs FE production domain added
+2. **beautifulsoup4 warning**: `email_body_parser.py` falls back to regex when bs4 not installed (non-critical, optional: add `beautifulsoup4` to requirements.txt)
+3. **Google OAuth redirect_uri**: User must manually add Render callback URI to Google Cloud Console
+
+---
+
+## Next Steps (Phase 6 ideas)
 
 1. **Batch process Gmail → Firestore**: Auto-process all Gmail emails and save to internal_invoices (eliminates manual TapHoa39BanHang workflow)
 2. **Tax portal import**: Upload XML files from GDT to `tax_invoices` via `/api/v2/invoices/import-xml`

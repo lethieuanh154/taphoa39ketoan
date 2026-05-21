@@ -830,12 +830,21 @@
       <div class="portal-filter-bar">
         <div class="portal-filter-group">
           <label>Gmail Label (NCC)</label>
-          <select class="filter-input" [(ngModel)]="portalLinksLabelId">
-            <option value="">Tất cả email</option>
-            <option *ngFor="let label of gmailLabels" [value]="label.id">
-              {{ label.displayName }}
-            </option>
-          </select>
+          <div class="custom-label-select" [class.open]="labelDropdownOpen">
+            <div class="custom-label-trigger filter-input" (click)="onLabelTriggerClick($event)">
+              <span>{{ getSelectedLabelName() || 'Tất cả email' }}</span>
+              <span class="custom-label-arrow">▼</span>
+            </div>
+            <div class="custom-label-panel" *ngIf="labelDropdownOpen" (click)="$event.stopPropagation()">
+              <div class="custom-label-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6c757d" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" [(ngModel)]="portalLinksLabelSearch" placeholder="Tìm label..." (keydown)="$event.stopPropagation()" autofocus>
+              </div>
+              <div class="custom-label-option" (click)="selectPortalLabel('')">Tất cả email</div>
+              <div class="custom-label-option" *ngFor="let label of filteredGmailLabels" (click)="selectPortalLabel(label.id)">{{ label.displayName }}</div>
+              <div *ngIf="filteredGmailLabels.length === 0" class="custom-label-no-results">Không tìm thấy</div>
+            </div>
+          </div>
         </div>
         <div class="portal-filter-group">
           <label>Từ ngày</label>

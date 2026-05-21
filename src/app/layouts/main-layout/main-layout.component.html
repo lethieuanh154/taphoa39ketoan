@@ -7,7 +7,7 @@
   <aside class="sidebar" [class.collapsed]="isSidebarCollapsed">
     <!-- Header -->
     <div class="sidebar-header">
-      <a routerLink="/dashboard" class="logo-link" title="Trang chủ Kế toán">
+      <a routerLink="/accountant-dashboard" class="logo-link" title="Trang chủ Kế toán">
         <i class="fa-solid fa-calculator"></i>
       </a>
       <h2 class="sidebar-title" *ngIf="!isSidebarCollapsed">Kế Toán DN</h2>
@@ -21,7 +21,7 @@
       <div class="nav-items">
 
         <!-- Dashboard -->
-        <a routerLink="/dashboard" routerLinkActive="active" class="nav-link dashboard-link">
+        <a routerLink="/accountant-dashboard" routerLinkActive="active" class="nav-link dashboard-link">
           <i class="fa-solid fa-gauge-high nav-icon"></i>
           <span class="nav-text" *ngIf="!isSidebarCollapsed">Tổng quan</span>
         </a>
@@ -41,10 +41,10 @@
                [class.fa-chevron-right]="!expandedGroups['kiemTraHoaDon']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['kiemTraHoaDon'] && !isSidebarCollapsed">
-            <a routerLink="/dong-bo/hoa-don-dau-vao" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/accountant-pages/ledger-8-dong-bo-hoa-don-v2" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-file-import"></i> Hóa đơn đầu vào
             </a>
-            <a routerLink="/dong-bo/hoa-don-dau-ra" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-file-export"></i> Hóa đơn đầu ra
             </a>
           </div>
@@ -63,22 +63,22 @@
                [class.fa-chevron-right]="!expandedGroups['danhMuc']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['danhMuc'] && !isSidebarCollapsed">
-            <a routerLink="/danh-muc/tai-khoan" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/chart-of-accounts-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-sitemap"></i> Hệ thống tài khoản
             </a>
-            <a routerLink="/danh-muc/khach-hang" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/customer-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-user-tie"></i> Khách hàng
             </a>
-            <a routerLink="/danh-muc/nha-cung-cap" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/supplier-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-truck-field"></i> Nhà cung cấp
             </a>
-            <a routerLink="/danh-muc/nhan-vien" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/employee-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-id-badge"></i> Nhân viên
             </a>
-            <a routerLink="/danh-muc/hang-hoa" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/product-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-boxes-stacked"></i> Hàng hóa - Dịch vụ
             </a>
-            <a routerLink="/danh-muc/ngan-hang" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/bank-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-building-columns"></i> Ngân hàng
             </a>
           </div>
@@ -97,19 +97,19 @@
                [class.fa-chevron-right]="!expandedGroups['chungTu']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['chungTu'] && !isSidebarCollapsed">
-            <a routerLink="/chung-tu/phieu-thu" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/cash-voucher-page/receipt" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-arrow-down"></i> Phiếu thu
             </a>
-            <a routerLink="/chung-tu/phieu-chi" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/cash-voucher-page/payment" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-arrow-up"></i> Phiếu chi
             </a>
-            <a routerLink="/chung-tu/phieu-nhap-kho" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/warehouse-page/receipt" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-box-archive"></i> Phiếu nhập kho
             </a>
-            <a routerLink="/chung-tu/phieu-xuat-kho" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/warehouse-page/issue" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-truck-ramp-box"></i> Phiếu xuất kho
             </a>
-            <a routerLink="/chung-tu/chung-tu-khac" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/other-voucher-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-file-circle-plus"></i> Chứng từ nghiệp vụ khác
             </a>
           </div>
@@ -128,10 +128,10 @@
                [class.fa-chevron-right]="!expandedGroups['banHang']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['banHang'] && !isSidebarCollapsed">
-            <a routerLink="/ban-hang/hoa-don-ban-ra" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/accountant-pages/sales-invoice-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-file-invoice-dollar"></i> Hóa đơn bán ra
             </a>
-            <a routerLink="/ban-hang/cong-no-131" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/receivable-ledger-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-hand-holding-dollar"></i> Sổ chi tiết TK 131
             </a>
           </div>
@@ -150,10 +150,10 @@
                [class.fa-chevron-right]="!expandedGroups['muaHang']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['muaHang'] && !isSidebarCollapsed">
-            <a routerLink="/mua-hang/hoa-don-mua-vao" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/accountant-pages/purchase-invoice-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-file-import"></i> Hóa đơn mua vào
             </a>
-            <a routerLink="/mua-hang/cong-no-331" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/payable-ledger-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-credit-card"></i> Sổ chi tiết TK 331
             </a>
           </div>
@@ -172,13 +172,13 @@
                [class.fa-chevron-right]="!expandedGroups['kho']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['kho'] && !isSidebarCollapsed">
-            <a routerLink="/kho/the-kho" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/stock-card-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-clipboard-list"></i> Thẻ kho
             </a>
-            <a routerLink="/kho/nhap-xuat-ton" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/inventory-report-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-chart-simple"></i> Tổng hợp N-X-T
             </a>
-            <a routerLink="/kho/gia-von-632" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/cogs-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-calculator"></i> Giá vốn hàng bán (632)
             </a>
           </div>
@@ -197,13 +197,13 @@
                [class.fa-chevron-right]="!expandedGroups['luong']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['luong'] && !isSidebarCollapsed">
-            <a routerLink="/luong/bang-luong" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/payroll-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-table"></i> Bảng lương
             </a>
-            <a routerLink="/luong/thanh-toan-luong" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/salary-payment-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-money-check"></i> Thanh toán lương
             </a>
-            <a routerLink="/luong/bao-hiem" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/insurance-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-shield-halved"></i> BHXH, BHYT, BHTN
             </a>
           </div>
@@ -222,10 +222,10 @@
                [class.fa-chevron-right]="!expandedGroups['tien']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['tien'] && !isSidebarCollapsed">
-            <a routerLink="/tien/quy-tien-mat" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/cash-book-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-cash-register"></i> Sổ quỹ tiền mặt (111)
             </a>
-            <a routerLink="/tien/tien-ngan-hang" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/bank-book-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-university"></i> Sổ tiền gửi NH (112)
             </a>
           </div>
@@ -244,13 +244,13 @@
                [class.fa-chevron-right]="!expandedGroups['thue']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['thue'] && !isSidebarCollapsed">
-            <a routerLink="/thue/gtgt" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/vat-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-percent"></i> Thuế GTGT
             </a>
-            <a routerLink="/thue/tncn" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/pit-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-user-minus"></i> Thuế TNCN
             </a>
-            <a routerLink="/thue/tndn" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/cit-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-building"></i> Thuế TNDN
             </a>
             <a routerLink="/thue/mon-bai" routerLinkActive="active" class="nav-sublink">
@@ -274,13 +274,13 @@
                [class.fa-chevron-right]="!expandedGroups['soTongHop']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['soTongHop'] && !isSidebarCollapsed">
-            <a routerLink="/so-tong-hop/nhat-ky-chung" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/journal-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-book-open"></i> Sổ nhật ký chung
             </a>
-            <a routerLink="/so-tong-hop/so-cai" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/ledger-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-book-bookmark"></i> Sổ cái theo TK
             </a>
-            <a routerLink="/so-tong-hop/bang-can-doi-tai-khoan" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/trial-balance-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-scale-balanced"></i> Bảng cân đối TK
             </a>
           </div>
@@ -301,23 +301,23 @@
           <div class="nav-group-items" *ngIf="expandedGroups['baoCao'] && !isSidebarCollapsed">
             <!-- Báo cáo tài chính -->
             <span class="nav-subgroup-label">Báo cáo tài chính</span>
-            <a routerLink="/bao-cao/bang-can-doi-ke-toan" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/balance-sheet-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-file-invoice-dollar"></i> Bảng cân đối kế toán
             </a>
-            <a routerLink="/bao-cao/ket-qua-kinh-doanh" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/income-statement-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-file-lines"></i> Báo cáo KQKD
             </a>
-            <a routerLink="/bao-cao/luu-chuyen-tien-te" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/cash-flow-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-money-bill-transfer"></i> Lưu chuyển tiền tệ
             </a>
             <!-- Báo cáo thuế -->
             <span class="nav-subgroup-label">Báo cáo thuế</span>
-            <a routerLink="/bao-cao/thue" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/vat-declaration-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-file-invoice"></i> Tờ khai thuế GTGT
             </a>
             <!-- Báo cáo quản trị -->
             <span class="nav-subgroup-label">Báo cáo quản trị</span>
-            <a routerLink="/bao-cao/quan-tri" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/management-reports-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-chart-line"></i> Báo cáo quản trị
             </a>
           </div>
@@ -338,16 +338,16 @@
                [class.fa-chevron-right]="!expandedGroups['heThong']"></i>
           </div>
           <div class="nav-group-items" *ngIf="expandedGroups['heThong'] && !isSidebarCollapsed">
-            <a routerLink="/he-thong/khoa-so" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/period-lock-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-lock"></i> Khóa sổ kế toán
             </a>
-            <a routerLink="/he-thong/audit-trail" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/audit-trail-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-clock-rotate-left"></i> Dấu vết kiểm toán
             </a>
-            <a routerLink="/he-thong/phan-quyen" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/user-roles-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-user-shield"></i> Phân quyền
             </a>
-            <a routerLink="/he-thong/cai-dat" routerLinkActive="active" class="nav-sublink">
+            <a routerLink="/system-settings-page" routerLinkActive="active" class="nav-sublink">
               <i class="fa-solid fa-gear"></i> Cài đặt
             </a>
           </div>
