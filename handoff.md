@@ -419,11 +419,105 @@ https://songminhketoanbackend.onrender.com/api/gmail/auth/callback
 
 ---
 
-## Next Steps (Phase 6 ideas)
+## Phase 6 — COMPLETE: Email Attachment Processing (Copy from BanHang)
 
-1. **Batch process Gmail → Firestore**: Auto-process all Gmail emails and save to internal_invoices (eliminates manual TapHoa39BanHang workflow)
-2. **Tax portal import**: Upload XML files from GDT to `tax_invoices` via `/api/v2/invoices/import-xml`
-3. **Reconciliation UI improvements**: Confidence warnings, source column
+### Problem
+Portal-links endpoint only returns metadata + portal URLs. No amounts (totalBeforeVat, vatAmount, totalAmount).
+Cannot reconcile with GDT API without amounts.
+
+### Solution
+Copy email attachment processing from TapHoa39BackEnd (Flask) to TapHoa39KeToanBackEnd (FastAPI):
+- Download XML/ZIP/PDF attachments from Gmail
+- Parse XML with TaxInvoiceXMLParser → extract full invoice data (amounts + items)
+- Return structured data for reconciliation
+
+### Files Created/Modified
+
+#### TapHoa39KeToanBackEnd (FastAPI)
+
+| File | Action | Notes |
+|------|--------|-------|
+| `app/services/zip_extractor.py` | **NEW** | Copy from Flask BE — extract_xml_from_zip, extract_pdf_from_zip, list_zip_contents |
+| `app/services/gmail_service.py` | Modified | Added: get_message_metadata, get_xml_attachment, get_pdf_attachment, get_zip_attachment, _get_attachment_by_ext, get_email_body_html |
+| `app/routes/gmail_routes.py` | Modified | Added: POST /api/gmail/emails/{id}/process, parse_attachments param for portal-links, _parse_attachment_for_amounts helper |
+
+### API Contract (new/modified endpoints)
+
+```
+POST /api/gmail/emails/{email_id}/process
+  Body: {"uid": "..."}  (or ?uid= query param)
+  Response:
+  {
+    "success": true,
+    "type": "xml" | "zip_xml" | "zip_pdf" | "pdf" | "none",
+    "invoices": [{                    // only for xml/zip_xml types
+      "invoiceNo": "25015",
+      "invoiceSymbol": "1C26TYT",
+      "invoiceDate": "2026-05-21",
+      "sellerTaxCode": "0101505984-002",
+      "sellerName": "CÔNG TY ...",
+      "totalBeforeVat": 3692900,
+      "vatAmount": 295432,
+      "totalAmount": 3988332,
+      "vatRate": 8,
+      "items": [{"name", "unit", "quantity", "unitPrice", "amount", ...}]
+    }],
+    "needs_gemini": false,            // true for pdf/zip_pdf
+    "pdf_base64": "...",              // only for pdf/zip_pdf
+    "email": {metadata},
+    "portalUrl": "...",
+    "invoiceProvider": "VNPT",
+    "portalPdfUrl": "...",
+    "portalCredentials": {}
+  }
+
+GET /api/gmail/portal-links?...&parse_attachments=true
+  Enhanced response per item (when parse_attachments=true):
+  {
+    ...existing portal link fields...,
+    "hasAmounts": true,
+    "parseSource": "xml_attachment" | "zip_xml" | "none",
+    "needsAiProcessing": false,
+    "totalBeforeVat": 3692900,
+    "vatAmount": 295432,
+    "vatRate": 8,
+    "totalAmount": 3988332,
+    "items": [...],
+    "invoiceDate": "2026-05-21"       // from XML (more accurate than email date)
+  }
+```
+
+### Key Details
+
+- **processEmail**: Same logic as TapHoa39BackEnd Flask version. Priority: XML > ZIP(XML>PDF) > PDF > none
+- **parse_attachments**: Optional flag on portal-links. Default=false (backward compatible). When true, sequential download+parse per email.
+- **Thread safety**: googleapiclient is NOT thread-safe. All Gmail API calls are sequential within a single GmailService instance.
+- **No new dependencies**: zip_extractor uses built-in `zipfile` + `io`. TaxInvoiceXMLParser already existed in KeToanBackEnd.
+- **Parsed data overrides**: When XML is parsed, invoiceNo/supplierTaxCode/supplierName from XML override regex-extracted values (more accurate).
+
+### Data Flow for Reconciliation
+
+```
+GDT API (hoadondientu.gdt.gov.vn)
+  → /api/query/invoices/purchase → tax_invoices (Firestore)
+  → Fields: shdon, khhdon, tdlap, nbmst, nbten, tgtcthue, tgtthue, tgtttbso
+
+Gmail API (portal-links?parse_attachments=true)
+  → Download XML attachment → TaxInvoiceXMLParser.parse()
+  → Fields: invoiceNo, invoiceSymbol, invoiceDate, sellerTaxCode, sellerName, totalBeforeVat, vatAmount, totalAmount, items[]
+
+Match Key: normalize(invoiceNo) + "|" + normalize(supplierTaxCode)
+  - invoiceNo: strip leading zeros
+  - taxCode: strip branch suffix "-XXX"
+```
+
+---
+
+## Next Steps (Phase 7+ ideas)
+
+1. **GDT ↔ Gmail reconciliation**: Compare GDT tax_invoices vs Gmail-parsed invoices (amounts, counts)
+2. **Batch process Gmail → Firestore**: Auto-save parsed invoices to internal_invoices
+3. **Reconciliation UI**: Side-by-side comparison with field diffs, confidence warnings
 4. **Supplier analytics**: Chart by provider, by month
 5. **Export**: Excel/PDF export of reconciliation results
 6. **Playwright download**: Auto-download XML/PDF from portal NCC (Phase F in plan.md)

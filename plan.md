@@ -857,14 +857,81 @@ Portal Links Tab → KeToanBackEnd /api/gmail/portal-links
     → Trả về danh sách trực tiếp (KHÔNG lưu Firestore)
 ```
 
-### Phase 5: Reconciliation cải tiến
+### Phase 5: Render Deployment — ✅ COMPLETE
 
 ```
-Bước 4.1: Sửa reconciliation logic
+✅ Render service: songminhketoanbackend
+✅ Build + start commands, env vars, CORS
+```
+
+### Phase 6: Email Attachment Processing (KeToanBackEnd) — ✅ COMPLETE
+
+**Vấn đề:** Portal-links chỉ trả metadata + portal URL, KHÔNG có amounts (totalBeforeVat, vatAmount, totalAmount). Cần parse XML/PDF attachment từ email để đối chiếu với GDT.
+
+**Giải pháp:** Copy chức năng processEmail từ TapHoa39BackEnd (Flask) → TapHoa39KeToanBackEnd (FastAPI).
+
+```
+✅ Bước 6.1: Copy zip_extractor.py
+    - File mới: app/services/zip_extractor.py
+    - extract_xml_from_zip(), extract_pdf_from_zip(), list_zip_contents()
+
+✅ Bước 6.2: Mở rộng GmailService — thêm attachment download methods
+    - get_message_metadata() — email metadata (from, subject, attachments)
+    - get_xml_attachment() — download XML attachment
+    - get_pdf_attachment() — download PDF (bytes, filename)
+    - get_zip_attachment() — download ZIP (bytes, filename)
+    - _get_attachment_by_ext() — generic downloader
+    - get_email_body_html() — standalone HTML body fetch
+
+✅ Bước 6.3: Endpoint POST /api/gmail/emails/{email_id}/process
+    - Auto-detect attachment: XML → ZIP(XML→PDF) → PDF → none
+    - XML/ZIP_XML: TaxInvoiceXMLParser.parse() → invoices[] (amounts + items)
+    - PDF/ZIP_PDF: return base64 + needs_gemini=true
+    - Also extracts portal URL from email body
+
+✅ Bước 6.4: Enhance portal-links với parse_attachments=true
+    - GET /api/gmail/portal-links?...&parse_attachments=true
+    - Sequential download XML/ZIP per email → parse → add amounts
+    - Response thêm: hasAmounts, totalBeforeVat, vatAmount, totalAmount,
+      items[], parseSource, needsAiProcessing, invoiceDate
+    - Parsed data overrides regex-extracted metadata (more accurate)
+```
+
+**API Contract (Phase 6):**
+```
+POST /api/gmail/emails/{email_id}/process
+  Body: {"uid": "..."}
+  Response: {
+    success, type: "xml"|"zip_xml"|"zip_pdf"|"pdf"|"none",
+    invoices: [...],     // only for xml/zip_xml
+    needs_gemini: bool,  // only for pdf/zip_pdf
+    pdf_base64: "...",   // only for pdf/zip_pdf
+    email: {metadata},
+    portalUrl, invoiceProvider, portalPdfUrl, portalCredentials
+  }
+
+GET /api/gmail/portal-links?...&parse_attachments=true
+  Response thêm per item: {
+    hasAmounts: true,
+    parseSource: "xml_attachment"|"zip_xml"|"none",
+    needsAiProcessing: false,
+    totalBeforeVat: 3692900,
+    vatAmount: 295432,
+    totalAmount: 3988332,
+    vatRate: 8,
+    items: [{name, unit, quantity, unitPrice, amount, ...}],
+    invoiceDate: "2026-05-21"  // từ XML (chính xác hơn email date)
+  }
+```
+
+### Phase 7: Reconciliation cải tiến (TODO)
+
+```
+Bước 7.1: Sửa reconciliation logic
     - Thêm fields vào comparison: sourceTab, confidence, processingMethod
     - Hiển thị warning nếu confidence < 0.8
 
-Bước 4.2: Sửa reconciliation results display
+Bước 7.2: Sửa reconciliation results display
     - Thêm column "Nguồn" (XML/PDF AI/Gmail/Clone)
     - Thêm link đến email Gmail gốc
     - Highlight low-confidence items

@@ -1,11 +1,10 @@
 <!--
-  LEDGER 8 - ĐỒNG BỘ HÓA ĐƠN ĐẦU VÀO (Input Invoices)
-  Đồng bộ hóa đơn từ Trang thuế với Hóa đơn AI/PDF
-  Scalable component với pagination cho 100.000+ hóa đơn
+  LEDGER 8 - ĐỐI CHIẾU HÓA ĐƠN ĐẦU VÀO
+  So sánh tự động Gmail vs GDT (hoadondientu.gdt.gov.vn)
 -->
 <div class="invoice-page">
   <!-- Page Title -->
-  <h2 class="page-title">ĐỒNG BỘ HÓA ĐƠN ĐẦU VÀO</h2>
+  <h2 class="page-title">ĐỐI CHIẾU HÓA ĐƠN ĐẦU VÀO</h2>
 
   <!-- Main Tab Bar -->
   <div class="main-tab-bar">
@@ -69,13 +68,13 @@
         <div class="filter-group">
           <label>&nbsp;</label>
           <div class="button-group">
-            <button type="button" class="btn btn-primary" (click)="applyFilter()" [disabled]="loadingAi">
+            <button type="button" class="btn btn-primary" (click)="applyFilter()" [disabled]="loadingLabels">
               <i class="fa-solid fa-search"></i> Tìm kiếm
             </button>
             <button type="button" class="btn btn-outline-secondary" (click)="resetFilter()">
               <i class="fa-solid fa-rotate-left"></i> Đặt lại
             </button>
-            <button type="button" class="btn btn-outline-primary" (click)="forceReload()" [disabled]="loadingAi" title="Tải lại từ server (bỏ qua cache)">
+            <button type="button" class="btn btn-outline-primary" (click)="forceReload()" [disabled]="loadingLabels" title="Tải lại từ server (bỏ qua cache)">
               <i class="fa-solid fa-sync"></i> Tải lại
             </button>
           </div>
@@ -85,736 +84,136 @@
   </div>
 
   <!-- ============================================ -->
-  <!-- SUMMARY SECTION -->
-  <!-- ============================================ -->
-  <div class="summary-section" *ngIf="summary">
-    <div class="summary-cards">
-      <div class="summary-card">
-        <div class="card-label">Trang thuế</div>
-        <div class="card-value">{{ summary.taxPortalCount }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="card-label">AI (PDF)</div>
-        <div class="card-value">{{ summary.aiPdfCount }}</div>
-      </div>
-      <div class="summary-card card-success">
-        <div class="card-label">Khớp</div>
-        <div class="card-value">{{ summary.matchedCount }}</div>
-      </div>
-      <div class="summary-card card-warning">
-        <div class="card-label">Thiếu</div>
-        <div class="card-value">{{ summary.unmatchedCount }}</div>
-      </div>
-      <div class="summary-card card-danger">
-        <div class="card-label">Sai số</div>
-        <div class="card-value">{{ summary.mismatchCount }}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================ -->
-  <!-- ACTION BUTTONS -->
+  <!-- ACTION BUTTON -->
   <!-- ============================================ -->
   <div class="action-section">
-    <div class="action-left">
-      <button class="btn btn-primary" (click)="uploadXmlFiles()" [disabled]="importing">
-        <span *ngIf="!importing">
-          <i class="fa-solid fa-upload"></i> Import XML (Trang thuế)
-        </span>
-        <span *ngIf="importing">
-          <i class="fa-solid fa-spinner fa-spin"></i> Đang import...
-        </span>
-      </button>
-    </div>
-
     <div class="action-center">
-      <button class="btn btn-success btn-large" (click)="runReconciliation()" [disabled]="reconciling">
-        <span *ngIf="!reconciling">
-          <i class="fa-solid fa-check-double"></i> Chạy đối chiếu
+      <button class="btn btn-warning btn-large" (click)="runLiveReconciliation()" [disabled]="liveReconciling">
+        <span *ngIf="!liveReconciling">
+          <i class="fa-solid fa-bolt"></i> Đối chiếu Gmail vs GDT
         </span>
-        <span *ngIf="reconciling">
+        <span *ngIf="liveReconciling">
           <i class="fa-solid fa-spinner fa-spin"></i> Đang đối chiếu...
         </span>
       </button>
-      <button class="btn btn-info" (click)="loadReconciliationResults()" [disabled]="loadingResults" style="margin-left: 8px;">
-        <span *ngIf="!loadingResults">
-          <i class="fa-solid fa-list-check"></i> Xem kết quả
-        </span>
-        <span *ngIf="loadingResults">
-          <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
-        </span>
-      </button>
-    </div>
-
-    <div class="action-right">
-      <button style="background-color: #2980b9;" class="btn btn-danger" (click)="clearBySource('TAX_PORTAL')" [disabled]="clearing">
-        <i class="fa-solid fa-trash"></i> Xóa Thuế
-      </button>
-      <button style="background-color: #8e44ad;" class="btn btn-danger" (click)="clearBySource('AI_PDF')" [disabled]="clearing">
-        <i class="fa-solid fa-trash"></i> Xóa AI
-      </button>
-      <button class="btn btn-danger" (click)="clearAll()" [disabled]="clearing">
-        <i class="fa-solid fa-trash-can"></i> Xóa tất cả
-      </button>
     </div>
   </div>
 
   <!-- ============================================ -->
-  <!-- RECONCILIATION RESULTS (Chi tiết sai lệch) -->
+  <!-- LIVE RECONCILIATION RESULTS (Gmail vs GDT) -->
   <!-- ============================================ -->
-  <div class="reconciliation-section" *ngIf="reconciliationResults.length > 0">
+  <div class="live-reconciliation-section" *ngIf="liveResults.length > 0 || liveReconciling">
     <div class="section-header">
-      <h3><i class="fa-solid fa-balance-scale"></i> Kết quả đối chiếu chi tiết</h3>
-      <div class="result-filter">
-        <button class="btn btn-sm" [class.active]="!loadingResults" (click)="loadReconciliationResults()">Tất cả</button>
-        <button class="btn btn-sm btn-mismatch" (click)="loadReconciliationResults('MISMATCH')">Sai số</button>
-        <button class="btn btn-sm btn-missing" (click)="loadReconciliationResults('MISSING_INTERNAL')">Thiếu AI</button>
-        <button class="btn btn-sm btn-missing" (click)="loadReconciliationResults('MISSING_TAX')">Thiếu Thuế</button>
+      <h3><i class="fa-solid fa-bolt"></i> Đối chiếu trực tiếp: Gmail vs GDT</h3>
+      <div class="live-actions" *ngIf="liveResults.length > 0">
+        <button class="btn btn-sm btn-primary" (click)="saveLiveResults()" [disabled]="liveSaving || liveSaved">
+          <span *ngIf="liveSaving"><i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...</span>
+          <span *ngIf="liveSaved"><i class="fa-solid fa-check"></i> Đã lưu</span>
+          <span *ngIf="!liveSaving && !liveSaved"><i class="fa-solid fa-save"></i> Lưu kết quả</span>
+        </button>
       </div>
     </div>
 
-    <div class="results-table-wrapper">
-      <table class="results-table">
+    <!-- Summary cards -->
+    <div class="live-summary-cards" *ngIf="liveResults.length > 0">
+      <div class="summary-card">
+        <div class="card-label">Gmail</div>
+        <div class="card-value">{{ liveGmailCount }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">GDT</div>
+        <div class="card-value">{{ liveGdtCount }}</div>
+      </div>
+      <div class="summary-card card-success">
+        <div class="card-label">Khớp</div>
+        <div class="card-value">{{ liveSummary.matched }}</div>
+      </div>
+      <div class="summary-card card-warning">
+        <div class="card-label">Thiếu Gmail</div>
+        <div class="card-value">{{ liveSummary.missingGmail }}</div>
+      </div>
+      <div class="summary-card card-warning">
+        <div class="card-label">Thiếu GDT</div>
+        <div class="card-value">{{ liveSummary.missingGdt }}</div>
+      </div>
+      <div class="summary-card card-danger">
+        <div class="card-label">Sai số</div>
+        <div class="card-value">{{ liveSummary.mismatch }}</div>
+      </div>
+    </div>
+
+    <!-- Status log -->
+    <div *ngIf="liveStatusLog.length > 0" class="status-log-section" style="background:#1e1e1e;color:#d4d4d4;font-family:monospace;font-size:12px;padding:10px 14px;border-radius:6px;margin-bottom:12px;max-height:160px;overflow-y:auto;">
+      <div *ngFor="let line of liveStatusLog" style="line-height:1.6;">{{ line }}</div>
+      <div *ngIf="liveReconciling" style="line-height:1.6;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:4px;"></i> Đang xử lý...</div>
+    </div>
+
+    <!-- Results table -->
+    <div class="live-results-table-wrapper" *ngIf="liveResults.length > 0">
+      <table class="live-results-table">
         <thead>
           <tr>
-            <th>Số HĐ</th>
-            <th>Trạng thái</th>
-            <th>Số field sai</th>
-            <th>Chi tiết sai lệch</th>
-            <th>Hành động</th>
+            <th rowspan="2">#</th>
+            <th rowspan="2">Số HĐ</th>
+            <th rowspan="2">Ký hiệu</th>
+            <th rowspan="2">MST NCC</th>
+            <th rowspan="2">Tên NCC</th>
+            <th rowspan="2">Ngày</th>
+            <th colspan="3" class="th-group th-gmail">Gmail (Email)</th>
+            <th colspan="3" class="th-group th-gdt">GDT (Trang thuế)</th>
+            <th rowspan="2">Kết quả</th>
+          </tr>
+          <tr>
+            <th class="th-gmail">Trước thuế</th>
+            <th class="th-gmail">Thuế</th>
+            <th class="th-gmail">Tổng TT</th>
+            <th class="th-gdt">Trước thuế</th>
+            <th class="th-gdt">Thuế</th>
+            <th class="th-gdt">Tổng TT</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let result of reconciliationResults"
-              [ngClass]="getReconcileResultStatusClass(result.status)"
-              class="clickable-row"
-              (click)="showInvoiceCompareModal(result)">
-            <td>{{ result.invoiceKey }}</td>
+          <tr *ngFor="let row of liveResults; let i = index" [ngClass]="getLiveStatusClass(row.status)">
+            <td>{{ i + 1 }}</td>
+            <td>{{ row.gdtData?.shdon || row.gmailData?.invoiceNo || '-' }}</td>
+            <td>{{ row.gdtData?.khhdon || row.gmailData?.invoiceSymbol || '-' }}</td>
+            <td>{{ row.gdtData?.nbmst || row.gmailData?.supplierTaxCode || '-' }}</td>
+            <td class="td-name" [title]="row.gdtData?.nbten || row.gmailData?.supplierName || ''">{{ row.gdtData?.nbten || row.gmailData?.supplierName || '-' }}</td>
+            <td>{{ row.gdtData ? formatGdtDate(row.gdtData.tdlap) : (row.gmailData?.invoiceDate | date:'dd/MM/yyyy') }}</td>
+            <!-- Gmail amounts -->
+            <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
+              {{ row.gmailData ? formatCurrency(row.gmailData.totalBeforeVat) : '-' }}
+            </td>
+            <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
+              {{ row.gmailData ? formatCurrency(row.gmailData.vatAmount) : '-' }}
+            </td>
+            <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
+              {{ row.gmailData ? formatCurrency(row.gmailData.totalAmount) : '-' }}
+            </td>
+            <!-- GDT amounts -->
+            <td class="td-amount">
+              {{ row.gdtData ? formatCurrency(row.gdtData.tgtcthue) : '-' }}
+            </td>
+            <td class="td-amount">
+              {{ row.gdtData ? formatCurrency(row.gdtData.tgtthue) : '-' }}
+            </td>
+            <td class="td-amount">
+              {{ row.gdtData ? formatCurrency(row.gdtData.tgtttbso) : '-' }}
+            </td>
+            <!-- Status -->
             <td>
-              <span class="status-badge" [ngClass]="getReconcileResultStatusClass(result.status)">
-                {{ getReconcileResultStatusLabel(result.status) }}
+              <span class="live-status-badge" [ngClass]="getLiveStatusClass(row.status)">
+                {{ getLiveStatusLabel(row.status) }}
               </span>
-            </td>
-            <td>{{ getFieldDiffsCount(result) }}</td>
-            <td class="diff-summary">
-              <ng-container *ngIf="result.fieldDiffs && result.fieldDiffs.length > 0">
-                <span *ngFor="let diff of result.fieldDiffs.slice(0, 2); let i = index" class="diff-chip">
-                  {{ diff.fieldLabel }}: {{ diff.taxValue }} → {{ diff.internalValue }}
-                </span>
-                <span *ngIf="result.fieldDiffs.length > 2" class="diff-more">+{{ result.fieldDiffs.length - 2 }} more</span>
-              </ng-container>
-              <span *ngIf="!result.fieldDiffs || result.fieldDiffs.length === 0" class="no-diff">
-                {{ result.status === 'MATCH' ? 'Khớp hoàn toàn' : 'Không có dữ liệu so sánh' }}
-              </span>
-            </td>
-            <td>
-              <button class="btn btn-sm btn-danger" (click)="deleteReconciliationResult(result); $event.stopPropagation()"
-                      title="Xóa kết quả đối chiếu này">
-                <i class="fa-solid fa-trash"></i>
-              </button>
-            </td>
-          </tr>
-
-          <!-- Loading -->
-          <tr *ngIf="loadingResults">
-            <td colspan="5" class="loading-data">
-              <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
+              <div class="diff-detail" *ngIf="row.fieldDiffs.length > 0">
+                <small *ngFor="let d of row.fieldDiffs">
+                  {{ d.fieldLabel }}: {{ formatDiffValue(d) }}
+                </small>
+              </div>
             </td>
           </tr>
         </tbody>
       </table>
-    </div>
-  </div>
-
-  <!-- ============================================ -->
-  <!-- MISMATCH DETAIL MODAL -->
-  <!-- ============================================ -->
-  <div class="modal-overlay" *ngIf="showMismatchModal" (click)="closeMismatchModal()">
-    <div class="modal-content" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-search-plus"></i> Chi tiết sai lệch</h3>
-        <button class="btn-close" (click)="closeMismatchModal()">
-          <i class="fa-solid fa-times"></i>
-        </button>
-      </div>
-
-      <div class="modal-body" *ngIf="selectedResult">
-        <!-- Invoice Info -->
-        <div class="invoice-info-row">
-          <div class="info-item">
-            <label>Số hóa đơn:</label>
-            <span>{{ selectedResult.invoiceKey }}</span>
-          </div>
-          <div class="info-item">
-            <label>Trạng thái:</label>
-            <span class="status-badge" [ngClass]="getReconcileResultStatusClass(selectedResult.status)">
-              {{ getReconcileResultStatusLabel(selectedResult.status) }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Field Diffs Table -->
-        <div class="diff-table-wrapper" *ngIf="selectedResult.fieldDiffs && selectedResult.fieldDiffs.length > 0">
-          <h4>Các trường sai lệch ({{ selectedResult.fieldDiffs.length }} trường)</h4>
-          <table class="diff-table">
-            <thead>
-              <tr>
-                <th>Trường</th>
-                <th>Giá trị Trang thuế</th>
-                <th>Giá trị AI/PDF</th>
-                <th>Chênh lệch</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let diff of selectedResult.fieldDiffs" class="diff-row">
-                <td class="field-name">{{ diff.fieldLabel }}</td>
-                <td class="tax-value">
-                  <span *ngIf="diff.diffType === 'number'">{{ formatCurrency(diff.taxValue) }}</span>
-                  <span *ngIf="diff.diffType !== 'number'">{{ diff.taxValue }}</span>
-                </td>
-                <td class="internal-value">
-                  <span *ngIf="diff.diffType === 'number'">{{ formatCurrency(diff.internalValue) }}</span>
-                  <span *ngIf="diff.diffType !== 'number'">{{ diff.internalValue }}</span>
-                </td>
-                <td class="diff-value" [class.positive]="diff.diff > 0" [class.negative]="diff.diff < 0">
-                  {{ formatDiffValue(diff) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Full Invoice Comparison -->
-        <div class="full-comparison" *ngIf="selectedResult.taxData || selectedResult.internalData">
-          <h4>So sánh đầy đủ</h4>
-          <div class="comparison-grid">
-            <!-- Tax Data -->
-            <div class="comparison-column">
-              <h5><i class="fa-solid fa-building-columns"></i> Trang thuế</h5>
-              <div class="data-fields" *ngIf="selectedResult.taxData">
-                <div class="field-row"><label>Số HĐ:</label><span>{{ selectedResult.taxData.invoiceNo }}</span></div>
-                <div class="field-row"><label>Ký hiệu:</label><span>{{ selectedResult.taxData.invoiceSymbol }}</span></div>
-                <div class="field-row"><label>Ngày:</label><span>{{ selectedResult.taxData.invoiceDate }}</span></div>
-                <div class="field-row"><label>NCC:</label><span>{{ selectedResult.taxData.supplierName }}</span></div>
-                <div class="field-row"><label>MST:</label><span>{{ selectedResult.taxData.supplierTaxCode }}</span></div>
-                <div class="field-row"><label>Tiền hàng:</label><span>{{ formatCurrency(selectedResult.taxData.totalBeforeVat) }}</span></div>
-                <div class="field-row"><label>Thuế suất:</label><span>{{ selectedResult.taxData.vatRate }}%</span></div>
-                <div class="field-row"><label>Tiền thuế:</label><span>{{ formatCurrency(selectedResult.taxData.vatAmount) }}</span></div>
-                <div class="field-row highlight"><label>Tổng tiền:</label><span>{{ formatCurrency(selectedResult.taxData.totalAmount) }}</span></div>
-              </div>
-              <div class="no-data" *ngIf="!selectedResult.taxData">Không có dữ liệu</div>
-            </div>
-
-            <!-- Internal/AI Data -->
-            <div class="comparison-column">
-              <h5><i class="fa-solid fa-robot"></i> AI/PDF</h5>
-              <div class="data-fields" *ngIf="selectedResult.internalData">
-                <div class="field-row"><label>Số HĐ:</label><span>{{ selectedResult.internalData.invoiceNo }}</span></div>
-                <div class="field-row"><label>Ký hiệu:</label><span>{{ selectedResult.internalData.invoiceSymbol }}</span></div>
-                <div class="field-row"><label>Ngày:</label><span>{{ selectedResult.internalData.invoiceDate }}</span></div>
-                <div class="field-row"><label>NCC:</label><span>{{ selectedResult.internalData.supplierName }}</span></div>
-                <div class="field-row"><label>MST:</label><span>{{ selectedResult.internalData.supplierTaxCode }}</span></div>
-                <div class="field-row"><label>Tiền hàng:</label><span>{{ formatCurrency(selectedResult.internalData.totalBeforeVat) }}</span></div>
-                <div class="field-row"><label>Thuế suất:</label><span>{{ selectedResult.internalData.vatRate }}%</span></div>
-                <div class="field-row"><label>Tiền thuế:</label><span>{{ formatCurrency(selectedResult.internalData.vatAmount) }}</span></div>
-                <div class="field-row highlight"><label>Tổng tiền:</label><span>{{ formatCurrency(selectedResult.internalData.totalAmount) }}</span></div>
-              </div>
-              <div class="no-data" *ngIf="!selectedResult.internalData">Không có dữ liệu</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" (click)="closeMismatchModal()">Đóng</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================ -->
-  <!-- INVOICE COMPARE MODAL (Full Invoice Side-by-Side) -->
-  <!-- ============================================ -->
-  <div class="modal-overlay compare-modal-overlay" *ngIf="showCompareModal" (click)="closeCompareModal()">
-    <div class="modal-content compare-modal-content" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-columns"></i> So sánh hóa đơn</h3>
-        <div class="modal-header-info">
-          <span class="status-badge" [ngClass]="getReconcileResultStatusClass(compareResult?.status || '')">
-            {{ getReconcileResultStatusLabel(compareResult?.status || '') }}
-          </span>
-        </div>
-        <button class="btn-close" (click)="closeCompareModal()">
-          <i class="fa-solid fa-times"></i>
-        </button>
-      </div>
-
-      <div class="modal-body compare-modal-body" *ngIf="compareResult">
-        <!-- Loading -->
-        <div class="loading-compare" *ngIf="loadingCompareData">
-          <i class="fa-solid fa-spinner fa-spin"></i> Đang tải dữ liệu...
-        </div>
-
-        <!-- Two Column Layout -->
-        <div class="compare-columns" *ngIf="!loadingCompareData">
-          <!-- ======== CỘT TRÁI: HÓA ĐƠN TỪ TRANG THUẾ ======== -->
-          <div class="compare-column tax-column">
-            <div class="column-header">
-              <i class="fa-solid fa-building-columns"></i>
-              <span>Hóa đơn từ Trang thuế</span>
-            </div>
-
-            <div class="invoice-detail" *ngIf="compareTaxInvoice || compareResult.taxData">
-              <ng-container *ngIf="$any(compareTaxInvoice || compareResult.taxData) as inv">
-                <!-- Thông tin cơ bản -->
-                <div class="detail-section">
-                  <h4>Thông tin hóa đơn</h4>
-                  <div class="detail-row">
-                    <label>Ký hiệu:</label>
-                    <span>{{ inv.invoiceSymbol || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Số hóa đơn:</label>
-                    <span>{{ inv.invoiceNo }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Ngày hóa đơn:</label>
-                    <span>{{ formatDate(inv.invoiceDate || inv.issueDate) }}</span>
-                  </div>
-                </div>
-
-                <!-- Nhà cung cấp (NBan) -->
-                <div class="detail-section">
-                  <h4>Nhà cung cấp</h4>
-                  <div class="detail-row">
-                    <label>Tên:</label>
-                    <span>{{ inv.supplierName || inv.sellerName || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>MST:</label>
-                    <span>{{ inv.supplierTaxCode || inv.sellerTaxCode || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Địa chỉ:</label>
-                    <span>{{ inv.supplierAddress || inv.sellerAddress || '-' }}</span>
-                  </div>
-                </div>
-
-                <!-- Người mua (NMua) -->
-                <div class="detail-section">
-                  <h4>Người mua</h4>
-                  <div class="detail-row">
-                    <label>Tên:</label>
-                    <span>{{ inv.buyerName || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>MST:</label>
-                    <span>{{ inv.buyerTaxCode || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Địa chỉ:</label>
-                    <span>{{ inv.buyerAddress || '-' }}</span>
-                  </div>
-                </div>
-
-                <!-- Tổng tiền -->
-                <div class="detail-section">
-                  <h4>Số tiền</h4>
-                  <div class="detail-row">
-                    <label>Tiền hàng:</label>
-                    <span class="amount">{{ formatCurrency(inv.totalBeforeVat) }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Thuế suất:</label>
-                    <span>{{ inv.vatRate }}%</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Tiền thuế:</label>
-                    <span class="amount">{{ formatCurrency(inv.vatAmount) }}</span>
-                  </div>
-                  <div class="detail-row highlight">
-                    <label>Tổng tiền:</label>
-                    <span class="amount total">{{ formatCurrency(inv.totalAmount) }}</span>
-                  </div>
-                </div>
-
-                <!-- Danh sách hàng hóa -->
-                <div class="detail-section items-section" *ngIf="inv.items && inv.items.length > 0">
-                  <h4>Danh sách hàng hóa ({{ inv.items.length }} dòng)</h4>
-                  <div class="items-table-wrapper">
-                    <table class="items-table">
-                      <thead>
-                        <tr>
-                          <th>STT</th>
-                          <th>Tên hàng</th>
-                          <th>ĐVT</th>
-                          <th>SL</th>
-                          <th>Đơn giá</th>
-                          <th>Thành tiền</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr *ngFor="let item of inv.items; let i = index">
-                          <td class="text-center">{{ item.stt || item.lineNumber || (i + 1) }}</td>
-                          <td class="item-name">{{ item.description || item.itemName || item.name || item.THHDVu || '-' }}</td>
-                          <td class="text-center">{{ item.unit || item.unitName || item.DVTinh || '-' }}</td>
-                          <td class="text-right">{{ item.quantity || item.SLuong || 0 }}</td>
-                          <td class="text-right">{{ formatCurrency(item.unitPrice || item.unit_price || item.DGia) }}</td>
-                          <td class="text-right">{{ formatCurrency(item.amount || item.totalAmount || item.ThTien) }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </ng-container>
-            </div>
-
-            <div class="no-invoice-data" *ngIf="!compareTaxInvoice && !compareResult.taxData">
-              <i class="fa-solid fa-file-circle-xmark"></i>
-              <span>Không có dữ liệu từ Trang thuế</span>
-            </div>
-          </div>
-
-          <!-- ======== CỘT PHẢI: HÓA ĐƠN TỪ AI/PDF ======== -->
-          <div class="compare-column ai-column">
-            <div class="column-header">
-              <i class="fa-solid fa-robot"></i>
-              <span>Hóa đơn từ AI/PDF</span>
-            </div>
-
-            <div class="invoice-detail" *ngIf="compareAiInvoice || compareResult.internalData">
-              <ng-container *ngIf="$any(compareAiInvoice || compareResult.internalData) as inv">
-                <!-- Thông tin cơ bản -->
-                <div class="detail-section">
-                  <h4>Thông tin hóa đơn</h4>
-                  <div class="detail-row">
-                    <label>Ký hiệu:</label>
-                    <span>{{ inv.invoiceSymbol || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Số hóa đơn:</label>
-                    <span>{{ inv.invoiceNo }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Ngày hóa đơn:</label>
-                    <span>{{ formatDate(inv.invoiceDate || inv.issueDate) }}</span>
-                  </div>
-                </div>
-
-                <!-- Nhà cung cấp -->
-                <div class="detail-section">
-                  <h4>Nhà cung cấp</h4>
-                  <div class="detail-row">
-                    <label>Tên:</label>
-                    <span>{{ inv.supplierName || inv.sellerName || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>MST:</label>
-                    <span>{{ inv.supplierTaxCode || inv.sellerTaxCode || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Địa chỉ:</label>
-                    <span>{{ inv.supplierAddress || inv.sellerAddress || '-' }}</span>
-                  </div>
-                </div>
-
-                <!-- Người mua (NMua) -->
-                <div class="detail-section">
-                  <h4>Người mua</h4>
-                  <div class="detail-row">
-                    <label>Tên:</label>
-                    <span>{{ inv.buyerName || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>MST:</label>
-                    <span>{{ inv.buyerTaxCode || '-' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Địa chỉ:</label>
-                    <span>{{ inv.buyerAddress || '-' }}</span>
-                  </div>
-                </div>
-
-                <!-- Tổng tiền -->
-                <div class="detail-section">
-                  <h4>Số tiền</h4>
-                  <div class="detail-row">
-                    <label>Tiền hàng:</label>
-                    <span class="amount">{{ formatCurrency(inv.totalBeforeVat) }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Thuế suất:</label>
-                    <span>{{ inv.vatRate }}%</span>
-                  </div>
-                  <div class="detail-row">
-                    <label>Tiền thuế:</label>
-                    <span class="amount">{{ formatCurrency(inv.vatAmount) }}</span>
-                  </div>
-                  <div class="detail-row highlight">
-                    <label>Tổng tiền:</label>
-                    <span class="amount total">{{ formatCurrency(inv.totalAmount) }}</span>
-                  </div>
-                </div>
-
-                <!-- Danh sách hàng hóa -->
-                <div class="detail-section items-section" *ngIf="inv.items && inv.items.length > 0">
-                  <h4>Danh sách hàng hóa ({{ inv.items.length }} dòng)</h4>
-                  <div class="items-table-wrapper">
-                    <table class="items-table">
-                      <thead>
-                        <tr>
-                          <th>STT</th>
-                          <th>Tên hàng</th>
-                          <th>ĐVT</th>
-                          <th>SL</th>
-                          <th>Đơn giá</th>
-                          <th>Thành tiền</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr *ngFor="let item of inv.items; let i = index">
-                          <td class="text-center">{{ item.stt || item.lineNumber || (i + 1) }}</td>
-                          <td class="item-name">{{ item.description || item.itemName || item.name || item.THHDVu || '-' }}</td>
-                          <td class="text-center">{{ item.unit || item.unitName || item.DVTinh || '-' }}</td>
-                          <td class="text-right">{{ item.quantity || item.SLuong || 0 }}</td>
-                          <td class="text-right">{{ formatCurrency(item.unitPrice || item.unit_price || item.DGia) }}</td>
-                          <td class="text-right">{{ formatCurrency(item.amount || item.totalAmount || item.ThTien) }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </ng-container>
-            </div>
-
-            <div class="no-invoice-data" *ngIf="!compareAiInvoice && !compareResult.internalData">
-              <i class="fa-solid fa-file-circle-xmark"></i>
-              <span>Không có dữ liệu từ AI/PDF</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Field Diffs Summary (nếu có) -->
-        <div class="compare-diffs" *ngIf="compareResult.fieldDiffs && compareResult.fieldDiffs.length > 0">
-          <h4><i class="fa-solid fa-exclamation-triangle"></i> Các trường sai lệch ({{ compareResult.fieldDiffs.length }})</h4>
-          <div class="diffs-chips">
-            <span *ngFor="let diff of compareResult.fieldDiffs" class="diff-chip-large">
-              <strong>{{ diff.fieldLabel }}:</strong>
-              <span class="tax-val">{{ diff.diffType === 'number' ? formatCurrency(diff.taxValue) : diff.taxValue }}</span>
-              <i class="fa-solid fa-arrow-right"></i>
-              <span class="ai-val">{{ diff.diffType === 'number' ? formatCurrency(diff.internalValue) : diff.internalValue }}</span>
-              <span class="diff-amount" *ngIf="diff.diffType === 'number'">({{ diff.diff > 0 ? '+' : '' }}{{ formatCurrency(diff.diff) }})</span>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" (click)="closeCompareModal()">
-          <i class="fa-solid fa-times"></i> Đóng
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================ -->
-  <!-- TWO-PANEL INVOICE TABLES -->
-  <!-- ============================================ -->
-  <div class="data-panels">
-    <!-- ======================================== -->
-    <!-- Panel Trái: HÓA ĐƠN TỪ TRANG THUẾ -->
-    <!-- ======================================== -->
-    <div class="panel">
-      <div class="panel-header">
-        <h3><i class="fa-solid fa-building-columns"></i> Hóa đơn từ Trang thuế</h3>
-        <div class="panel-info">
-          <span class="invoice-count" *ngIf="!gdtMode">{{ taxPagination.count }} hóa đơn (Firestore)</span>
-          <span class="invoice-count gdt-count" *ngIf="gdtMode">{{ hddtInvoices.length }} hóa đơn (GDT trực tiếp)</span>
-          <button class="btn btn-sm btn-gdt" (click)="fetchFromGdt()" [disabled]="fetchingGdt || loadingTax" title="Tải từ hoadondientu.gdt.gov.vn theo filter hiện tại">
-            <i class="fa-solid fa-cloud-arrow-down" *ngIf="!fetchingGdt"></i>
-            <i class="fa-solid fa-spinner fa-spin" *ngIf="fetchingGdt"></i>
-            {{ fetchingGdt ? 'Đang tải...' : 'Tải từ GDT' }}
-          </button>
-          <button class="btn btn-sm btn-outline-secondary" *ngIf="gdtMode" (click)="resetGdtMode()" title="Về lại dữ liệu Firestore">
-            <i class="fa-solid fa-database"></i> Firestore
-          </button>
-        </div>
-      </div>
-
-      <!-- GDT error -->
-      <div class="gdt-error" *ngIf="gdtError">
-        <i class="fa-solid fa-triangle-exclamation"></i> {{ gdtError }}
-      </div>
-
-      <!-- GDT mode badge -->
-      <div class="gdt-mode-banner" *ngIf="gdtMode">
-        <i class="fa-solid fa-circle-info"></i>
-        Đang hiển thị dữ liệu trực tiếp từ Trang thuế GDT — chưa lưu vào Firestore
-      </div>
-
-      <div class="panel-body">
-        <div class="table-wrapper">
-          <table class="invoice-table">
-            <thead>
-              <tr>
-                <th class="col-invoice-no">Số HĐ</th>
-                <th class="col-date">Ngày</th>
-                <th class="col-supplier">Nhà cung cấp</th>
-                <th class="col-amount">Tổng tiền</th>
-                <th class="col-vat">Thuế GTGT</th>
-                <th class="col-status">TT</th>
-              </tr>
-            </thead>
-
-            <!-- Firestore mode -->
-            <tbody *ngIf="!gdtMode">
-              <tr *ngFor="let inv of taxInvoices; trackBy: trackByInvoice"
-                  [class.row-matched]="inv.reconcileStatus === 'MATCHED'"
-                  [class.row-unmatched]="inv.reconcileStatus === 'UNMATCHED'"
-                  [class.row-mismatch]="inv.reconcileStatus === 'MISMATCH'">
-                <td>{{ inv.invoiceSymbol ? inv.invoiceSymbol + '-' : '' }}{{ inv.invoiceNo }}</td>
-                <td>{{ formatDate(inv.issueDate) }}</td>
-                <td class="col-supplier-name" [title]="inv.supplierName + ' - ' + inv.supplierTaxCode">
-                  {{ inv.supplierName }}
-                </td>
-                <td class="number-col">{{ formatCurrency(inv.totalAmount) }}</td>
-                <td class="number-col">{{ formatCurrency(inv.vatAmount) }}</td>
-                <td>
-                  <span class="status-dot" [ngClass]="getStatusClass(inv.reconcileStatus)"
-                        [title]="getStatusLabel(inv.reconcileStatus)"></span>
-                </td>
-              </tr>
-              <tr *ngIf="taxInvoices.length === 0 && !loadingTax">
-                <td colspan="6" class="no-data">Chưa có dữ liệu từ trang thuế</td>
-              </tr>
-              <tr *ngIf="loadingTax">
-                <td colspan="6" class="loading-data">
-                  <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
-                </td>
-              </tr>
-            </tbody>
-
-            <!-- GDT direct mode -->
-            <tbody *ngIf="gdtMode">
-              <tr *ngFor="let inv of hddtInvoices">
-                <td>{{ getHddtInvoiceNo(inv) }}</td>
-                <td>{{ formatDate(inv.tdlap) }}</td>
-                <td class="col-supplier-name" [title]="inv.nbten + ' - ' + inv.nbmst">
-                  {{ inv.nbten }}
-                </td>
-                <td class="number-col">{{ formatCurrency(inv.tgtttbso) }}</td>
-                <td class="number-col">{{ formatCurrency(inv.tgtthue) }}</td>
-                <td>
-                  <span class="badge-gdt" [title]="'ttxly=' + inv.ttxly">GDT</span>
-                </td>
-              </tr>
-              <tr *ngIf="hddtInvoices.length === 0 && !loadingTax">
-                <td colspan="6" class="no-data">Không có hóa đơn từ GDT theo filter này</td>
-              </tr>
-              <tr *ngIf="loadingTax">
-                <td colspan="6" class="loading-data">
-                  <i class="fa-solid fa-spinner fa-spin"></i> Đang tải từ GDT...
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Pagination (Firestore mode only) -->
-        <div class="panel-footer" *ngIf="!gdtMode && taxInvoices.length > 0">
-          <button class="btn btn-sm" (click)="prevTaxPage()" [disabled]="!taxPagination.hasPrev || loadingTax">
-            <i class="fa-solid fa-chevron-left"></i>
-          </button>
-          <button class="btn btn-sm" (click)="nextTaxPage()" [disabled]="!taxPagination.hasNext || loadingTax">
-            <i class="fa-solid fa-chevron-right"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ======================================== -->
-    <!-- Panel Phải: HÓA ĐƠN TỪ AI/PDF -->
-    <!-- ======================================== -->
-    <div class="panel">
-      <div class="panel-header panel-header-ai">
-        <h3><i class="fa-solid fa-robot"></i> Hóa đơn từ AI (PDF/Email)</h3>
-        <div class="panel-info">
-          <span class="invoice-count">{{ aiPagination.count }} hóa đơn</span>
-          <!-- Provider filter -->
-          <select class="provider-filter" [(ngModel)]="selectedProvider" (change)="filterByProvider(selectedProvider)">
-            <option value="">Tất cả NCC Portal</option>
-            <option *ngFor="let p of providerOptions" [value]="p.name">{{ p.name }} ({{ p.count }})</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="panel-body">
-        <div class="table-wrapper">
-          <table class="invoice-table">
-            <thead>
-              <tr>
-                <th class="col-invoice-no">Số HĐ</th>
-                <th class="col-date">Ngày</th>
-                <th class="col-supplier">Nhà cung cấp</th>
-                <th class="col-amount">Tổng tiền</th>
-                <th class="col-provider">NCC Portal</th>
-                <th class="col-source-tab">Nguồn</th>
-                <th class="col-portal">HĐ gốc</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let inv of aiInvoices; trackBy: trackByInvoice"
-                  [class.row-matched]="inv.reconcileStatus === 'MATCHED'"
-                  [class.row-unmatched]="inv.reconcileStatus === 'UNMATCHED'"
-                  [class.row-mismatch]="inv.reconcileStatus === 'MISMATCH'">
-                <td>{{ inv.invoiceSymbol ? inv.invoiceSymbol + '-' : '' }}{{ inv.invoiceNo }}</td>
-                <td>{{ formatDate(inv.issueDate) }}</td>
-                <td class="col-supplier-name" [title]="(inv.supplierName || '') + ' - ' + (inv.supplierTaxCode || '')">
-                  {{ inv.supplierName }}
-                </td>
-                <td class="number-col">{{ formatCurrency(inv.totalAmount) }}</td>
-                <td>
-                  <span *ngIf="inv.invoiceProvider" class="provider-badge" [ngClass]="getProviderClass(inv.invoiceProvider)">
-                    {{ inv.invoiceProvider }}
-                  </span>
-                </td>
-                <td>
-                  <span *ngIf="inv.sourceTab" class="source-tab-badge">{{ getSourceTabLabel(inv.sourceTab) }}</span>
-                </td>
-                <td>
-                  <button class="btn btn-xs btn-portal"
-                          (click)="openPortalUrl(inv); $event.stopPropagation()"
-                          [disabled]="!inv.portalUrl"
-                          [title]="inv.portalUrl ? 'Xem HĐ gốc trên portal NCC' : 'Không có link portal'">
-                    <i class="fa-solid fa-external-link-alt"></i>
-                  </button>
-                </td>
-              </tr>
-
-              <!-- No data -->
-              <tr *ngIf="aiInvoices.length === 0 && !loadingAi">
-                <td colspan="7" class="no-data">Chưa có dữ liệu từ AI/PDF</td>
-              </tr>
-
-              <!-- Loading -->
-              <tr *ngIf="loadingAi">
-                <td colspan="7" class="loading-data">
-                  <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Pagination -->
-        <div class="panel-footer" *ngIf="aiInvoices.length > 0">
-          <button class="btn btn-sm" (click)="prevAiPage()" [disabled]="!aiPagination.hasPrev || loadingAi">
-            <i class="fa-solid fa-chevron-left"></i>
-          </button>
-          <button class="btn btn-sm" (click)="nextAiPage()" [disabled]="!aiPagination.hasNext || loadingAi">
-            <i class="fa-solid fa-chevron-right"></i>
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 

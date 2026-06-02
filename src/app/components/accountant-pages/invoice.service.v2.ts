@@ -258,7 +258,10 @@ export interface RecentAiInvoice {
 
 export interface PortalLink {
   gmailId: string;
+  gmailThreadId?: string;
   invoiceNo: string;
+  invoiceSymbol?: string;
+  invoiceDate?: string;
   supplierName: string;
   supplierTaxCode: string;
   issueDate: string;
@@ -269,6 +272,43 @@ export interface PortalLink {
   gmailFrom: string;
   gmailSubject: string;
   attachments: string[];
+  // Attachment parsing fields (when parse_attachments=true)
+  hasAmounts?: boolean;
+  parseSource?: string;
+  needsAiProcessing?: boolean;
+  totalBeforeVat?: number;
+  vatAmount?: number;
+  vatRate?: number;
+  totalAmount?: number;
+  items?: any[];
+}
+
+export interface LiveReconcileRow {
+  invoiceKey: string;
+  matchKey: string;
+  status: 'MATCH' | 'MISMATCH' | 'MISSING_GMAIL' | 'MISSING_GDT' | 'NO_AMOUNT';
+  gmailData?: {
+    invoiceNo: string;
+    invoiceSymbol: string;
+    supplierTaxCode: string;
+    supplierName: string;
+    totalBeforeVat: number;
+    vatAmount: number;
+    totalAmount: number;
+    invoiceDate: string;
+    parseSource: string;
+  };
+  gdtData?: {
+    shdon: number;
+    khhdon: string;
+    nbmst: string;
+    nbten: string;
+    tgtcthue: number;
+    tgtthue: number;
+    tgtttbso: number;
+    tdlap: string;
+  };
+  fieldDiffs: FieldDiff[];
 }
 
 export interface PortalLinksResponse {
@@ -735,6 +775,7 @@ export class InvoiceServiceV2 {
     labelName?: string;
     daysBack?: number;
     pageSize?: number;
+    parseAttachments?: boolean;
   }): Observable<PortalLinksResponse> {
     const gmailUrl = `${(environment as any).ketoanBackendUrl}/api/gmail/portal-links`;
     let httpParams = new HttpParams();
@@ -743,9 +784,34 @@ export class InvoiceServiceV2 {
     if (params.labelName) httpParams = httpParams.set('label_name', params.labelName);
     if (params.daysBack) httpParams = httpParams.set('days_back', params.daysBack.toString());
     if (params.pageSize) httpParams = httpParams.set('page_size', params.pageSize.toString());
+    if (params.parseAttachments) httpParams = httpParams.set('parse_attachments', 'true');
 
     return this.http.get<PortalLinksResponse>(gmailUrl, { params: httpParams }).pipe(
       tap(r => console.log(`[Gmail portal-links] ${r.total} results, ${r.parseErrors || 0} errors`)),
+      catchError(this.handleError)
+    );
+  }
+
+  /**
+   * Scrape XML from invoice portal URLs (Playwright), parse amounts, cache in Firestore.
+   */
+  scrapePortalXml(items: { gmailId: string; portalUrl: string; provider: string; credentials: Record<string, string> }[]): Observable<{
+    success: boolean;
+    results: { gmailId: string; success: boolean; amounts?: Partial<PortalLink>; cached?: boolean; error?: string }[];
+  }> {
+    const url = `${(environment as any).ketoanBackendUrl}/api/gmail/scrape-portal-xml`;
+    return this.http.post<any>(url, { items }).pipe(catchError(this.handleError));
+  }
+
+  /**
+   * Save live reconciliation results (Gmail vs GDT) to Firestore
+   */
+  saveLiveReconciliation(results: LiveReconcileRow[]): Observable<{ success: boolean; saved: number }> {
+    return this.http.post<{ success: boolean; saved: number }>(
+      `${this.apiUrl}/reconciliation/save-live`,
+      { results }
+    ).pipe(
+      tap(r => console.log(`💾 Saved ${r.saved} live reconciliation results`)),
       catchError(this.handleError)
     );
   }
