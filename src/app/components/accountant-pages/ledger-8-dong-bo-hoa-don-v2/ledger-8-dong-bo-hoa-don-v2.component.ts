@@ -290,9 +290,16 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
    */
   async forceReload(): Promise<void> {
     console.log('🔄 Force reloading data...');
-    await this.cacheService.clearAllCache();  // Xóa tất cả cache bao gồm summary
+    await this.cacheService.clearAllCache();
     this.applyFilter();
     this.loadGmailLabels();
+  }
+
+  async forceReloadReconcile(): Promise<void> {
+    console.log('🔄 Force reloading reconcile...');
+    await this.cacheService.clearAllCache();
+    this.loadGmailLabels();
+    this.runLiveReconciliation();
   }
 
   switchMainTab(tab: 'reconcile' | 'portal'): void {

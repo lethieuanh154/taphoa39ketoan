@@ -68,13 +68,15 @@
         <div class="filter-group">
           <label>&nbsp;</label>
           <div class="button-group">
-            <button type="button" class="btn btn-primary" (click)="applyFilter()" [disabled]="loadingLabels">
-              <i class="fa-solid fa-search"></i> Tìm kiếm
+            <button type="button" class="btn btn-primary" (click)="runLiveReconciliation()" [disabled]="liveReconciling">
+              <i class="fa-solid fa-search" *ngIf="!liveReconciling"></i>
+              <i class="fa-solid fa-spinner fa-spin" *ngIf="liveReconciling"></i>
+              Tìm kiếm
             </button>
             <button type="button" class="btn btn-outline-secondary" (click)="resetFilter()">
               <i class="fa-solid fa-rotate-left"></i> Đặt lại
             </button>
-            <button type="button" class="btn btn-outline-primary" (click)="forceReload()" [disabled]="loadingLabels" title="Tải lại từ server (bỏ qua cache)">
+            <button type="button" class="btn btn-outline-primary" (click)="forceReloadReconcile()" [disabled]="liveReconciling" title="Tải lại từ server (bỏ qua cache)">
               <i class="fa-solid fa-sync"></i> Tải lại
             </button>
           </div>
