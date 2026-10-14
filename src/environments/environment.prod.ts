@@ -22,9 +22,10 @@ export const environment = {
     appId: "1:245620111851:web:110acf5f993691c14f81ae",
     measurementId: "G-Y0FXR6CW04"
   },
-  domainUrl: 'https://songminhketoanbackend.onrender.com',  // Production API
-  apiUrl: 'https://api.taphoa39.com/api',  // Backend API base URL (HDDT proxy)
-  ketoanBackendUrl: 'https://songminhketoanbackend.onrender.com',  // KeToan FastAPI BE
+  // VPS ketoan.songminhcr.com: nginx serve FE + proxy /api/ -> FastAPI cung origin -> URL rong (goi /api/... tuong doi)
+  domainUrl: '',
+  apiUrl: '',
+  ketoanBackendUrl: '',
   appName: 'Kế Toán Doanh Nghiệp',
   version: '1.0.0'
 };
