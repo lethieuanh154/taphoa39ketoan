@@ -13,7 +13,7 @@
         <select class="input wide" [ngModel]="runId" (ngModelChange)="openRun($event)">
           @for (r of runs; track r.id) { <option [value]="r.id">{{ runLabel(r) }}</option> }
         </select>
-      } @else {
+      } @else if (!loading) {
         <span class="hint">Chưa có lần đối soát nào — chạy <a routerLink="/invoice-reconciliation-page">Đối soát hóa đơn XML</a> với thư mục HĐ vào + ra của kỳ.</span>
       }
       @if (loading) { <i class="fa-solid fa-spinner fa-spin"></i> }
@@ -26,7 +26,8 @@
     @if (msg) { <div class="msg ok"><i class="fa-solid fa-copy"></i> {{ msg }}</div> }
   </section>
 
-  <section class="card">
+  <section class="card rel">
+    @if (loading) { <app-table-loading [overlay]="!!fig" text="Đang tải số liệu khai thuế..."></app-table-loading> }
     <div class="tabs">
       <button type="button" class="tab" [class.active]="view === 'gtgt'" (click)="setView('gtgt')">01/GTGT</button>
       <button type="button" class="tab" [class.active]="view === 'pl142'" (click)="setView('pl142')">Phụ lục 142 (NQ 204)</button>

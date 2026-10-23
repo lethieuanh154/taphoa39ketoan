@@ -2,7 +2,6 @@ import { Routes } from '@angular/router';
 import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
 import { authGuard, loginGuard } from './guards/auth.guard';
 import { LoginPageComponent } from './components/login-page/login-page.component';
-import { PlaceholderComponent } from './components/placeholder/placeholder.component';
 
 // Components
 import { AccountantDashboardComponent } from './components/accountant-dashboard/accountant-dashboard.component';
@@ -89,8 +88,12 @@ export const routes: Routes = [
         loadComponent: () => import('./components/tax-figures-page/tax-figures-page.component')
           .then(m => m.TaxFiguresPageComponent)
       },
-      // Đối soát CK — chuyển khoản HĐ đầu vào (HĐ mua ⇄ tiền trả NCC): chưa làm (user 23/10/2026: pending)
-      { path: 'bank-reconciliation-in-page', component: PlaceholderComponent, data: { title: 'Chuyển khoản hóa đơn đầu vào', module: 'Tiện ích — Đối soát CK: HĐ đầu vào ⇄ tiền trả nhà cung cấp trên sao kê (chưa làm)' } },
+      // Đối soát CK — chuyển khoản HĐ đầu vào (23/10/2026): HĐ mua (thư mục XML / Gmail) ⇄ tiền ra trên sao kê TPBank; HĐ theo kỳ
+      {
+        path: 'bank-reconciliation-in-page',
+        loadComponent: () => import('./components/bank-reconciliation-in-page/bank-reconciliation-in-page.component')
+          .then(m => m.BankReconciliationInPageComponent)
+      },
       // Đối soát hóa đơn XML (Pha 1 bước 3) — tải riêng khi mở trang (kèm thư viện nén ZIP fflate)
       {
         path: 'invoice-reconciliation-page',

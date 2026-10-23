@@ -24,13 +24,7 @@
       }
     </div>
     <div class="row">
-      <label class="radio"><input type="radio" name="scope" value="draft" [(ngModel)]="scope"> HĐ nháp còn tồn (chưa phát hành)</label>
-      <label class="radio"><input type="radio" name="scope" value="accepted" [(ngModel)]="scope"> HĐ đã phát hành (CQT chấp nhận)</label>
-      @if (scope === 'accepted') {
-        <label class="date-field">Từ <input type="date" [(ngModel)]="fromDate"></label>
-        <label class="date-field">Đến <input type="date" [(ngModel)]="toDate"></label>
-        <span class="hint">tối đa 7 ngày / lần (~180 HĐ / ngày, đọc từng HĐ mất ~0,5 giây)</span>
-      }
+      <span class="hint"><i class="fa-solid fa-file-pen"></i> Kiểm mọi <b>HĐ nháp còn tồn</b> (chưa phát hành) — không kiểm HĐ đã phát hành.</span>
       <button type="button" class="btn btn-primary" (click)="startCheck()" [disabled]="starting || !!list?.busy">
         <i class="fa-solid" [ngClass]="starting ? 'fa-spinner fa-spin' : 'fa-play'"></i>
         {{ list?.busy ? 'Đang kiểm...' : 'Kiểm tra ngay' }}
@@ -44,8 +38,12 @@
   </section>
 
   <!-- ═══════════ KẾT QUẢ 1 LẦN KIỂM ═══════════ -->
+  @if (!run && !error && (loadingRun || !list)) {
+    <section class="card"><app-table-loading text="Đang tải kết quả kiểm tra..."></app-table-loading></section>
+  }
   @if (run) {
     <section class="card">
+      @if (switchingRun) { <app-table-loading [overlay]="true" text="Đang mở lần kiểm..."></app-table-loading> }
       <div class="result-head">
         <h2>Lần kiểm {{ viTime(run.started_at) }}</h2>
         <span class="hint">{{ run.trigger === 'schedule' ? 'Lịch tự động' : run.created_by }} · {{ run.scope_label }}
@@ -251,7 +249,8 @@
         <span class="total">{{ filteredRates.length | number }} mã master</span>
         <button type="button" class="btn small" (click)="loadRates()"><i class="fa-solid fa-rotate"></i> Tải lại</button>
       </div>
-      <div class="wrap">
+      <div class="wrap rel">
+        @if (loadingRates && ratesLoaded) { <app-table-loading [overlay]="true"></app-table-loading> }
         <table>
           <thead><tr><th>Mã master</th><th>Tên</th><th>Thuế suất đúng</th><th>Nguồn</th><th>HĐ vào gần nhất</th><th>Đặt thuế suất</th></tr></thead>
           <tbody>
@@ -272,7 +271,7 @@
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="6" class="empty">{{ ratesLoaded ? 'Chưa có — chạy Đối soát hóa đơn XML (có HĐ đầu vào) để máy tự lấy thuế suất theo mã master.' : 'Đang tải...' }}</td></tr>
+              <tr><td colspan="6" class="empty">@if (ratesLoaded) { Chưa có — chạy Đối soát hóa đơn XML (có HĐ đầu vào) để máy tự lấy thuế suất theo mã master. } @else { <app-table-loading text="Đang tải thuế suất..."></app-table-loading> }</td></tr>
             }
           </tbody>
         </table>

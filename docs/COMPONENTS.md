@@ -307,6 +307,8 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
   máy chủ lấy từ KiotViet (≤ 7 ngày / lần, có tiến trình). **Lấy lại từ KiotViet** = mọi ngày (cập nhật trạng thái HĐĐT).
 - Khớp theo số tiền + 3 tab Đối soát / CK nhiều lần / CK dư + Xuất CSV: y BanHang (`utils/transfer-reconcile.util.ts`).
   Khác BanHang: bảng 2 cột **phân trang** (100–1000 dòng / trang, KeToan chưa có `@angular/cdk`), bỏ nút "Đánh sao HĐ thiếu".
+- (23/10/2026) Tab CK nhiều lần + CK dư có cột **Số HĐ** (số HĐĐT CQT đã chấp nhận, `readKvEInvoice`; chưa có → trống, rê chuột xem
+  trạng thái). CSV các tab vốn đã có cột HĐĐT.
 
 ## TaxFiguresPageComponent — Tiện ích "Số liệu khai thuế" (bước 5, 23/10/2026)
 
@@ -338,16 +340,19 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - (23/10/2026) Cả 2 trang: MST công ty lấy từ `CompanyService` (chưa nhập mới tự nhận; khác MST tự nhận → cảnh báo). XML đã đọc,
   HĐĐT / link Gmail đã lấy lưu IndexedDB (`TienIchCacheService`) → quay lại trang hiện ngay kết quả cũ; "Lấy lại từ KiotViet" /
   "Tải lại" / chọn lại thư mục để cập nhật.
+- (23/10/2026 chiều) Cả 2 trang: bỏ ô Từ / Đến ngày (cả tab Links HĐ gốc) — khoảng ngày = KỲ ở thanh chọn kỳ (đổi kỳ → hiện kết quả
+  đã lưu của kỳ mới); đọc XML, lấy HĐĐT, lấy Gmail chạy NỀN (`BackgroundJobService`) → chuyển trang không dừng, quay lại thấy tiến độ.
+  Đầu ra bỏ nút "Theo ngày trong XML"; kỳ > 92 ngày → nhắc chọn Tháng / Quý.
 
 ## InvoiceCheckPageComponent — Tiện ích "Kiểm tra HĐ tự động" (23/10/2026)
 
 **Path**: `components/invoice-check-page/` — route `/invoice-check-page?run=<id>` (lazy, không thanh chọn kỳ).
 
-- Trạng thái lịch tự kiểm của máy chủ; **Kiểm tra ngay**: HĐ nháp còn tồn (mặc định) hoặc HĐ CQT đã chấp nhận (≤ 7 ngày) →
-  hỏi tiến trình mỗi 1,5 giây.
+- Trạng thái lịch tự kiểm của máy chủ (00:00, 12:00, 17:00, 21:00); **Kiểm tra ngay**: chỉ HĐ nháp còn tồn (23/10/2026 bỏ kiểm HĐ
+  đã phát hành) → hỏi tiến trình mỗi 1,5 giây.
 - Kết quả: thống kê (HĐ lỗi / cần xem / không lỗi / mặt hàng chưa biết thuế suất đúng), tab HĐ có lỗi (mặc định) · Tất cả HĐ ·
   Chưa biết thuế suất đúng (có khung giải thích nguồn thuế suất) · Mã không có trong bảng quy đổi · Thuế suất đúng theo mã master.
-  Mã HĐ = link mở đúng HĐ trên einvoiceapp (`?id=`) + nút copy. Lệch tiền ≥ 1đ (kể cả do KiotViet làm tròn) = Lỗi (user 23/10/2026).
+  Mã HĐ = link mở đúng HĐ trên einvoiceapp (`?id=`) + nút copy. Lệch tiền ≥ 1đ = Lỗi, TRỪ thuế làm tròn lên / xuống < 1đ (thuế dòng; thuế nhóm = cộng các dòng đúng) — user 23/10/2026 chiều.
 - Đặt thuế suất đúng: tại dòng lỗi ("Đúng là 10%" / "Khóa 8%"), tại bảng chưa có thuế suất, hoặc bảng thuế suất (chọn / bỏ) →
   `PUT /tax-rates`, áp dụng từ lần kiểm sau. Lịch sử các lần kiểm.
 
@@ -399,3 +404,27 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 
 ### Dependencies
 - AuthService
+
+## BankReconciliationInPageComponent — Tiện ích "Đối soát CK → Chuyển khoản HĐ đầu vào" (23/10/2026)
+
+**Path**: `components/bank-reconciliation-in-page/` — route `/bank-reconciliation-in-page` (lazy).
+
+Giống "Chuyển khoản HĐ đầu ra" nhưng HĐ là HĐ **mua vào** và tiền là tiền **ra** (Ghi nợ) trên sao kê TPBank.
+- **Nguồn HĐ** (chọn 1, nhớ lựa chọn): thư mục XML (app FDI `…\purchase`) hoặc Gmail — dùng chung bản đã đọc / đã lấy với Kiểm tra số lượng
+  HĐ đầu vào (`PurchaseInvoiceSourceService`, IndexedDB `xml-in` / `gmail-links:*:<kỳ>`, chạy nền). HĐ theo kỳ ở thanh chọn kỳ; XML dùng cả
+  HĐ ngoài kỳ để ghép tiền trả HĐ cũ nhưng chỉ báo "HĐ chưa thấy CK" cho HĐ trong kỳ. Gmail: chỉ email có số HĐ + số tiền mới đối soát được.
+- **Sao kê**: 1 hoặc nhiều file Bảng kê TPBank → `utils/tpbank-debit.util.ts` (cột D Ghi nợ; bỏ GD trùng khi chọn trùng file), lưu
+  IndexedDB `tpbank-debit`. Đo thật: sao kê tháng 9 = 86 GD tiền ra (3.803 GD tiền vào), 100% có chủ TK nhận.
+- **Ghép** `utils/purchase-transfer-reconcile.util.ts`: 1 CK = 1 HĐ (số tiền bằng nhau, ưu tiên tên người nhận giống tên NCC — bỏ
+  "Công ty / TNHH / Thương mại…", không dấu — hoặc diễn giải có số HĐ, ngày gần) → 1 CK trả nhiều HĐ cùng NCC (2–8 HĐ) → 1 HĐ trả
+  nhiều lần (2–4 CK) → HĐ chưa thấy CK / CK không có HĐ (kèm gợi ý CK / HĐ cùng NCC lệch số tiền). CK trong [ngày HĐ − 30, + 120 ngày].
+  Độ tin cậy cao / vừa / thấp ("Khớp — cần xem" = chỉ khớp số tiền, tên người nhận khác tên NCC).
+- Thống kê, lọc theo kết quả, tìm, phân trang 100, Xuất CSV, mở email gốc (nguồn Gmail).
+
+## TableLoadingComponent — vòng xoay "đang tải" của bảng (23/10/2026)
+
+**Path**: `components/shared/table-loading/` — `<app-table-loading [text]="..." [overlay]="true|false">`.
+- Mặc định (chưa có bảng): vòng xoay + chữ giữa vùng bảng (cao ≥ 160px). `overlay` (đang tải lại khi đã có bảng): phủ mờ lên bảng cũ —
+  phần tử cha phải `position: relative`.
+- Dùng ở: `server-table` (mọi bảng Đối soát hóa đơn XML / Số liệu khai thuế), Kiểm tra HĐ tự động (mở lần kiểm, bảng thuế suất), Số liệu
+  khai thuế, Ánh xạ hàng hóa, Chuyển khoản HĐ đầu ra / đầu vào, Kiểm tra số lượng HĐ đầu vào / đầu ra (cả bảng Links HĐ gốc), Tổng quan.

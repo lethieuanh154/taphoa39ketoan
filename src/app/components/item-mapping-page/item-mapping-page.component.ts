@@ -6,6 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { httpErrorText } from '../../services/auth.service';
+import { TableLoadingComponent } from '../shared/table-loading/table-loading.component';
 import { formatVn } from '../../services/period.service';
 import {
   CatalogItem, MappingEdit, ReconciliationRun, ReconciliationService, TabPage, TabQuery
@@ -56,7 +57,7 @@ const QTY_FMT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 });
 @Component({
   selector: 'app-item-mapping-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, TableLoadingComponent],
   templateUrl: './item-mapping-page.component.html',
   styleUrl: './item-mapping-page.component.css',
 })

@@ -1,0 +1,154 @@
+<!-- ĐỐI SOÁT CK → CHUYỂN KHOẢN HĐ ĐẦU VÀO: HĐ mua vào (XML / Gmail) ⇄ tiền ra trên sao kê TPBank (23/10/2026) -->
+<div class="page">
+  <header class="page-head">
+    <h1><i class="fa-solid fa-money-bill-transfer"></i> Chuyển khoản hóa đơn đầu vào</h1>
+    <p class="sub">Hóa đơn <b>mua vào</b> ⇄ tiền <b>ra</b> trên <b>sao kê TPBank</b> (trả nhà cung cấp). Khớp theo số tiền, ưu tiên tên người nhận
+      giống tên NCC / diễn giải có số HĐ; nhận ra cả <b>1 lần CK trả nhiều HĐ</b> cùng NCC và <b>1 HĐ trả nhiều lần</b>.
+      CK trong khoảng {{ window.before }} ngày trước → {{ window.after }} ngày sau ngày HĐ.</p>
+  </header>
+
+  <!-- 1. Nguồn hóa đơn -->
+  <section class="card">
+    <div class="row">
+      <span class="step">1</span><b>Hóa đơn đầu vào</b>
+      <span class="hint">kỳ <b>{{ periodLabel() }}</b> (đổi ở thanh chọn kỳ)</span>
+      <div class="seg">
+        <button type="button" [class.active]="src === 'xml'" (click)="setSource('xml')"><i class="fa-regular fa-folder-open"></i> Thư mục XML</button>
+        <button type="button" [class.active]="src === 'gmail'" (click)="setSource('gmail')"><i class="fa-solid fa-envelope"></i> Gmail</button>
+      </div>
+    </div>
+    @if (src === 'xml') {
+      <div class="row">
+        <label class="btn btn-primary pick" [class.disabled]="xmlReading">
+          <i class="fa-solid" [ngClass]="xmlReading ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
+          {{ xmlReading ? ('Đang đọc ' + (xmlJob?.progress || '...')) : 'Chọn thư mục XML HĐ đầu vào' }}
+          <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
+        </label>
+        @if (xmlInfo) {
+          <span><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
+            @if (xmlSavedAt) { <span class="hint">· đọc lúc {{ viTime(xmlSavedAt) }} (dùng chung với Kiểm tra số lượng HĐ đầu vào)</span> }</span>
+        } @else if (!xmlReading) {
+          <span class="hint">Thư mục app FDI tải về (<code>…\purchase\xml</code>), nên chọn cả quý để ghép được tiền trả HĐ tháng trước. Có ZIP cũng được.</span>
+        }
+      </div>
+      @if (mstWarning) { <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstWarning }}</div> }
+    } @else {
+      <div class="row">
+        <button type="button" class="btn btn-primary" (click)="loadGmail(!!gmailInfo)" [disabled]="gmailLoading">
+          <i class="fa-solid" [ngClass]="gmailLoading ? 'fa-spinner fa-spin' : 'fa-envelope-open-text'"></i>
+          {{ gmailLoading ? 'Đang lấy Gmail...' : (gmailInfo ? 'Lấy lại từ Gmail' : 'Lấy HĐ từ Gmail') }}
+        </button>
+        @if (gmailInfo) {
+          <span>{{ gmailInfo }} @if (gmailFetchedAt) { <span class="hint">· lấy lúc {{ viTime(gmailFetchedAt) }} (dùng chung với Kiểm tra số lượng HĐ đầu vào)</span> }</span>
+        } @else if (!gmailLoading) {
+          <span class="hint">Email HĐ nhà cung cấp gửi về hộp thư hóa đơn trong kỳ — chỉ HĐ lấy được số tiền mới đối soát được.</span>
+        }
+      </div>
+      @if (gmailLoading && gmailJob?.log?.length) {
+        <div class="log">@for (l of gmailJob!.log; track $index) { <div>{{ l }}</div> }</div>
+      }
+    }
+  </section>
+
+  <!-- 2. Sao kê -->
+  <section class="card">
+    <div class="row">
+      <span class="step">2</span><b>Sao kê TPBank</b>
+      <label class="btn pick" [class.disabled]="parsing" title="Chọn được nhiều file (vd 3 tháng của 1 quý)">
+        <i class="fa-solid" [ngClass]="parsing ? 'fa-spinner fa-spin' : 'fa-file-excel'"></i>
+        {{ parsing ? 'Đang đọc...' : (bank ? 'Chọn lại file sao kê' : 'Chọn file Bảng kê TPBank (.xlsx)') }}
+        <input type="file" accept=".xlsx" multiple (change)="onBankSelected($event)" [disabled]="parsing" hidden>
+      </label>
+      @if (bank) {
+        <span><b>{{ bank.transactions.length | number }}</b> giao dịch tiền ra · {{ vnd(bank.total) }} đ · GD {{ viDate(bank.fromDate) }} → {{ viDate(bank.toDate) }}
+          <span class="hint">· {{ bank.files.join(', ') }}@if (bankSavedAt) { · đọc lúc {{ viTime(bankSavedAt) }} }</span></span>
+        <button type="button" class="btn-link" (click)="clearBank()"><i class="fa-solid fa-xmark"></i> Bỏ sao kê</button>
+      }
+    </div>
+    @if (bank && (bank.toDate < from || bank.fromDate > to)) {
+      <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> Sao kê ({{ viDate(bank.fromDate) }} → {{ viDate(bank.toDate) }})
+        không trùng kỳ đang chọn ({{ periodLabel() }}) — kiểm tra lại kỳ hoặc file.</div>
+    }
+  </section>
+
+  @if (error) { <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div> }
+
+  @if (!result && (xmlReading || gmailLoading || parsing)) {
+    <section class="card">
+      <app-table-loading [text]="parsing ? 'Đang đọc sao kê...' : xmlReading ? 'Đang đọc thư mục XML... ' + (xmlJob?.progress || '') : 'Đang lấy hóa đơn từ Gmail...'"></app-table-loading>
+    </section>
+  } @else if (!result) {
+    <div class="msg muted"><i class="fa-solid fa-circle-info"></i>
+      @if (!sourceReady) { Chọn nguồn hóa đơn (bước 1) } @if (!sourceReady && !bank) { và } @if (!bank) { chọn file sao kê (bước 2) } để đối soát.</div>
+  } @else {
+    <section class="card rel">
+      @if (xmlReading || gmailLoading || parsing) {
+        <app-table-loading [overlay]="true" [text]="parsing ? 'Đang đọc sao kê...' : xmlReading ? 'Đang đọc thư mục XML...' : 'Đang lấy hóa đơn từ Gmail...'"></app-table-loading>
+      }
+      <div class="stats">
+        <div class="stat"><b>{{ vnd(result.invoiceTotal) }}</b><small>Tổng HĐ trong kỳ</small></div>
+        <div class="stat"><b>{{ vnd(result.txnTotal) }}</b><small>Tổng tiền ra trên sao kê</small></div>
+        <div class="stat good"><b>{{ vnd(result.paidTotal) }}</b><small>đã khớp</small></div>
+        <div class="stat good"><b>{{ result.counts.matched + result.counts.matched_group + result.counts.matched_split }}</b><small>cặp khớp</small></div>
+        <div class="stat" [class.warnc]="result.counts.invoice_only"><b>{{ result.counts.invoice_only }}</b><small>HĐ chưa thấy CK</small></div>
+        <div class="stat" [class.warnc]="result.counts.bank_only"><b>{{ result.counts.bank_only }}</b><small>CK không có HĐ</small></div>
+      </div>
+      @if (result.outsideUnmatched) {
+        <p class="hint">{{ result.outsideUnmatched }} HĐ ngoài kỳ không ghép được — không tính vào "HĐ chưa thấy CK".</p>
+      }
+      <p class="hint">"HĐ chưa thấy CK": trả tiền mặt, trả sau kỳ sao kê, hoặc CK lệch số tiền (xem Ghi chú). "CK không có HĐ": lương, phí,
+        hàng không lấy HĐ, trả HĐ ngoài kỳ… "Khớp — cần xem": chỉ khớp số tiền, tên người nhận khác tên NCC.</p>
+
+      <div class="toolbar">
+        <div class="chips">
+          @for (c of chips; track c.value) {
+            <button type="button" class="chip" [class.active]="filter === c.value" (click)="setFilter(c.value)">{{ c.label }} ({{ countOf(c.value) }})</button>
+          }
+        </div>
+        <div class="search"><i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" [(ngModel)]="q" (ngModelChange)="page = 1" placeholder="Số HĐ, NCC, người nhận, diễn giải, số tiền..."></div>
+        <button type="button" class="btn small" (click)="exportCsv()" [disabled]="!filteredRows.length"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Kết quả</th><th>Hóa đơn</th><th class="num">Tổng HĐ</th><th>Chuyển khoản</th><th class="num">Số tiền CK</th><th>Lệch ngày</th><th>Ghi chú</th></tr>
+          </thead>
+          <tbody>
+            @for (r of pageRows; track $index) {
+              <tr [class]="'k-' + r.kind">
+                <td><span class="badge" [class]="'b-' + r.kind">{{ kindLabel[r.kind] }}</span>
+                  @if (r.confidence && r.confidence !== 'cao') { <span class="conf">tin cậy {{ r.confidence }}</span> }</td>
+                <td>
+                  @for (i of r.invoices; track i.key) {
+                    <div class="inv"><b>{{ i.symbol }}-{{ i.no }}</b> · {{ viDate(i.date) }}
+                      @if (i.gmailThreadId) { <button type="button" class="btn-mail" (click)="openGmail(i)" title="Mở email gốc"><i class="fa-solid fa-envelope"></i></button> }
+                      <small>{{ i.sellerName }}@if (i.sellerMst) { · {{ i.sellerMst }} }@if (r.invoices.length > 1) { · {{ vnd(i.total) }} }</small></div>
+                  } @empty { <span class="muted">—</span> }
+                </td>
+                <td class="num">{{ r.invoices.length ? vnd(r.kind === 'matched_group' ? r.amount : r.invoices[0].total) : '' }}</td>
+                <td>
+                  @for (t of r.txns; track t.iso + t.amount) {
+                    <div class="txn"><b>{{ t.date }}</b> · {{ t.counterparty || '—' }}@if (r.txns.length > 1) { · {{ vnd(t.amount) }} }
+                      <small [title]="t.desc">{{ t.desc }}</small></div>
+                  } @empty { <span class="muted">—</span> }
+                </td>
+                <td class="num">{{ r.txns.length ? vnd(r.kind === 'matched_split' ? r.amount : r.txns[0].amount) : '' }}</td>
+                <td>{{ r.days === null ? '' : (r.days > 0 ? '+' + r.days : r.days) + ' ngày' }}</td>
+                <td class="hint-cell">{{ r.hint }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (pageCount > 1) {
+        <div class="pager">
+          <button type="button" (click)="page = page - 1" [disabled]="page === 1"><i class="fa-solid fa-angle-left"></i></button>
+          Trang {{ page }} / {{ pageCount }} ({{ filteredRows.length | number }} dòng)
+          <button type="button" (click)="page = page + 1" [disabled]="page === pageCount"><i class="fa-solid fa-angle-right"></i></button>
+        </div>
+      }
+    </section>
+  }
+</div>

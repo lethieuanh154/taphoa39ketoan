@@ -9,6 +9,7 @@ import { CashVoucherApiService, CashVoucherStatistics } from '../../services/cas
 import { WarehouseVoucherApiService, WarehouseVoucherStatistics } from '../../services/warehouse-voucher-api.service';
 import { CheckRun, EinvoiceCheckService } from '../../services/einvoice-check.service';
 import { recalcGtgt, savedV22 } from '../../utils/gtgt.util';
+import { TableLoadingComponent } from '../shared/table-loading/table-loading.component';
 
 /**
  * TỔNG QUAN (trang chủ KeToan) — 23/10/2026: bỏ số liệu giả, chỉ hiện dữ liệu THẬT theo kỳ ở thanh chọn kỳ (PeriodService):
@@ -31,7 +32,7 @@ interface TaxCard { code: string; label: string; value: number; tone: string; ic
 @Component({
   selector: 'app-accountant-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, TableLoadingComponent],
   templateUrl: './accountant-dashboard.component.html',
   styleUrl: './accountant-dashboard.component.css'
 })

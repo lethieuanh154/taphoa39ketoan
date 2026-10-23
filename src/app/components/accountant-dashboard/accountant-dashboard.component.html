@@ -9,7 +9,7 @@
     </h2>
 
     @if (taxLoading) {
-      <div class="section-note"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải số liệu...</div>
+      <app-table-loading text="Đang tải số liệu thuế..."></app-table-loading>
     } @else if (taxError) {
       <div class="section-note error"><i class="fa-solid fa-triangle-exclamation"></i> {{ taxError }}</div>
     } @else if (taxCards.length) {
@@ -132,10 +132,12 @@
           </div>
         </a>
       }
-      @if (!activities.length) {
+      @if (!activities.length && activitiesLoading) {
+        <app-table-loading text="Đang tải hoạt động..."></app-table-loading>
+      } @else if (!activities.length) {
         <div class="no-activity">
-          <i class="fa-solid" [ngClass]="activitiesLoading ? 'fa-spinner fa-spin' : 'fa-inbox'"></i>
-          <span>{{ activitiesLoading ? 'Đang tải...' : 'Chưa có phiếu thu / chi, phiếu kho hay lần đối soát nào trong kỳ này' }}</span>
+          <i class="fa-solid fa-inbox"></i>
+          <span>Chưa có phiếu thu / chi, phiếu kho hay lần đối soát nào trong kỳ này</span>
         </div>
       }
     </div>

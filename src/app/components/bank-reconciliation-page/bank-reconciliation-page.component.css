@@ -167,3 +167,6 @@
   .btn-primary { margin-left: 0; }
   .aligned-row, .compare-head { grid-template-columns: 1fr; }
 }
+
+/* vòng xoay đang tải (app-table-loading overlay) */
+.recon-body { position: relative; }

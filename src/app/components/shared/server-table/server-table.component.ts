@@ -5,6 +5,7 @@ import { Observable, Subject, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { httpErrorText } from '../../../services/auth.service';
 import { ColumnType, TabPage, TabQuery } from '../../../services/reconciliation.service';
+import { TableLoadingComponent } from '../table-loading/table-loading.component';
 
 /** Nguồn dữ liệu của bảng: phân trang / tìm / sắp xếp / lọc / xuất đều làm ở BE (quy ước chung, plan-ketoan-flow mục 1). */
 export interface ServerTableSource {
@@ -21,7 +22,7 @@ const NUMBER_FORMATS: { [fmt: string]: Intl.NumberFormat } = {};
 @Component({
   selector: 'app-server-table',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TableLoadingComponent],
   templateUrl: './server-table.component.html',
   styleUrl: './server-table.component.css',
 })

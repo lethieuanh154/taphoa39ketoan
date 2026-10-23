@@ -2,6 +2,7 @@ import { Component, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { httpErrorText } from '../../services/auth.service';
+import { TableLoadingComponent } from '../shared/table-loading/table-loading.component';
 import { BankReconciliationService, TransferRange } from '../../services/bank-reconciliation.service';
 import { PeriodService } from '../../services/period.service';
 import { parseTpBankStatement, BankStatementResult } from '../../utils/tpbank-statement.util';
@@ -47,6 +48,9 @@ interface AlignedRow {
 interface MultiRow {
   first: boolean;
   code: string;
+  /** Số HĐĐT (CQT đã chấp nhận) — '' khi chưa có (23/10/2026) */
+  einvoiceNo: string;
+  einvoiceStatus: string;
   time: string;
   total: number;
   note: string;
@@ -63,6 +67,8 @@ interface MultiRow {
 // 1 dòng của tab "CK dư" (mỗi HĐ 1 dòng): khách chuyển dư, đã trả lại tiền mặt
 interface ExcessRow {
   code: string;
+  einvoiceNo: string;
+  einvoiceStatus: string;
   time: string;
   total: number;
   note: string;
@@ -79,7 +85,7 @@ interface ExcessRow {
 @Component({
   selector: 'app-bank-reconciliation-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TableLoadingComponent],
   templateUrl: './bank-reconciliation-page.component.html',
   styleUrls: ['./bank-reconciliation-page.component.css']
 })
@@ -351,6 +357,8 @@ export class BankReconciliationPageComponent {
       return {
         first,
         code: it.invoice.code,
+        einvoiceNo: it.invoice.einvoiceNumber || '',
+        einvoiceStatus: it.invoice.einvoiceStatus || '',
         time: it.invoice.time,
         total: it.invoice.total,
         note: it.invoice.note,
@@ -372,6 +380,8 @@ export class BankReconciliationPageComponent {
       const ex = it.excess!;
       return {
         code: it.invoice.code,
+        einvoiceNo: it.invoice.einvoiceNumber || '',
+        einvoiceStatus: it.invoice.einvoiceStatus || '',
         time: it.invoice.time,
         total: it.invoice.total,
         note: it.invoice.note,

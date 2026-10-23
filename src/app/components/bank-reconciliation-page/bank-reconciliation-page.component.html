@@ -101,6 +101,11 @@
     </div>
   }
 
+  <!-- Nội dung các tab — đang lấy lại HĐ thì phủ vòng xoay lên bảng cũ -->
+  <div class="recon-body">
+  @if (loadingKv && kvLoaded) {
+    <app-table-loading [overlay]="true" [text]="'Đang lấy hóa đơn KiotViet... ' + loadProgress"></app-table-loading>
+  }
   <!-- TAB 1: Bảng canh hàng theo số tiền (2 cột song song) -->
   @if (canCompare && activeTab === 'all') {
     <div class="filter-chips">
@@ -193,7 +198,7 @@
       <table class="multi-table">
         <thead>
           <tr>
-            <th>Mã HĐ</th><th>Giờ HĐ</th><th class="num">Tổng</th><th>Ghi chú</th>
+            <th>Mã HĐ</th><th>Số HĐ</th><th>Giờ HĐ</th><th class="num">Tổng</th><th>Ghi chú</th>
             <th>Khoản</th><th class="num">Số tiền</th>
             @if (bank) { <th>Giao dịch khớp</th><th>Trạng thái</th> }
           </tr>
@@ -202,6 +207,7 @@
           @for (r of multiRows; track $index) {
             <tr [class.group-start]="r.first">
               <td class="code">{{ r.first ? r.code : '' }}</td>
+              <td class="code" [title]="r.einvoiceStatus">{{ r.first ? r.einvoiceNo : '' }}</td>
               <td>{{ r.first ? r.time : '' }}</td>
               <td class="num">{{ r.first ? formatVnd(r.total) : '' }}</td>
               <td>
@@ -241,7 +247,7 @@
       <table class="multi-table">
         <thead>
           <tr>
-            <th>Mã HĐ</th><th>Giờ HĐ</th><th class="num">Tổng HĐ</th><th>Ghi chú</th>
+            <th>Mã HĐ</th><th>Số HĐ</th><th>Giờ HĐ</th><th class="num">Tổng HĐ</th><th>Ghi chú</th>
             <th class="num">Khách chuyển</th><th class="num">Trả lại khách</th>
             @if (bank) { <th>Giao dịch khớp</th><th>Trạng thái</th> }
           </tr>
@@ -250,6 +256,7 @@
           @for (r of excessRows; track $index) {
             <tr class="group-start">
               <td class="code">{{ r.code }}</td>
+              <td class="code" [title]="r.einvoiceStatus">{{ r.einvoiceNo }}</td>
               <td>{{ r.time }}</td>
               <td class="num">{{ formatVnd(r.total) }}</td>
               <td>{{ r.note }} <span class="note-status" [class.bad]="!r.noteOk">{{ r.noteStatus }}</span></td>
@@ -271,8 +278,12 @@
       }
     </div>
   }
+  </div>
 
-  @if (!kvLoaded) {
+  @if (loadingKv && !kvLoaded) {
+    <app-table-loading [text]="'Đang lấy hóa đơn KiotViet... ' + loadProgress"></app-table-loading>
+  }
+  @if (!kvLoaded && !loadingKv) {
     <p class="hint">
       Import file Bảng kê TPBank (chọn được nhiều file, vd cả quý) và bấm <b>Lấy hóa đơn KiotViet</b> để đối chiếu.
       Chỉ cần danh sách HĐ <b>chuyển khoản nhiều lần</b>: chọn khoảng ngày rồi bấm <b>Lấy hóa đơn KiotViet</b>, không cần sao kê.

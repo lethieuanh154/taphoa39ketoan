@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { httpErrorText } from '../../services/auth.service';
+import { TableLoadingComponent } from '../shared/table-loading/table-loading.component';
 import { PeriodService } from '../../services/period.service';
 import { V22_KEY, recalcGtgt } from '../../utils/gtgt.util';
 import {
@@ -24,7 +25,7 @@ type View = 'gtgt' | 'pl142' | 'bk-ra' | 'bk-vao' | 'tncn';
 @Component({
   selector: 'app-tax-figures-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ServerTableComponent],
+  imports: [CommonModule, FormsModule, RouterLink, ServerTableComponent, TableLoadingComponent],
   templateUrl: './tax-figures-page.component.html',
   styleUrls: ['./tax-figures-page.component.css']
 })
@@ -63,6 +64,7 @@ export class TaxFiguresPageComponent implements OnInit {
   }
 
   async loadRuns(): Promise<void> {
+    this.loading = true;
     try {
       const r = await firstValueFrom(this.service.listRuns());
       this.runs = r.runs.filter(x => x.status === 'done');
@@ -73,6 +75,8 @@ export class TaxFiguresPageComponent implements OnInit {
     } catch (e: any) {
       console.error(`${LOG} Không tải được danh sách lần đối soát: ${httpErrorText(e)}`);
       this.error = `Không tải được danh sách lần đối soát: ${e?.error?.detail || httpErrorText(e)}`;
+    } finally {
+      this.loading = false;
     }
   }
 

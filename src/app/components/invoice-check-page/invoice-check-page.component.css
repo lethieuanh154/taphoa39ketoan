@@ -124,3 +124,6 @@ select { height: 24px; border: 1px solid #d1d5db; border-radius: 4px; font-size:
   .page { padding: 0.75rem; }
   td.issues { min-width: 260px; }
 }
+
+/* vòng xoay đang tải (app-table-loading overlay) */
+.card, .wrap.rel { position: relative; }

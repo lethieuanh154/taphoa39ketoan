@@ -49,7 +49,7 @@
   </section>
 
   @if (run && run.mapping_tabs?.length) {
-    <section class="card">
+    <section class="card rel">
       <nav class="tabs">
         <button type="button" class="tab" [class.active]="activeTab === 'anh-xa-dau-vao'" (click)="selectTab('anh-xa-dau-vao')">
           Đầu vào <span class="count">{{ tabCount('anh-xa-dau-vao') | number }}</span>
@@ -79,6 +79,7 @@
       </div>
 
       @if (page) {
+        @if (loading) { <app-table-loading [overlay]="true"></app-table-loading> }
         <div class="wrap">
           <table>
             <thead>
@@ -206,6 +207,8 @@
           </label>
           <span class="hint">Thay đổi chưa lưu được giữ khi chuyển trang / lọc.</span>
         </div>
+      } @else if (loading) {
+        <app-table-loading text="Đang tải bảng ánh xạ..."></app-table-loading>
       }
     </section>
   }

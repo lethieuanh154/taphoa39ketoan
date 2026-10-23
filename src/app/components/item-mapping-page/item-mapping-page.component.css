@@ -490,3 +490,6 @@ tbody tr.edited td.edit input {
     width: 100%;
   }
 }
+
+/* vòng xoay đang tải (app-table-loading overlay) */
+.card.rel { position: relative; }

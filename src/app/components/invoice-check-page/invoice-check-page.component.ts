@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { httpErrorText } from '../../services/auth.service';
+import { TableLoadingComponent } from '../shared/table-loading/table-loading.component';
 import {
-  BillLevel, CheckBill, CheckIssue, CheckRun, CheckScope, EinvoiceCheckService, RunList, TaxRate, UnknownMaster
+  BillLevel, CheckBill, CheckIssue, CheckRun, EinvoiceCheckService, RunList, TaxRate, UnknownMaster
 } from '../../services/einvoice-check.service';
 
 /**
@@ -20,7 +21,7 @@ type View = 'issues' | 'all' | 'unknown' | 'unmapped' | 'rates';
 @Component({
   selector: 'app-invoice-check-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TableLoadingComponent],
   templateUrl: './invoice-check-page.component.html',
   styleUrls: ['./invoice-check-page.component.css']
 })
@@ -34,13 +35,13 @@ export class InvoiceCheckPageComponent implements OnInit {
   run: CheckRun | null = null;
   einvoiceUrl = '';
   loadingRun = false;
+  /** đang mở lần kiểm KHÁC lần đang xem → phủ vòng xoay lên kết quả cũ */
+  switchingRun = false;
+  loadingRates = false;
   error = '';
   msg = '';
 
-  // Kiểm tra ngay
-  scope: CheckScope = 'draft';
-  fromDate = this.yesterday();
-  toDate = this.yesterday();
+  // Kiểm tra ngay — chỉ HĐ nháp (23/10/2026: bỏ kiểm HĐ đã phát hành)
   starting = false;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -73,11 +74,6 @@ export class InvoiceCheckPageComponent implements OnInit {
     });
   }
 
-  private yesterday(): string {
-    const d = new Date(Date.now() - 86400000);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  }
-
   async loadList(): Promise<void> {
     try {
       this.list = await this.service.listRuns();
@@ -91,6 +87,7 @@ export class InvoiceCheckPageComponent implements OnInit {
 
   async openRun(id: string): Promise<void> {
     this.stopPoll();
+    this.switchingRun = !!this.run && this.run.id !== id;
     this.loadingRun = true;
     this.error = '';
     try {
@@ -111,6 +108,7 @@ export class InvoiceCheckPageComponent implements OnInit {
       this.error = `Không mở được lần kiểm: ${e?.error?.detail || httpErrorText(e)}`;
     } finally {
       this.loadingRun = false;
+      this.switchingRun = false;
     }
   }
 
@@ -120,17 +118,12 @@ export class InvoiceCheckPageComponent implements OnInit {
   }
 
   async startCheck(): Promise<void> {
-    if (this.scope === 'accepted' && (!this.fromDate || !this.toDate || this.fromDate > this.toDate)) {
-      console.warn(`${LOG} Khoảng ngày không hợp lệ: ${this.fromDate} → ${this.toDate}`);
-      this.error = 'Chọn Từ ngày ≤ Đến ngày.';
-      return;
-    }
     this.starting = true;
     this.error = '';
     this.msg = '';
     try {
-      const id = await this.service.start(this.scope, this.fromDate, this.toDate);
-      console.log(`${LOG} Bắt đầu kiểm ${id} (${this.scope}${this.scope === 'accepted' ? ` ${this.fromDate} → ${this.toDate}` : ''})`);
+      const id = await this.service.start('draft');
+      console.log(`${LOG} Bắt đầu kiểm ${id} (HĐ nháp)`);
       this.view = 'issues';
       await this.loadList();
       await this.openRun(id);
@@ -194,6 +187,7 @@ export class InvoiceCheckPageComponent implements OnInit {
 
   // ===== Thuế suất đúng =====
   async loadRates(): Promise<void> {
+    this.loadingRates = true;
     try {
       const r = await this.service.taxRates();
       this.rates = r.rates;
@@ -204,6 +198,8 @@ export class InvoiceCheckPageComponent implements OnInit {
     } catch (e: any) {
       console.error(`${LOG} Không tải được thuế suất đúng: ${httpErrorText(e)}`);
       this.error = `Không tải được thuế suất đúng: ${e?.error?.detail || httpErrorText(e)}`;
+    } finally {
+      this.loadingRates = false;
     }
   }
 

@@ -328,3 +328,6 @@ Giao diện TapHoa39KeToan đã có **100%** (chưa nối dữ liệu thật —
 - 39 trang/màn hình
 - Tuân thủ Thông tư 133/2016/TT-BTC
 - Dành cho Công ty TNHH 1 thành viên - Doanh nghiệp nhỏ & vừa
+
+- 23/10/2026: **Đối soát CK → Chuyển khoản HĐ đầu vào** xong (`/bank-reconciliation-in-page`): HĐ mua (XML / Gmail) ⇄ tiền ra sao kê
+  TPBank; test util 19/19 (2 file sao kê thật = 90 GD tiền ra), E2E 13/13. Chưa thử với thư mục XML / Gmail thật của quý (máy kế toán).

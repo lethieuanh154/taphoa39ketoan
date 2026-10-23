@@ -715,3 +715,16 @@
   white-space: nowrap;
   max-width: 260px;
 }
+
+/* Kỳ (thay ô Từ / Đến ngày — 23/10/2026) */
+.period-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-weight: 600;
+  white-space: nowrap;
+}

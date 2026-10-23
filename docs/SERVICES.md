@@ -453,3 +453,26 @@ Lỗi IndexedDB chỉ log cảnh báo (trang chạy như không có cache). Mụ
 
 Mở lại ledger-8 / ledger-9: có XML lưu + kết quả HĐĐT / Gmail lưu cho kỳ đang chọn → đối chiếu lại ngay từ bản lưu (không gọi máy chủ);
 trang ghi "đọc lúc … / lấy lúc … (đã lưu trên máy)".
+
+## BackgroundJobService — việc chạy nền của trang Tiện ích (23/10/2026)
+
+`services/background-job.service.ts` — giữ việc đang chạy ở service (sống suốt phiên) thay vì component → **chuyển trang không dừng**.
+```typescript
+run<T>(key, label, meta, fn: (job) => Promise<T>): BgJob<T>   // cùng key đang chạy → dùng lại, không chạy trùng
+get<T>(key) / find<T>(prefix)                                  // việc đang chạy (xong / lỗi thì tự bỏ khỏi danh sách)
+BgJob = { key, label, startedAt, progress, log[], meta, promise }
+```
+Dùng ở Kiểm tra số lượng HĐ: đọc thư mục XML (`xml-in` / `xml-out`, `progress` = "120/450 file"), lấy HĐĐT KiotViet
+(`einvoice-bills:<from>:<to>`), lấy Gmail + scrape (`gmail-links:...`, `log` = khung log). Việc tự ghi kết quả vào IndexedDB
+(TienIchCacheService) → quay lại trang: còn chạy thì hiện tiến độ / log và chờ tiếp, xong rồi thì đọc bản lưu. Tải lại cả trang (F5)
+thì việc đang chạy mất (bản đã lưu vẫn còn).
+
+## PurchaseInvoiceSourceService — nguồn HĐ đầu vào dùng chung (23/10/2026)
+
+`services/purchase-invoice-source.service.ts` — Kiểm tra số lượng HĐ đầu vào + Chuyển khoản HĐ đầu vào dùng CHUNG 1 bản XML / Gmail.
+```typescript
+startXml(files, folder) / runningXml() / cachedXml()          // IndexedDB `xml-in`, chạy nền (BackgroundJobService)
+xmlPurchases(result, companyMst) → { mst, detected, invoices }   // bên mua = MST công ty (chưa nhập → tự nhận)
+startGmail({label, labelId?, from, to}) / runningGmail() / cachedGmail(p)   // portal-links + scrape, khóa `gmail-links:<nhãn>:<từ>:<đến>`
+static fromXml(LocalXmlInvoice) / fromGmail(links, from, to) → PurchaseInv[]  // Gmail: chỉ email có số HĐ + số tiền, bỏ trùng
+```

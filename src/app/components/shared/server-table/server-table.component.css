@@ -95,6 +95,10 @@
   font-size: 0.8rem;
 }
 
+.st-box {
+  position: relative;
+}
+
 .st-wrap {
   overflow: auto;
   max-height: calc(100vh - 260px);

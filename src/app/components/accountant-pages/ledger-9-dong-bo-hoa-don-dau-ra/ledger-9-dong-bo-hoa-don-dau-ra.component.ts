@@ -6,6 +6,8 @@
  * Khóa so: mẫu số + ký hiệu + số HĐ. XML đọc ngay trên trình duyệt (utils/invoice-xml.util.ts), không tải lên máy chủ.
  * MST công ty = CompanyService (popup ở MainLayout), chưa nhập thì tự nhận từ XML. XML đã đọc + HĐĐT đã lấy lưu IndexedDB
  * (TienIchCacheService) → mở lại trang hiện ngay kết quả cũ, bấm "Lấy lại từ KiotViet" / chọn lại thư mục để cập nhật.
+ * 23/10/2026: khoảng ngày = KỲ ở thanh chọn kỳ (bỏ ô Từ / Đến riêng — trùng, dễ lệch với kỳ). Đọc XML + lấy HĐĐT chạy NỀN
+ * (BackgroundJobService) → chuyển trang không dừng; quay lại thấy tiến độ / kết quả.
  */
 import { Component, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -15,7 +17,9 @@ import { EinvoiceBill, EinvoiceCheckService } from '../../../services/einvoice-c
 import { PeriodService } from '../../../services/period.service';
 import { CompanyService } from '../../../services/company.service';
 import { TienIchCacheService } from '../../../services/tien-ich-cache.service';
+import { BackgroundJobService, BgJob } from '../../../services/background-job.service';
 import { LocalXmlInvoice, XmlReadResult, detectCompanyMst, readInvoiceFiles } from '../../../utils/invoice-xml.util';
+import { TableLoadingComponent } from '../../shared/table-loading/table-loading.component';
 
 const LOG = '[InvoiceCountOut]';
 const TOL = 1;
@@ -38,7 +42,7 @@ interface CompareRow {
 @Component({
   selector: 'app-ledger-9-dong-bo-hoa-don-dau-ra',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TableLoadingComponent],
   templateUrl: './ledger-9-dong-bo-hoa-don-dau-ra.component.html',
   styleUrls: ['./ledger-9-dong-bo-hoa-don-dau-ra.component.css']
 })
@@ -47,6 +51,7 @@ export class Ledger9DongBoHoaDonDauRaComponent {
   private periodService = inject(PeriodService);
   private companyService = inject(CompanyService);
   private cache = inject(TienIchCacheService);
+  private jobs = inject(BackgroundJobService);
   readonly periodLabel = this.periodService.label;
 
   fromDate = '';
@@ -56,7 +61,8 @@ export class Ledger9DongBoHoaDonDauRaComponent {
   xmlInvoices: LocalXmlInvoice[] = [];
   xmlFolder = '';
   xmlReading = false;
-  xmlProgress = '';
+  /** việc đọc thư mục đang chạy nền (tiến độ lấy từ đây — vẫn chạy khi đã chuyển trang) */
+  xmlJob: BgJob<CachedXml> | null = null;
   xmlInfo = '';
   xmlDates: [string, string] | null = null;
   companyMst = '';
@@ -94,8 +100,14 @@ export class Ledger9DongBoHoaDonDauRaComponent {
   constructor() {
     effect(() => {
       const p = this.periodService.period();
+      const changed = !!this.fromDate && (p.from !== this.fromDate || p.to !== this.toDate);
       this.fromDate = p.from;
       this.toDate = p.to;
+      if (changed && this.rawXml) {
+        console.log(`${LOG} Kỳ đổi → ${p.from} → ${p.to}: hiện kết quả đã lưu của kỳ này (nếu có)`);
+        this.compared = false;
+        void this.compare(false, true);
+      }
     });
     effect(() => {
       const mst = this.companyService.mst();
@@ -110,35 +122,43 @@ export class Ledger9DongBoHoaDonDauRaComponent {
 
   /** Mở lại trang: XML đã đọc lần trước + HĐĐT đã lấy cho kỳ đang chọn (nếu có) → hiện ngay, không gọi máy chủ */
   private async restore(): Promise<void> {
-    const c = await this.cache.get<CachedXml>(CACHE_XML);
-    if (!c || this.rawXml || this.xmlReading) return;
-    this.xmlFolder = c.data.folder;
-    this.rawXml = c.data.result;
-    this.xmlSavedAt = c.savedAt;
-    this.applyXml();
     if (!this.fromDate || !this.toDate) ({ from: this.fromDate, to: this.toDate } = this.periodService.period());
-    console.log(`${LOG} Dùng XML đã đọc lúc ${this.viTime(c.savedAt)} ("${this.xmlFolder}", ${this.xmlInvoices.length} HĐ)`);
-    if (this.xmlInvoices.length && !this.rangeError) await this.compare(false, true);
+    const running = this.jobs.get<CachedXml>(CACHE_XML);
+    if (running) {
+      console.log(`${LOG} Quay lại trang: đang đọc thư mục "${running.meta['folder']}" (chạy nền) → chờ tiếp`);
+      await this.awaitXmlJob(running);
+    } else {
+      const c = await this.cache.get<CachedXml>(CACHE_XML);
+      if (!c || this.rawXml || this.xmlReading) return;
+      this.xmlFolder = c.data.folder;
+      this.rawXml = c.data.result;
+      this.xmlSavedAt = c.savedAt;
+      this.applyXml();
+      console.log(`${LOG} Dùng XML đã đọc lúc ${this.viTime(c.savedAt)} ("${this.xmlFolder}", ${this.xmlInvoices.length} HĐ)`);
+    }
+    if (!this.xmlInvoices.length || this.rangeError) return;
+    const bills = this.jobs.find<CachedBills>('einvoice-bills:');
+    if (bills) {
+      console.log(`${LOG} Quay lại trang: đang lấy HĐĐT ${bills.meta['from']} → ${bills.meta['to']} (chạy nền) → chờ tiếp`);
+      this.loadingKv = true;
+      await bills.promise.catch(() => null);
+      this.loadingKv = false;
+    }
+    await this.compare(false, true);
   }
 
-  async onXmlSelected(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const files = Array.from(input.files || []);
-    input.value = '';
-    if (!files.length) return;
-    this.xmlFolder = (files[0] as any).webkitRelativePath?.split('/')[0] || `${files.length} file`;
+  /** Chờ việc đọc thư mục chạy nền xong → dùng kết quả (cũng dùng khi quay lại trang giữa chừng) */
+  private async awaitXmlJob(job: BgJob<CachedXml>): Promise<void> {
+    this.xmlJob = job;
     this.xmlReading = true;
-    this.error = '';
-    this.xmlInfo = '';
-    this.compared = false;
+    this.xmlFolder = job.meta['folder'];
     try {
-      const r = await readInvoiceFiles(files, (d, t) => this.xmlProgress = `${d}/${t} file`);
+      const { result: r } = await job.promise;
       this.rawXml = r;
       this.xmlSavedAt = Date.now();
       this.applyXml();
       console.log(`${LOG} Thư mục "${this.xmlFolder}": ${this.xmlInfo}`);
       if (r.errors.length) console.warn(`${LOG} File XML lỗi:`, r.errors.slice(0, 10));
-      await this.cache.set<CachedXml>(CACHE_XML, { folder: this.xmlFolder, result: r });
     } catch (e: any) {
       console.error(`${LOG} Không đọc được thư mục XML: ${e?.message || e}`);
       this.error = `Không đọc được thư mục XML: ${e?.message || e}`;
@@ -146,8 +166,26 @@ export class Ledger9DongBoHoaDonDauRaComponent {
       this.rawXml = null;
     } finally {
       this.xmlReading = false;
-      this.xmlProgress = '';
+      this.xmlJob = null;
     }
+  }
+
+  async onXmlSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) return;
+    const folder = (files[0] as any).webkitRelativePath?.split('/')[0] || `${files.length} file`;
+    this.error = '';
+    this.xmlInfo = '';
+    this.compared = false;
+    // chạy nền: đổi trang vẫn đọc tiếp, đọc xong ghi IndexedDB ngay trong việc
+    const job = this.jobs.run<CachedXml>(CACHE_XML, `Đọc thư mục XML đầu ra "${folder}"`, { folder }, async j => {
+      const result = await readInvoiceFiles(files, (d, t) => j.progress = `${d}/${t} file`);
+      await this.cache.set<CachedXml>(CACHE_XML, { folder, result });
+      return { folder, result };
+    });
+    await this.awaitXmlJob(job);
   }
 
   /** Lọc HĐ đầu ra (bên bán = MST công ty) từ XML đã đọc */
@@ -171,16 +209,10 @@ export class Ledger9DongBoHoaDonDauRaComponent {
     this.error = this.xmlInvoices.length ? '' : 'Không tìm thấy HĐ đầu ra nào của MST công ty trong thư mục đã chọn (cần file XML hóa đơn điện tử hoặc ZIP chứa XML).';
   }
 
-  /** Đặt khoảng ngày theo ngày HĐ trong thư mục XML */
-  useXmlDates(): void {
-    if (!this.xmlDates) return;
-    [this.fromDate, this.toDate] = this.xmlDates;
-  }
-
   get rangeError(): string {
-    if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) return 'Chọn Từ ngày ≤ Đến ngày';
+    if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) return 'Chọn kỳ trên thanh chọn kỳ';
     const days = (Date.parse(this.toDate) - Date.parse(this.fromDate)) / 86400000 + 1;
-    return days > MAX_DAYS ? `Tối đa ${MAX_DAYS} ngày mỗi lần (đang chọn ${days} ngày)` : '';
+    return days > MAX_DAYS ? `Kỳ đang chọn dài ${days} ngày — tối đa ${MAX_DAYS} ngày mỗi lần, chọn kỳ Tháng hoặc Quý` : '';
   }
 
   /** `force` = bỏ bản lưu, lấy lại HĐĐT từ máy chủ. `cacheOnly` (mở lại trang) = chỉ dùng bản lưu, không có thì thôi. */
@@ -207,9 +239,15 @@ export class Ledger9DongBoHoaDonDauRaComponent {
         this.kvFetchedAt = cached.savedAt;
         console.log(`${LOG} HĐĐT ${this.fromDate} → ${this.toDate}: dùng bản lưu lúc ${this.viTime(cached.savedAt)} (${res.bills.length} HĐ)`);
       } else {
-        res = await this.service.listBills(this.fromDate, this.toDate);
+        const [from, to] = [this.fromDate, this.toDate];
+        // chạy nền: đổi trang vẫn lấy tiếp, xong ghi IndexedDB ngay trong việc
+        res = await this.jobs.run<CachedBills>(cacheKey, `Lấy HĐĐT KiotViet ${from} → ${to}`, { from, to }, async () => {
+          const r = await this.service.listBills(from, to);
+          const data = { einvoice_url: r.einvoice_url, bills: r.bills };
+          await this.cache.set<CachedBills>(cacheKey, data);
+          return data;
+        }).promise;
         this.kvFetchedAt = Date.now();
-        await this.cache.set<CachedBills>(cacheKey, { einvoice_url: res.einvoice_url, bills: res.bills });
       }
       this.einvoiceUrl = res.einvoice_url;
       const published = res.bills.filter(b => b.number);

@@ -31,7 +31,7 @@
     <div class="xml-picker">
       <label class="btn btn-primary" [class.disabled]="xmlReading">
         <i class="fa-solid" [ngClass]="xmlReading ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
-        {{ xmlReading ? ('Đang đọc ' + xmlProgress) : 'Chọn thư mục XML HĐ đầu vào' }}
+        {{ xmlReading ? ('Đang đọc ' + (xmlJob?.progress || '...')) : 'Chọn thư mục XML HĐ đầu vào' }}
         <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
       </label>
       <span class="xml-hint" *ngIf="!xmlInfo && !xmlReading">Thư mục app FDI tải về (vd <code>...\T9\&lt;MST&gt;\purchase\xml</code>) — đọc ngay trên máy, không tải lên máy chủ. Có ZIP cũng được.</span>
@@ -45,16 +45,10 @@
 
     <form [formGroup]="filterForm" class="filter-form">
       <div class="filter-row">
-        <!-- Từ ngày -->
+        <!-- Khoảng ngày = kỳ ở thanh chọn kỳ (23/10/2026: bỏ ô Từ / Đến riêng) -->
         <div class="filter-group">
-          <label>Từ ngày</label>
-          <input type="date" formControlName="fromDate" class="filter-input">
-        </div>
-
-        <!-- Đến ngày -->
-        <div class="filter-group">
-          <label>Đến ngày</label>
-          <input type="date" formControlName="toDate" class="filter-input">
+          <label>Kỳ</label>
+          <span class="period-chip"><i class="fa-solid fa-calendar-day"></i> {{ periodLabel() }}</span>
         </div>
 
         <!-- Nhà cung cấp (Gmail labels) -->
@@ -184,6 +178,7 @@
     </div>
 
     <!-- Results table -->
+    <app-table-loading *ngIf="liveReconciling && liveResults.length === 0" text="Đang đối chiếu Gmail với thư mục XML..."></app-table-loading>
     <div class="live-results-table-wrapper" *ngIf="liveResults.length > 0">
       <table class="live-results-table">
         <thead>
@@ -290,12 +285,8 @@
           </div>
         </div>
         <div class="portal-filter-group">
-          <label>Từ ngày</label>
-          <input type="date" class="filter-input" [(ngModel)]="portalLinksFromDate">
-        </div>
-        <div class="portal-filter-group">
-          <label>Đến ngày</label>
-          <input type="date" class="filter-input" [(ngModel)]="portalLinksToDate">
+          <label>Kỳ</label>
+          <span class="period-chip"><i class="fa-solid fa-calendar-day"></i> {{ periodLabel() }}</span>
         </div>
         <div class="portal-filter-group">
           <label>Tìm số HĐ / tên NCC</label>
@@ -382,9 +373,7 @@
               </td>
             </tr>
             <tr *ngIf="loadingPortalLinks">
-              <td colspan="9" class="loading-data">
-                <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
-              </td>
+              <td colspan="9" class="loading-data"><app-table-loading text="Đang tải link HĐ gốc từ Gmail..."></app-table-loading></td>
             </tr>
           </tbody>
         </table>

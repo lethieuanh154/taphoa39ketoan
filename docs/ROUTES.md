@@ -68,7 +68,7 @@ Thêm / bớt trang trong menu → sửa `menu.config.ts`, không sửa HTML. Nh
 |-----|------|-----------|---------|
 | Tiện ích | `/invoice-check-page` | InvoiceCheckPageComponent (`loadComponent`) | Kiểm tra HĐ tự động (23/10/2026). `?run=<id>` = mở 1 lần kiểm. `noPeriodBar` |
 | Tiện ích | nhóm **Đối soát CK** → `/bank-reconciliation-page` | BankReconciliationPageComponent (`loadComponent`) | "Chuyển khoản HĐ đầu ra" (23/10/2026) — khoảng ngày theo thanh chọn kỳ / theo sao kê |
-| Tiện ích | nhóm **Đối soát CK** → `/bank-reconciliation-in-page` | PlaceholderComponent | "Chuyển khoản HĐ đầu vào" (HĐ mua ⇄ tiền trả NCC) — chờ làm (user 23/10/2026) |
+| Tiện ích | nhóm **Đối soát CK** → `/bank-reconciliation-in-page` | BankReconciliationInPageComponent (lazy) | "Chuyển khoản HĐ đầu vào" (23/10/2026): HĐ mua (thư mục XML / Gmail) ⇄ tiền ra trên sao kê TPBank |
 | Tiện ích | `/invoice-reconciliation-page` | InvoiceReconciliationPageComponent (`loadComponent`, tải riêng) | Đối soát hóa đơn XML (23/10/2026). `?run=<id>` = mở 1 lần đối soát |
 | Tiện ích (mục cuối, sau các nhóm — `tailItems`) | `/tax-figures-page` | TaxFiguresPageComponent (`loadComponent`) | Số liệu khai thuế (bước 5, 23/10/2026): 01/GTGT, PL142, bảng kê bán ra / mua vào, 05/KK-TNCN. `?run=<id>` |
 | Tiện ích | `/item-mapping-page` | ItemMappingPageComponent (`loadComponent`) | Ánh xạ hàng hóa (23/10/2026). `?run=<id>` (trống = lần đối soát mới nhất). `canDeactivate` hỏi lại khi còn thay đổi chưa lưu |

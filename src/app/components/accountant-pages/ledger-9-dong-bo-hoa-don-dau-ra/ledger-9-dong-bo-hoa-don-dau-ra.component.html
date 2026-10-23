@@ -11,7 +11,7 @@
     <div class="row">
       <label class="btn btn-primary pick" [class.disabled]="xmlReading">
         <i class="fa-solid" [ngClass]="xmlReading ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
-        {{ xmlReading ? ('Đang đọc ' + xmlProgress) : 'Chọn thư mục XML HĐ đầu ra' }}
+        {{ xmlReading ? ('Đang đọc ' + (xmlJob?.progress || '...')) : 'Chọn thư mục XML HĐ đầu ra' }}
         <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
       </label>
       @if (xmlInfo) {
@@ -22,12 +22,8 @@
       }
     </div>
     <div class="row">
-      <label class="date-field">Từ <input type="date" [(ngModel)]="fromDate"></label>
-      <label class="date-field">Đến <input type="date" [(ngModel)]="toDate"></label>
-      <span class="hint">mặc định theo kỳ đang chọn ({{ periodLabel() }}), tối đa 92 ngày</span>
-      @if (xmlDates) {
-        <button type="button" class="btn small" (click)="useXmlDates()">Theo ngày trong XML</button>
-      }
+      <span class="hint"><i class="fa-solid fa-calendar-day"></i> Kỳ: <b>{{ periodLabel() }}</b> (đổi ở thanh chọn kỳ trên cùng, tối đa 92 ngày)
+        @if (rangeError) { — <b class="warn-text">{{ rangeError }}</b> }</span>
       <button type="button" class="btn btn-primary" (click)="compare()" [disabled]="loadingKv || xmlReading || !xmlInvoices.length">
         <i class="fa-solid" [ngClass]="loadingKv ? 'fa-spinner fa-spin' : 'fa-scale-balanced'"></i>
         {{ loadingKv ? 'Đang lấy HĐĐT KiotViet...' : 'So với HĐĐT KiotViet' }}
@@ -38,7 +34,8 @@
   </section>
 
   @if (compared) {
-    <section class="card">
+    <section class="card rel">
+      @if (loadingKv) { <app-table-loading [overlay]="true" text="Đang lấy HĐĐT KiotViet..."></app-table-loading> }
       <h2>Kết quả {{ comparedRange }}</h2>
       <p class="hint"><i class="fa-solid fa-clock-rotate-left"></i> HĐĐT KiotViet lấy lúc {{ viTime(kvFetchedAt) }} (đã lưu trên máy)
         <button type="button" class="btn small" (click)="compare(true)" [disabled]="loadingKv">
@@ -110,6 +107,10 @@
           <button type="button" (click)="page = page + 1" [disabled]="page >= pageCount"><i class="fa-solid fa-angle-right"></i></button>
         </div>
       }
+    </section>
+  } @else if (loadingKv || xmlReading) {
+    <section class="card">
+      <app-table-loading [text]="xmlReading ? 'Đang đọc thư mục XML... ' + (xmlJob?.progress || '') : 'Đang lấy HĐĐT KiotViet...'"></app-table-loading>
     </section>
   }
 </div>

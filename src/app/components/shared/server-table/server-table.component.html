@@ -34,6 +34,7 @@
   }
 
   @if (page) {
+    <div class="st-box">
     <div class="st-wrap">
       <table>
         <thead>
@@ -74,6 +75,8 @@
         </tbody>
       </table>
     </div>
+    @if (loading) { <app-table-loading [overlay]="true"></app-table-loading> }
+    </div>
 
     <div class="st-pager">
       <button type="button" class="st-btn" (click)="goTo(1)" [disabled]="query.page <= 1" title="Trang đầu">
@@ -98,5 +101,7 @@
         </select>
       </label>
     </div>
+  } @else if (loading) {
+    <app-table-loading></app-table-loading>
   }
 </div>

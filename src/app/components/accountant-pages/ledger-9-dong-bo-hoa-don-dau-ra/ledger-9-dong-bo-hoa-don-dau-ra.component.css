@@ -68,3 +68,7 @@ td a i { font-size: 0.6rem; color: #9ca3af; }
 .pager button:disabled { opacity: 0.4; cursor: default; }
 
 @media (max-width: 768px) { .page { padding: 0.75rem; } }
+.warn-text { color: #b45309; }
+
+/* vòng xoay đang tải (app-table-loading overlay) */
+.card.rel { position: relative; }

@@ -2,14 +2,16 @@
  * LEDGER 8 - KIỂM TRA SỐ LƯỢNG HÓA ĐƠN ĐẦU VÀO (Tiện ích → Kiểm tra số lượng hóa đơn)
  * So sánh Gmail (HĐ NCC gửi qua email) vs danh sách HĐ trong thư mục XML trên máy (app FDI tải từ cổng thuế).
  * 23/10/2026: bỏ nguồn GDT (cổng thuế chặn tự động hóa) → đọc XML trong trình duyệt (utils/invoice-xml.util.ts), không upload.
+ * 23/10/2026 chiều: khoảng ngày = KỲ ở thanh chọn kỳ (bỏ ô Từ / Đến ở cả 2 tab — trùng, dễ lệch với kỳ). Đọc XML + lấy Gmail chạy
+ * NỀN (BackgroundJobService) → chuyển trang không dừng; quay lại thấy tiến độ (khung log) / kết quả.
  */
 
 import { Component, OnInit, OnDestroy, HostListener, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Subject, of } from 'rxjs';
-import { takeUntil, finalize, switchMap, catchError, map, tap } from 'rxjs/operators';
+import { Subject } from 'rxjs';
+import { takeUntil, finalize } from 'rxjs/operators';
 
 import {
   InvoiceServiceV2,
@@ -23,20 +25,20 @@ import {
 import { AccountantCacheService } from '../accountant-cache.service';
 import { PeriodService } from '../../../services/period.service';
 import { CompanyService } from '../../../services/company.service';
-import { TienIchCacheService } from '../../../services/tien-ich-cache.service';
-import { LocalXmlInvoice, XmlReadResult, readInvoiceFiles, detectCompanyMst } from '../../../utils/invoice-xml.util';
+import { BgJob } from '../../../services/background-job.service';
+import { LocalXmlInvoice, XmlReadResult, detectCompanyMst } from '../../../utils/invoice-xml.util';
+import { CachedXml, PurchaseInvoiceSourceService } from '../../../services/purchase-invoice-source.service';
 import { environment } from '../../../../environments/environment';
+import { TableLoadingComponent } from '../../shared/table-loading/table-loading.component';
 
 const LOG = '[InvoiceCountIn]';
-/** IndexedDB (TienIchCacheService): XML đã đọc + link Gmail đã lấy theo nhãn + kỳ → mở lại trang không phải chọn / tải lại */
-const CACHE_XML = 'xml-in';
+/** XML đã đọc + link Gmail đã lấy (IndexedDB, PurchaseInvoiceSourceService) → mở lại trang không phải chọn / tải lại */
 
-interface CachedXml { folder: string; result: XmlReadResult; }
 
 @Component({
   selector: 'app-ledger-8-dong-bo-hoa-don-v2',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, TableLoadingComponent],
   templateUrl: './ledger-8-dong-bo-hoa-don-v2.component.html',
   styleUrls: ['./ledger-8-dong-bo-hoa-don-v2.component.css']
 })
@@ -87,7 +89,6 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   xmlInvoices: LocalXmlInvoice[] = [];   // HĐ đầu vào (bên mua = công ty)
   xmlFolder = '';
   xmlReading = false;
-  xmlProgress = '';
   xmlInfo = '';
   xmlError = '';
   companyMst = '';
@@ -99,7 +100,11 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   gmailFetchedAt: number | null = null;
 
   private companyService = inject(CompanyService);
-  private tienIchCache = inject(TienIchCacheService);
+  /** XML + Gmail dùng chung với Đối soát CK → Chuyển khoản HĐ đầu vào */
+  private source = inject(PurchaseInvoiceSourceService);
+  readonly periodLabel = inject(PeriodService).label;
+  /** việc đọc thư mục đang chạy nền (tiến độ lấy từ đây) */
+  xmlJob: BgJob<CachedXml> | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -118,6 +123,21 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       pageSize: [25]
     });
 
+    // Khoảng ngày luôn theo kỳ ở thanh chọn kỳ (cả tab Đối chiếu lẫn tab Links HĐ gốc)
+    effect(() => {
+      const p = this.periodService.period();
+      const prev = this.filterForm.value;
+      const changed = prev.fromDate !== p.from || prev.toDate !== p.to;
+      this.filterForm.patchValue({ fromDate: p.from, toDate: p.to }, { emitEvent: false });
+      this.portalLinksFromDate = p.from;
+      this.portalLinksToDate = p.to;
+      if (changed && this.rawXml && !this.liveReconciling) {
+        console.log(`${LOG} Kỳ đổi → ${p.from} → ${p.to}: hiện kết quả đã lưu của kỳ này (nếu có)`);
+        this.liveResults = [];
+        this.liveStatusLog = [];
+        void this.runLiveReconciliation(false, true);
+      }
+    });
     effect(() => {
       const mst = this.companyService.mst();
       if (this.rawXml) {
@@ -134,19 +154,52 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
 
   /** Mở lại trang: XML đã đọc lần trước; có link Gmail đã lấy cho bộ lọc đang chọn → đối chiếu ngay từ bản lưu */
   private async restore(): Promise<void> {
-    const c = await this.tienIchCache.get<CachedXml>(CACHE_XML);
-    if (!c || this.rawXml || this.xmlReading) return;
-    this.xmlFolder = c.data.folder;
-    this.rawXml = c.data.result;
-    this.xmlSavedAt = c.savedAt;
-    this.applyXml();
-    console.log(`${LOG} Dùng XML đã đọc lúc ${this.viTime(c.savedAt)} ("${this.xmlFolder}", ${this.xmlInvoices.length} HĐ)`);
-    if (this.xmlInvoices.length) await this.runLiveReconciliation(false, true);
+    const running = this.source.runningXml();
+    if (running) {
+      console.log(`${LOG} Quay lại trang: đang đọc thư mục "${running.meta['folder']}" (chạy nền) → chờ tiếp`);
+      await this.awaitXmlJob(running);
+    } else {
+      const c = await this.source.cachedXml();
+      if (!c || this.rawXml || this.xmlReading) return;
+      this.xmlFolder = c.data.folder;
+      this.rawXml = c.data.result;
+      this.xmlSavedAt = c.savedAt;
+      this.applyXml();
+      console.log(`${LOG} Dùng XML đã đọc lúc ${this.viTime(c.savedAt)} ("${this.xmlFolder}", ${this.xmlInvoices.length} HĐ)`);
+    }
+    if (!this.xmlInvoices.length) return;
+    const gmail = this.source.runningGmail();
+    if (gmail) {
+      console.log(`${LOG} Quay lại trang: đang lấy Gmail ${gmail.meta['from']} → ${gmail.meta['to']} (chạy nền) → chờ tiếp`);
+      this.liveReconciling = true;
+      this.liveStatusLog = gmail.log;
+      await gmail.promise.catch(() => null);
+      this.liveReconciling = false;
+    }
+    await this.runLiveReconciliation(false, true);
   }
 
-  /** Khóa cache link Gmail: nhãn + kỳ */
-  private gmailCacheKey(label: string, from: string, to: string): string {
-    return `gmail-links:${label || '*'}:${from || ''}:${to || ''}`;
+  /** Chờ việc đọc thư mục chạy nền xong → dùng kết quả (cũng dùng khi quay lại trang giữa chừng) */
+  private async awaitXmlJob(job: BgJob<CachedXml>): Promise<void> {
+    this.xmlJob = job;
+    this.xmlReading = true;
+    this.xmlFolder = job.meta['folder'];
+    try {
+      const { result: r } = await job.promise;
+      this.rawXml = r;
+      this.xmlSavedAt = Date.now();
+      this.applyXml();
+      console.log(`${LOG} Thư mục "${this.xmlFolder}": ${this.xmlInfo}`);
+      if (r.errors.length) console.warn(`${LOG} File XML lỗi:`, r.errors.slice(0, 10));
+    } catch (e: any) {
+      console.error(`${LOG} Không đọc được thư mục XML: ${e?.message || e}`);
+      this.xmlError = `Không đọc được thư mục XML: ${e?.message || e}`;
+      this.xmlInvoices = [];
+      this.rawXml = null;
+    } finally {
+      this.xmlReading = false;
+      this.xmlJob = null;
+    }
   }
 
   viTime(ms: number | null): string {
@@ -344,27 +397,11 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     const files = Array.from(input.files || []);
     input.value = '';
     if (!files.length) return;
-    this.xmlFolder = (files[0] as any).webkitRelativePath?.split('/')[0] || `${files.length} file`;
-    this.xmlReading = true;
+    const folder = (files[0] as any).webkitRelativePath?.split('/')[0] || `${files.length} file`;
     this.xmlError = '';
     this.xmlInfo = '';
-    try {
-      const r = await readInvoiceFiles(files, (d, t) => this.xmlProgress = `${d}/${t} file`);
-      this.rawXml = r;
-      this.xmlSavedAt = Date.now();
-      this.applyXml();
-      console.log(`${LOG} Thư mục "${this.xmlFolder}": ${this.xmlInfo}`);
-      if (r.errors.length) console.warn(`${LOG} File XML lỗi:`, r.errors.slice(0, 10));
-      await this.tienIchCache.set<CachedXml>(CACHE_XML, { folder: this.xmlFolder, result: r });
-    } catch (e: any) {
-      console.error(`${LOG} Không đọc được thư mục XML: ${e?.message || e}`);
-      this.xmlError = `Không đọc được thư mục XML: ${e?.message || e}`;
-      this.xmlInvoices = [];
-      this.rawXml = null;
-    } finally {
-      this.xmlReading = false;
-      this.xmlProgress = '';
-    }
+    // chạy nền: đổi trang vẫn đọc tiếp, đọc xong ghi IndexedDB ngay trong việc
+    await this.awaitXmlJob(this.source.startXml(files, folder));
   }
 
   /** Lọc HĐ đầu vào (bên mua = MST công ty — CompanyService, chưa nhập thì tự nhận) từ XML đã đọc */
@@ -570,114 +607,66 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     }
 
     const values = this.filterForm.value;
-    const fromDate = values.fromDate ? new Date(values.fromDate) : new Date();
-
-    // Gmail params
-    const gmailUid = localStorage.getItem('gmail_uid') || '';
-    let daysBack = 30;
-    if (values.fromDate) {
-      const now = new Date();
-      daysBack = Math.max(1, Math.ceil((now.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-    }
     const labelMapping = this.labelMappings.find(m => m.labelName === values.gmailLabel);
     const labelId = labelMapping ? this.gmailLabels.find(l => l.name === values.gmailLabel)?.id : undefined;
     const mst = labelMapping?.supplierTaxCode || '';
-    const gmailKey = this.gmailCacheKey(values.gmailLabel, values.fromDate, values.toDate);
-    const cached = force ? null : await this.tienIchCache.get<PortalLink[]>(gmailKey);
+    const gmailParams = { label: values.gmailLabel, labelId, from: values.fromDate, to: values.toDate };
+    const cached = force ? null : await this.source.cachedGmail(gmailParams);
     if (cacheOnly && !cached) return;
 
     this.liveReconciling = true;
     this.liveResults = [];
     this.liveSaved = false;
-    this.liveStatusLog = [`[${new Date().toLocaleTimeString()}] Bắt đầu đối chiếu...`];
-
-    const addLog = (msg: string) => this.liveStatusLog = [...this.liveStatusLog, `[${new Date().toLocaleTimeString()}] ${msg}`];
+    const stamp = (msg: string) => `[${new Date().toLocaleTimeString()}] ${msg}`;
+    this.liveStatusLog = [stamp('Bắt đầu đối chiếu...')];
+    const addLog = (msg: string) => this.liveStatusLog.push(stamp(msg));
 
     // HĐ trong thư mục XML có ngày lập trong kỳ
     const gdt = this.xmlInvoices.filter(i => (!values.fromDate || i.tdlap >= values.fromDate) && (!values.toDate || i.tdlap <= values.toDate));
     addLog(`XML (thư mục "${this.xmlFolder}"): ${gdt.length}/${this.xmlInvoices.length} HĐ trong kỳ ${values.fromDate} → ${values.toDate}`);
+    let gmailLinks: PortalLink[];
     if (cached) {
       addLog(`Gmail: dùng ${cached.data.length} link đã lấy lúc ${this.viTime(cached.savedAt)} (bấm "Tải lại" để lấy email mới)`);
       this.gmailFetchedAt = cached.savedAt;
+      gmailLinks = cached.data;
     } else {
-      addLog(`Đang tải Gmail (daysBack=${daysBack})...`);
+      // chạy nền: đổi trang vẫn lấy tiếp; khung log = log của việc (quay lại trang vẫn thấy)
+      const job = this.source.startGmail(gmailParams);
+      job.log.unshift(...this.liveStatusLog);
+      this.liveStatusLog = job.log;
+      try {
+        gmailLinks = await job.promise;
+        this.gmailFetchedAt = Date.now();
+      } catch (err: any) {
+        console.error(`${LOG} Đối chiếu lỗi:`, err?.status, err?.error?.detail || err?.message || err);
+        this.liveReconciling = false;
+        alert('Lỗi đối chiếu: ' + (err?.message || err));
+        return;
+      }
     }
 
-    const gmail$ = cached ? of({ gmailLinks: cached.data, gdtInvoices: gdt }) : this.invoiceService.getPortalLinksFromGmail({
-      uid: gmailUid,
-      labelId,
-      daysBack,
-      pageSize: 500,
-      parseAttachments: true,
-      beforeDate: values.toDate || undefined,   // chỉ email trong kỳ (kỳ quá khứ không bị page_size cắt mất)
-    }).pipe(
-      tap(res => addLog(`Gmail: ${(res.portalLinks || []).length} portal links`)),
-      switchMap(gmail => {
-        let gmailLinks = gmail.portalLinks || [];
-
-        const toScrape = gmailLinks
-          .filter(pl => !pl.hasAmounts && !!pl.portalUrl)
-          .map(pl => ({ gmailId: pl.gmailId, portalUrl: pl.portalUrl, provider: pl.invoiceProvider || '', credentials: pl.portalCredentials || {} }));
-
-        if (!toScrape.length) {
-          addLog('Không có portal nào cần scrape XML');
-          return of({ gmailLinks, gdtInvoices: gdt || [] });
-        }
-
-        addLog(`Đang scrape XML từ ${toScrape.length} portal...`);
-        return this.invoiceService.scrapePortalXml(toScrape).pipe(
-          map(res => {
-            const scraped = new Map((res.results || []).filter(r => r.success && r.amounts).map(r => [r.gmailId, r.amounts!]));
-            addLog(`Scrape xong: ${scraped.size}/${toScrape.length} OK`);
-            gmailLinks = gmailLinks.map(pl => scraped.has(pl.gmailId) ? { ...pl, ...scraped.get(pl.gmailId) } : pl);
-            return { gmailLinks, gdtInvoices: gdt || [] };
-          }),
-          catchError(err => {
-            addLog(`Scrape lỗi: ${err.message || err}`);
-            return of({ gmailLinks, gdtInvoices: gdt || [] });
-          })
-        );
-      }),
-      tap(({ gmailLinks }) => {
-        this.gmailFetchedAt = Date.now();
-        void this.tienIchCache.set<PortalLink[]>(gmailKey, gmailLinks);
-      })
-    );
-
-    gmail$.pipe(
-      takeUntil(this.destroy$),
-      finalize(() => this.liveReconciling = false)
-    ).subscribe({
-      next: ({ gmailLinks, gdtInvoices }) => {
-        // Filter by NCC MST if selected
-        if (mst) {
-          gmailLinks = gmailLinks.filter(pl => this._normalizeTaxCode(pl.supplierTaxCode) === this._normalizeTaxCode(mst));
-          gdtInvoices = gdtInvoices.filter(inv => this._normalizeTaxCode(inv.nbmst) === this._normalizeTaxCode(mst));
-        }
-
-        // Filter Gmail by date range
-        if (values.fromDate || values.toDate) {
-          gmailLinks = gmailLinks.filter(pl => {
-            const d = (pl.invoiceDate || pl.issueDate || '').split('T')[0];
-            if (values.fromDate && d < values.fromDate) return false;
-            if (values.toDate && d > values.toDate) return false;
-            return true;
-          });
-        }
-
-        this.liveGmailCount = gmailLinks.length;
-        this.liveGdtCount = gdtInvoices.length;
-
-        addLog(`Sau lọc: Gmail=${gmailLinks.length}, XML=${gdtInvoices.length}`);
-        addLog('Đang so khớp...');
-        this._matchAndCompare(gmailLinks, gdtInvoices);
-        addLog(`Hoàn tất: ${this.liveResults.length} kết quả`);
-      },
-      error: (err) => {
-        console.error(`${LOG} Đối chiếu lỗi:`, err?.status, err?.error?.detail || err?.message || err);
-        alert('Lỗi đối chiếu: ' + (err.message || err));
-      }
-    });
+    let gdtInvoices = gdt;
+    // Filter by NCC MST if selected
+    if (mst) {
+      gmailLinks = gmailLinks.filter(pl => this._normalizeTaxCode(pl.supplierTaxCode) === this._normalizeTaxCode(mst));
+      gdtInvoices = gdtInvoices.filter(inv => this._normalizeTaxCode(inv.nbmst) === this._normalizeTaxCode(mst));
+    }
+    // Lọc Gmail theo kỳ
+    if (values.fromDate || values.toDate) {
+      gmailLinks = gmailLinks.filter(pl => {
+        const d = (pl.invoiceDate || pl.issueDate || '').split('T')[0];
+        if (values.fromDate && d < values.fromDate) return false;
+        if (values.toDate && d > values.toDate) return false;
+        return true;
+      });
+    }
+    this.liveGmailCount = gmailLinks.length;
+    this.liveGdtCount = gdtInvoices.length;
+    addLog(`Sau lọc: Gmail=${gmailLinks.length}, XML=${gdtInvoices.length}`);
+    addLog('Đang so khớp...');
+    this._matchAndCompare(gmailLinks, gdtInvoices);
+    addLog(`Hoàn tất: ${this.liveResults.length} kết quả`);
+    this.liveReconciling = false;
   }
 
   /**
