@@ -1,5 +1,10 @@
 # PLAN: Hóa Đơn Đầu Vào — End-to-End Flow
 
+> **22/10/2026 — HẾT HIỆU LỰC làm kế hoạch.** Hướng Gmail → AI → `internal_invoices` → đối chiếu cổng GDT (captcha),
+> Playwright tải cổng NCC đã được thay bằng **import thư mục XML của app FDI** — xem `plan-ketoan-flow.md` (mục 3b).
+> File này chỉ còn là mô tả code đang có (ledger-8/9, `/api/gmail/portal-links`, `internal_invoices`) cho đến khi dọn ở
+> pha 6 của plan mới. Không làm tiếp các Phase/TODO bên dưới.
+
 ## Tổng quan
 
 **Full Flow:**

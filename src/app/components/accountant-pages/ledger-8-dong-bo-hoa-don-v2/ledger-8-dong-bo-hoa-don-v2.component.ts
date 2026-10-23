@@ -1,13 +1,14 @@
 /**
- * LEDGER 8 - ĐỐI CHIẾU HÓA ĐƠN ĐẦU VÀO
- * So sánh tự động Gmail vs GDT (hoadondientu.gdt.gov.vn)
+ * LEDGER 8 - KIỂM TRA SỐ LƯỢNG HÓA ĐƠN ĐẦU VÀO (Tiện ích → Kiểm tra số lượng hóa đơn)
+ * So sánh Gmail (HĐ NCC gửi qua email) vs danh sách HĐ trong thư mục XML trên máy (app FDI tải từ cổng thuế).
+ * 23/10/2026: bỏ nguồn GDT (cổng thuế chặn tự động hóa) → đọc XML trong trình duyệt (utils/invoice-xml.util.ts), không upload.
  */
 
-import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Subject, forkJoin, of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { takeUntil, finalize, switchMap, catchError, map, tap } from 'rxjs/operators';
 
 import {
@@ -20,8 +21,17 @@ import {
   LiveReconcileRow
 } from '../invoice.service.v2';
 import { AccountantCacheService } from '../accountant-cache.service';
-import { HddtService, HddtInvoice } from '../../../services/hddt.service';
+import { PeriodService } from '../../../services/period.service';
+import { CompanyService } from '../../../services/company.service';
+import { TienIchCacheService } from '../../../services/tien-ich-cache.service';
+import { LocalXmlInvoice, XmlReadResult, readInvoiceFiles, detectCompanyMst } from '../../../utils/invoice-xml.util';
 import { environment } from '../../../../environments/environment';
+
+const LOG = '[InvoiceCountIn]';
+/** IndexedDB (TienIchCacheService): XML đã đọc + link Gmail đã lấy theo nhãn + kỳ → mở lại trang không phải chọn / tải lại */
+const CACHE_XML = 'xml-in';
+
+interface CachedXml { folder: string; result: XmlReadResult; }
 
 @Component({
   selector: 'app-ledger-8-dong-bo-hoa-don-v2',
@@ -73,28 +83,74 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   liveSaved = false;
   liveStatusLog: string[] = [];
 
+  // === Danh sách HĐ từ thư mục XML trên máy (thay GDT) ===
+  xmlInvoices: LocalXmlInvoice[] = [];   // HĐ đầu vào (bên mua = công ty)
+  xmlFolder = '';
+  xmlReading = false;
+  xmlProgress = '';
+  xmlInfo = '';
+  xmlError = '';
+  companyMst = '';
+  /** MST đã nhập khác MST tự nhận từ XML */
+  mstWarning = '';
+  xmlSavedAt: number | null = null;
+  private rawXml: XmlReadResult | null = null;
+  /** thời điểm lấy link Gmail của kết quả đang xem */
+  gmailFetchedAt: number | null = null;
+
+  private companyService = inject(CompanyService);
+  private tienIchCache = inject(TienIchCacheService);
+
   constructor(
     private fb: FormBuilder,
     private invoiceService: InvoiceServiceV2,
     private cacheService: AccountantCacheService,
-    private hddtService: HddtService,
+    private periodService: PeriodService,
     private http: HttpClient
   ) {
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const toDateStr = today.toISOString().split('T')[0];
-    const fromDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+    // Kỳ mặc định theo thanh chọn kỳ (PeriodService)
+    const period = this.periodService.period();
 
     this.filterForm = this.fb.group({
-      fromDate: [fromDateStr],
-      toDate: [toDateStr],
+      fromDate: [period.from],
+      toDate: [period.to],
       gmailLabel: [''],
       pageSize: [25]
+    });
+
+    effect(() => {
+      const mst = this.companyService.mst();
+      if (this.rawXml) {
+        console.log(`${LOG} MST công ty đổi → ${mst || '(tự nhận)'}: lọc lại XML`);
+        this.applyXml();
+      }
     });
   }
 
   ngOnInit(): void {
     this.loadGmailLabels();
+    void this.restore();
+  }
+
+  /** Mở lại trang: XML đã đọc lần trước; có link Gmail đã lấy cho bộ lọc đang chọn → đối chiếu ngay từ bản lưu */
+  private async restore(): Promise<void> {
+    const c = await this.tienIchCache.get<CachedXml>(CACHE_XML);
+    if (!c || this.rawXml || this.xmlReading) return;
+    this.xmlFolder = c.data.folder;
+    this.rawXml = c.data.result;
+    this.xmlSavedAt = c.savedAt;
+    this.applyXml();
+    console.log(`${LOG} Dùng XML đã đọc lúc ${this.viTime(c.savedAt)} ("${this.xmlFolder}", ${this.xmlInvoices.length} HĐ)`);
+    if (this.xmlInvoices.length) await this.runLiveReconciliation(false, true);
+  }
+
+  /** Khóa cache link Gmail: nhãn + kỳ */
+  private gmailCacheKey(label: string, from: string, to: string): string {
+    return `gmail-links:${label || '*'}:${from || ''}:${to || ''}`;
+  }
+
+  viTime(ms: number | null): string {
+    return ms ? new Date(ms).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
   }
 
   ngOnDestroy(): void {
@@ -276,12 +332,61 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
    * Reset filter to default
    */
   resetFilter(): void {
-    const today = new Date().toISOString().split('T')[0];
-    console.log('🔄 resetFilter() → today:', today);
-    const now = new Date();
-    const ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    this.filterForm.reset({ fromDate: ago.toISOString().split('T')[0], toDate: now.toISOString().split('T')[0], gmailLabel: '', pageSize: 25 });
+    const period = this.periodService.period();
+    console.log(`${LOG} Đặt lại bộ lọc → kỳ ${period.from} → ${period.to}`);
+    this.filterForm.reset({ fromDate: period.from, toDate: period.to, gmailLabel: '', pageSize: 25 });
     this.applyFilter();
+  }
+
+  /** Chọn thư mục / file XML HĐ (app FDI) → đọc trong trình duyệt, giữ HĐ đầu vào (bên mua = MST công ty). */
+  async onXmlSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) return;
+    this.xmlFolder = (files[0] as any).webkitRelativePath?.split('/')[0] || `${files.length} file`;
+    this.xmlReading = true;
+    this.xmlError = '';
+    this.xmlInfo = '';
+    try {
+      const r = await readInvoiceFiles(files, (d, t) => this.xmlProgress = `${d}/${t} file`);
+      this.rawXml = r;
+      this.xmlSavedAt = Date.now();
+      this.applyXml();
+      console.log(`${LOG} Thư mục "${this.xmlFolder}": ${this.xmlInfo}`);
+      if (r.errors.length) console.warn(`${LOG} File XML lỗi:`, r.errors.slice(0, 10));
+      await this.tienIchCache.set<CachedXml>(CACHE_XML, { folder: this.xmlFolder, result: r });
+    } catch (e: any) {
+      console.error(`${LOG} Không đọc được thư mục XML: ${e?.message || e}`);
+      this.xmlError = `Không đọc được thư mục XML: ${e?.message || e}`;
+      this.xmlInvoices = [];
+      this.rawXml = null;
+    } finally {
+      this.xmlReading = false;
+      this.xmlProgress = '';
+    }
+  }
+
+  /** Lọc HĐ đầu vào (bên mua = MST công ty — CompanyService, chưa nhập thì tự nhận) từ XML đã đọc */
+  private applyXml(): void {
+    const r = this.rawXml;
+    if (!r) return;
+    const detected = detectCompanyMst(r.invoices, 'buyer');
+    const set = this.companyService.mst();
+    this.companyMst = set || detected;
+    this.mstWarning = set && detected && set !== detected
+      ? `MST công ty đã nhập ${set} khác MST bên mua gặp nhiều nhất trong XML ${detected} — kiểm tra lại thư mục, hoặc bấm "MST" ở góc dưới để đổi.` : '';
+    if (this.mstWarning) console.warn(`${LOG} ${this.mstWarning}`);
+    const isIn = (i: LocalXmlInvoice) => !this.companyMst || i.nmmst === this.companyMst;
+    this.xmlInvoices = r.invoices.filter(isIn);
+    const out = r.invoices.length - this.xmlInvoices.length;
+    const dates = this.xmlInvoices.map(i => i.tdlap).filter(Boolean).sort();
+    this.xmlInfo = `${this.xmlInvoices.length} HĐ đầu vào`
+      + (dates.length ? ` (ngày ${this.formatGdtDate(dates[0])} → ${this.formatGdtDate(dates[dates.length - 1])})` : '')
+      + ` · MST công ty ${this.companyMst || '?'}${set ? '' : ' (tự nhận)'} · đọc ${r.nFiles} file XML`
+      + (out ? ` · bỏ ${out} HĐ khác` : '') + (r.nNotInvoice ? ` · ${r.nNotInvoice} XML không phải HĐ` : '')
+      + (r.nDuplicates ? ` · ${r.nDuplicates} trùng` : '') + (r.errors.length ? ` · ${r.errors.length} file lỗi` : '');
+    this.xmlError = this.xmlInvoices.length ? '' : 'Không tìm thấy HĐ đầu vào nào của MST công ty trong thư mục đã chọn (cần file XML hóa đơn điện tử hoặc ZIP chứa XML).';
   }
 
   /**
@@ -299,7 +404,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     console.log('🔄 Force reloading reconcile...');
     await this.cacheService.clearAllCache();
     this.loadGmailLabels();
-    this.runLiveReconciliation();
+    await this.runLiveReconciliation(true);
   }
 
   switchMainTab(tab: 'reconcile' | 'portal'): void {
@@ -454,15 +559,18 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   // LIVE RECONCILIATION — Gmail vs GDT (parallel)
   // ==========================================================================
 
-  runLiveReconciliation(): void {
-    if (!this.hddtService.hasToken()) {
-      alert('Chưa đăng nhập GDT. Vui lòng đăng nhập tại trang Hóa đơn mua vào trước.');
+  /**
+   * `force` = bỏ bản lưu, tải lại Gmail. `cacheOnly` (mở lại trang) = chỉ đối chiếu khi đã có link Gmail lưu cho bộ lọc đang chọn.
+   */
+  async runLiveReconciliation(force = false, cacheOnly = false): Promise<void> {
+    if (!this.xmlInvoices.length) {
+      console.warn(`${LOG} Chưa chọn thư mục XML → không đối chiếu`);
+      this.xmlError = 'Chọn thư mục XML hóa đơn đầu vào (app FDI tải về) trước khi đối chiếu.';
       return;
     }
 
     const values = this.filterForm.value;
     const fromDate = values.fromDate ? new Date(values.fromDate) : new Date();
-    const toDate = values.toDate ? new Date(values.toDate) : new Date();
 
     // Gmail params
     const gmailUid = localStorage.getItem('gmail_uid') || '';
@@ -474,6 +582,9 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     const labelMapping = this.labelMappings.find(m => m.labelName === values.gmailLabel);
     const labelId = labelMapping ? this.gmailLabels.find(l => l.name === values.gmailLabel)?.id : undefined;
     const mst = labelMapping?.supplierTaxCode || '';
+    const gmailKey = this.gmailCacheKey(values.gmailLabel, values.fromDate, values.toDate);
+    const cached = force ? null : await this.tienIchCache.get<PortalLink[]>(gmailKey);
+    if (cacheOnly && !cached) return;
 
     this.liveReconciling = true;
     this.liveResults = [];
@@ -482,20 +593,26 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
 
     const addLog = (msg: string) => this.liveStatusLog = [...this.liveStatusLog, `[${new Date().toLocaleTimeString()}] ${msg}`];
 
-    addLog(`Đang tải Gmail (daysBack=${daysBack}) và GDT (${values.fromDate} → ${values.toDate})...`);
+    // HĐ trong thư mục XML có ngày lập trong kỳ
+    const gdt = this.xmlInvoices.filter(i => (!values.fromDate || i.tdlap >= values.fromDate) && (!values.toDate || i.tdlap <= values.toDate));
+    addLog(`XML (thư mục "${this.xmlFolder}"): ${gdt.length}/${this.xmlInvoices.length} HĐ trong kỳ ${values.fromDate} → ${values.toDate}`);
+    if (cached) {
+      addLog(`Gmail: dùng ${cached.data.length} link đã lấy lúc ${this.viTime(cached.savedAt)} (bấm "Tải lại" để lấy email mới)`);
+      this.gmailFetchedAt = cached.savedAt;
+    } else {
+      addLog(`Đang tải Gmail (daysBack=${daysBack})...`);
+    }
 
-    forkJoin({
-      gmail: this.invoiceService.getPortalLinksFromGmail({
-        uid: gmailUid,
-        labelId,
-        daysBack,
-        pageSize: 200,
-        parseAttachments: true,
-      }).pipe(tap(res => addLog(`Gmail: ${(res.portalLinks || []).length} portal links`))),
-      gdt: this.hddtService.getPurchaseInvoicesInRange(fromDate, toDate, true)
-        .pipe(tap(inv => addLog(`GDT: ${(inv || []).length} hóa đơn`))),
+    const gmail$ = cached ? of({ gmailLinks: cached.data, gdtInvoices: gdt }) : this.invoiceService.getPortalLinksFromGmail({
+      uid: gmailUid,
+      labelId,
+      daysBack,
+      pageSize: 500,
+      parseAttachments: true,
+      beforeDate: values.toDate || undefined,   // chỉ email trong kỳ (kỳ quá khứ không bị page_size cắt mất)
     }).pipe(
-      switchMap(({ gmail, gdt }) => {
+      tap(res => addLog(`Gmail: ${(res.portalLinks || []).length} portal links`)),
+      switchMap(gmail => {
         let gmailLinks = gmail.portalLinks || [];
 
         const toScrape = gmailLinks
@@ -521,6 +638,13 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
           })
         );
       }),
+      tap(({ gmailLinks }) => {
+        this.gmailFetchedAt = Date.now();
+        void this.tienIchCache.set<PortalLink[]>(gmailKey, gmailLinks);
+      })
+    );
+
+    gmail$.pipe(
       takeUntil(this.destroy$),
       finalize(() => this.liveReconciling = false)
     ).subscribe({
@@ -544,19 +668,19 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
         this.liveGmailCount = gmailLinks.length;
         this.liveGdtCount = gdtInvoices.length;
 
-        addLog(`Sau lọc: Gmail=${gmailLinks.length}, GDT=${gdtInvoices.length}`);
+        addLog(`Sau lọc: Gmail=${gmailLinks.length}, XML=${gdtInvoices.length}`);
         addLog('Đang so khớp...');
         this._matchAndCompare(gmailLinks, gdtInvoices);
         addLog(`Hoàn tất: ${this.liveResults.length} kết quả`);
       },
       error: (err) => {
-        console.error('❌ Live reconciliation error:', err);
+        console.error(`${LOG} Đối chiếu lỗi:`, err?.status, err?.error?.detail || err?.message || err);
         alert('Lỗi đối chiếu: ' + (err.message || err));
       }
     });
   }
 
-  private _matchAndCompare(gmailLinks: PortalLink[], gdtInvoices: HddtInvoice[]): void {
+  private _matchAndCompare(gmailLinks: PortalLink[], gdtInvoices: LocalXmlInvoice[]): void {
     // Build maps with normalized keys
     const gmailMap = new Map<string, PortalLink>();
     for (const pl of gmailLinks) {
@@ -566,23 +690,29 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       else console.warn(`[Gmail] SKIPPED (empty key): invoiceNo="${pl.invoiceNo}" from="${pl.gmailFrom}"`);
     }
 
-    const gdtMap = new Map<string, HddtInvoice>();
+    const gdtMap = new Map<string, LocalXmlInvoice>();
     for (const inv of gdtInvoices) {
       const key = this._makeMatchKey(String(inv.shdon), inv.nbmst);
-      console.log(`[GDT]   raw="${inv.shdon}" taxCode="${inv.nbmst}" → key="${key}"`);
+      console.log(`[XML]   raw="${inv.shdon}" taxCode="${inv.nbmst}" → key="${key}"`);
       if (key && key !== '|') gdtMap.set(key, inv);
-      else console.warn(`[GDT]   SKIPPED (empty key): shdon="${inv.shdon}"`);
+      else console.warn(`[XML]   SKIPPED (empty key): shdon="${inv.shdon}"`);
     }
 
     console.log(`[Reconcile] Gmail keys (${gmailMap.size}):`, [...gmailMap.keys()]);
-    console.log(`[Reconcile] GDT keys   (${gdtMap.size}):`, [...gdtMap.keys()]);
+    console.log(`[Reconcile] XML keys   (${gdtMap.size}):`, [...gdtMap.keys()]);
 
-    // Resolve Gmail entries with empty taxCode: find matching GDT key by invoiceNo only
+    // Gmail thiếu MST (HAR 23/10/2026: 17/20 email không có MST, 15/20 có ký hiệu) → khớp theo số HĐ + KÝ HIỆU (bỏ chữ số
+    // mẫu số đầu: "1C26TYT" = "C26TYT"); chỉ khi email không có ký hiệu mới khớp theo số HĐ (lấy HĐ XML đầu tiên cùng số)
+    const symbolOf = (s: string) => (s || '').toUpperCase().replace(/^\d/, '').trim();
     const resolvedGmailMap = new Map<string, PortalLink>();
     for (const [key, pl] of gmailMap) {
       if (key.endsWith('|')) {
         const noOnly = key.slice(0, -1);
-        const gdtKey = [...gdtMap.keys()].find(k => k.startsWith(noOnly + '|'));
+        const sameNo = [...gdtMap.entries()].filter(([k]) => k.startsWith(noOnly + '|'));
+        const sym = symbolOf(pl.invoiceSymbol || '');
+        const hit = sym ? sameNo.find(([, x]) => symbolOf(x.khhdon) === sym) : sameNo[0];
+        const gdtKey = hit?.[0];
+        if (sym && !hit && sameNo.length) console.warn(`${LOG} Gmail số ${noOnly} ký hiệu ${sym}: có ${sameNo.length} HĐ XML cùng số nhưng khác ký hiệu → không khớp`);
         if (gdtKey) {
           console.log(`[Reconcile] Gmail "${key}" → resolved to GDT key "${gdtKey}"`);
           resolvedGmailMap.set(gdtKey, pl);
@@ -605,7 +735,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       summary.total++;
 
       const row: LiveReconcileRow = {
-        invoiceKey: gdt ? `${gdt.khhdon}-${gdt.shdon}` : (gm?.invoiceNo || key),
+        invoiceKey: gdt ? `${gdt.khmshdon}${gdt.khhdon}-${gdt.shdon}` : (gm?.invoiceNo || key),
         matchKey: key,
         status: 'MATCH',
         fieldDiffs: [],
@@ -699,7 +829,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     return taxCode.replace(/-\d+$/, '').trim();
   }
 
-  private _compareAmounts(gm: PortalLink, gdt: HddtInvoice): FieldDiff[] {
+  private _compareAmounts(gm: PortalLink, gdt: LocalXmlInvoice): FieldDiff[] {
     const diffs: FieldDiff[] = [];
     const tolerance = 1;
 
@@ -751,7 +881,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       'MATCH': 'Khớp',
       'MISMATCH': 'Sai số',
       'MISSING_GMAIL': 'Thiếu Gmail',
-      'MISSING_GDT': 'Thiếu GDT',
+      'MISSING_GDT': 'Thiếu XML',
       'NO_AMOUNT': 'Chưa có số liệu',
     };
     return labels[status] || status;

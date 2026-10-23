@@ -1,0 +1,194 @@
+<div class="page">
+  <header class="page-head">
+    <h1><i class="fa-solid fa-calculator"></i> Số liệu khai thuế</h1>
+    <p class="sub">Con số để <b>copy / paste vào HTKK</b> (không xuất tờ khai). Nút <i class="fa-regular fa-copy"></i> copy số thuần, không
+      dấu chấm. 01/GTGT, phụ lục 142 và bảng kê lấy từ 1 lần <a routerLink="/invoice-reconciliation-page">Đối soát hóa đơn XML</a>
+      (đủ HĐ vào + ra của kỳ); 05/KK-TNCN lấy từ bảng lương.</p>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">Lần đối soát</span>
+      @if (runs.length) {
+        <select class="input wide" [ngModel]="runId" (ngModelChange)="openRun($event)">
+          @for (r of runs; track r.id) { <option [value]="r.id">{{ runLabel(r) }}</option> }
+        </select>
+      } @else {
+        <span class="hint">Chưa có lần đối soát nào — chạy <a routerLink="/invoice-reconciliation-page">Đối soát hóa đơn XML</a> với thư mục HĐ vào + ra của kỳ.</span>
+      }
+      @if (loading) { <i class="fa-solid fa-spinner fa-spin"></i> }
+    </div>
+    @if (periodMismatch) {
+      <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> Lần đối soát này là <b>{{ run?.summary?.period }}</b>, khác kỳ đang chọn
+        ({{ periodLabel() }}) — kiểm tra lại trước khi khai.</div>
+    }
+    @if (error) { <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div> }
+    @if (msg) { <div class="msg ok"><i class="fa-solid fa-copy"></i> {{ msg }}</div> }
+  </section>
+
+  <section class="card">
+    <div class="tabs">
+      <button type="button" class="tab" [class.active]="view === 'gtgt'" (click)="setView('gtgt')">01/GTGT</button>
+      <button type="button" class="tab" [class.active]="view === 'pl142'" (click)="setView('pl142')">Phụ lục 142 (NQ 204)</button>
+      <button type="button" class="tab" [class.active]="view === 'bk-ra'" (click)="setView('bk-ra')">Bảng kê bán ra</button>
+      <button type="button" class="tab" [class.active]="view === 'bk-vao'" (click)="setView('bk-vao')">Bảng kê mua vào</button>
+      <button type="button" class="tab" [class.active]="view === 'tncn'" (click)="setView('tncn')">05/KK-TNCN</button>
+    </div>
+
+    <!-- ═══════ 01/GTGT ═══════ -->
+    @if (view === 'gtgt') {
+      @if (fig?.tax) {
+        <div class="row">
+          <label class="label">[22] Thuế GTGT còn được khấu trừ kỳ trước chuyển sang</label>
+          <input class="input num" type="number" [(ngModel)]="v22" (ngModelChange)="onV22()">
+          <button type="button" class="btn small" (click)="resetV22()" title="Về số máy lấy từ tờ khai kỳ trước">Mặc định</button>
+          <span class="hint">nguồn: {{ v22Source }}</span>
+        </div>
+        @if (fig?.tax?.same_file) {
+          <p class="hint"><i class="fa-solid fa-scale-balanced"></i> Có tờ khai cùng kỳ đã nộp ({{ fig?.tax?.same_file }}) → cột "Đã nộp" để đối chiếu.</p>
+        }
+        @for (a of replAdj; track a.label) {
+          <p class="hint"><i class="fa-solid fa-circle-info"></i> {{ a.label }}: {{ a.n }} HĐ, {{ vnd(a.base) }} / thuế {{ vnd(a.tax) }} (đã tính vào số dưới).</p>
+        }
+        <div class="wrap">
+          <table class="tk">
+            <thead>
+              <tr><th>STT</th><th>Chỉ tiêu</th><th>Mã</th><th class="num">Giá trị HHDV</th><th>Mã</th><th class="num">Thuế GTGT</th>
+                @if (fig?.tax?.compare) { <th class="num">Đã nộp</th><th>Kết quả</th> }</tr>
+            </thead>
+            <tbody>
+              @for (r of fig!.tk_rows; track $index) {
+                <tr [class.bold]="r[4]">
+                  <td class="stt">{{ r[0] }}</td>
+                  <td class="text">{{ r[1] }}</td>
+                  <td class="code">{{ r[2] ? '[' + r[2] + ']' : '' }}</td>
+                  <td class="num">
+                    @if (r[2] === '21') { {{ tk['21'] ? 'X' : '' }} }
+                    @else if (r[2]) { {{ vnd(tk[r[2]]) }} <button type="button" class="cp" (click)="copy(tk[r[2]], r[2])" title="Copy số thuần"><i class="fa-regular fa-copy"></i></button> }
+                  </td>
+                  <td class="code">{{ r[3] ? '[' + r[3] + ']' : '' }}</td>
+                  <td class="num">
+                    @if (r[3] === '22') { <span class="edit">{{ vnd(tk['22']) }}</span> <button type="button" class="cp" (click)="copy(tk['22'], '22')"><i class="fa-regular fa-copy"></i></button> }
+                    @else if (r[3]) { {{ vnd(tk[r[3]]) }} <button type="button" class="cp" (click)="copy(tk[r[3]], r[3])" title="Copy số thuần"><i class="fa-regular fa-copy"></i></button> }
+                  </td>
+                  @if (fig?.tax?.compare) {
+                    @let c = compareOf(r[3] || r[2]);
+                    <td class="num muted">{{ c ? vnd(c.paid) : '' }}</td>
+                    <td [class.ok]="c?.ok" [class.bad]="c && !c.ok">{{ c?.verdict || '' }}</td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (otherCompare.length) {
+          <h3>So phụ lục 142 với tờ khai đã nộp</h3>
+          <table class="small-table">
+            <thead><tr><th>Chỉ tiêu</th><th class="num">Đã nộp</th><th class="num">Tính ra</th><th class="num">Chênh</th><th>Kết quả</th></tr></thead>
+            <tbody>
+              @for (r of otherCompare; track r[0]) {
+                <tr><td>{{ r[0] }}</td><td class="num">{{ vnd(r[1]) }}</td><td class="num">{{ vnd(r[2]) }}</td><td class="num">{{ vnd(r[3]) }}</td>
+                  <td [class.ok]="r[4] === 'Khớp'" [class.bad]="r[4].startsWith('LỆCH')">{{ r[4] }}</td></tr>
+              }
+            </tbody>
+          </table>
+        }
+      } @else if (!loading && runId) {
+        <p class="hint">Lần đối soát này chưa có số liệu thuế.</p>
+      }
+    }
+
+    <!-- ═══════ PL 142 ═══════ -->
+    @if (view === 'pl142' && fig?.tax) {
+      <div class="pl3">
+        <div><span>[06] Thuế GTGT HHDV mua vào được giảm (I)</span><b>{{ vnd(fig!.tax!.pl3['06']) }}</b>
+          <button type="button" class="cp" (click)="copy(fig!.tax!.pl3['06'], '06')"><i class="fa-regular fa-copy"></i></button></div>
+        <div><span>[08] Thuế GTGT bán ra được giảm (II)</span><b>{{ vnd(fig!.tax!.pl3['08']) }}</b>
+          <button type="button" class="cp" (click)="copy(fig!.tax!.pl3['08'], '08')"><i class="fa-regular fa-copy"></i></button></div>
+        <div><span>[09] = [08] − [06] (III)</span><b>{{ vnd(fig!.tax!.pl3['09']) }}</b>
+          <button type="button" class="cp" (click)="copy(fig!.tax!.pl3['09'], '09')"><i class="fa-regular fa-copy"></i></button></div>
+      </div>
+      <div class="subtabs">
+        <button type="button" class="chip" [class.active]="plView === 'pl1'" (click)="setPl('pl1')">I. HHDV mua vào ({{ fig!.tax!.pl1.length }} dòng)</button>
+        <button type="button" class="chip" [class.active]="plView === 'pl2'" (click)="setPl('pl2')">II. HHDV bán ra ({{ fig!.tax!.pl2.length }} dòng)</button>
+      </div>
+    }
+
+    <!-- ═══════ Bảng kê ═══════ -->
+    @if ((view === 'bk-ra' || view === 'bk-vao') && fig) {
+      <div class="row">
+        <span class="hint">Mẫu 01-1/GTGT như file kế toán xuất từ Vietda (bán ra 1 dòng / HĐ / thuế suất; mua vào 1 dòng / HĐ). Lọc cột "Nhóm" để xem từng nhóm.</span>
+        <button type="button" class="btn small" (click)="downloadBangKe()" [disabled]="!fig.has_bang_ke"
+          [title]="fig.has_bang_ke ? '' : 'Lần đối soát cũ — bấm Chạy lại ở trang Đối soát để tạo'">
+          <i class="fa-solid fa-file-excel"></i> Tải bảng kê Excel (mẫu 01-1, cả 2 sheet)</button>
+      </div>
+    }
+
+    @if ((view === 'pl142' || view === 'bk-ra' || view === 'bk-vao') && fig) {
+      @if (tableSource) {
+        <app-server-table [source]="tableSource"></app-server-table>
+      } @else {
+        <p class="hint">Lần đối soát này tạo trước khi có trang Số liệu khai thuế — bấm <b>Chạy lại</b> ở trang Đối soát hóa đơn XML để có bảng kê / phụ lục.</p>
+      }
+    }
+
+    <!-- ═══════ 05/KK-TNCN ═══════ -->
+    @if (view === 'tncn') {
+      <div class="row">
+        <label class="btn btn-primary">
+          <i class="fa-solid fa-file-excel"></i> {{ payrollFile ? payrollFile.name : 'Chọn file bảng lương (.xlsx)' }}
+          <input type="file" accept=".xlsx" (change)="onPayroll($event)" hidden>
+        </label>
+        <label class="btn">
+          <i class="fa-solid fa-file-code"></i> {{ tncnXml.length ? tncnXml.length + ' XML tờ khai' : 'XML tờ khai đã nộp (để so, tùy chọn)' }}
+          <input type="file" accept=".xml" multiple (change)="onTncnXml($event)" hidden>
+        </label>
+        <button type="button" class="btn btn-primary" (click)="calcTncn()" [disabled]="!payrollFile || tncnBusy">
+          <i class="fa-solid" [ngClass]="tncnBusy ? 'fa-spinner fa-spin' : 'fa-calculator'"></i> Tính cho {{ periodLabel() }}
+        </button>
+      </div>
+      <p class="hint">Kỳ theo thanh chọn kỳ. File bảng lương chỉ đọc rồi xóa, không lưu trên máy chủ. Không chọn file → dùng bảng lương trong thư mục
+        của lần đối soát đang mở (nếu có). [16]/[17] đếm số người của tháng cuối quý (như tờ khai đã nộp).</p>
+      @if (tncn) {
+        <p class="hint"><b>{{ tncn.period.label }}</b> · bảng lương: {{ tncn.src_name }}{{ tncnUploaded ? ' (tải lên)' : ' (trong thư mục đối soát)' }}
+          @if (tncn.same_file) { · so với {{ tncn.same_file }} }</p>
+        @for (w of tncn.warnings || []; track $index) { <div class="msg warn">{{ w }}</div> }
+        <div class="wrap">
+          <table class="tk">
+            <thead><tr><th>STT</th><th>Chỉ tiêu</th><th>Mã</th><th>ĐVT</th><th class="num">Số</th>
+              @if (tncn.compare) { <th class="num">Đã nộp</th><th>Kết quả</th> }</tr></thead>
+            <tbody>
+              @for (r of tncnRows; track $index) {
+                <tr [class.bold]="r[4]">
+                  <td class="stt">{{ r[0] }}</td><td class="text">{{ r[1] }}</td><td class="code">[{{ r[2] === '25_1' ? '25.1' : r[2] }}]</td><td>{{ r[3] }}</td>
+                  <td class="num">{{ vnd(tncn.tk[r[2]]) }} <button type="button" class="cp" (click)="copy(tncn.tk[r[2]], r[2])"><i class="fa-regular fa-copy"></i></button></td>
+                  @if (tncn.compare) {
+                    @let c = tncnCompare(r[2]);
+                    <td class="num muted">{{ c ? vnd(c[1]) : '' }}</td>
+                    <td [class.ok]="c?.[4] === 'Khớp'" [class.bad]="c?.[4]?.startsWith('LỆCH')">{{ c?.[4] || '' }}</td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <h3>Chi tiết theo người ({{ tncn.persons.length }})</h3>
+        <div class="wrap">
+          <table class="small-table">
+            <thead><tr><th>Họ tên</th><th>Chức vụ</th><th class="num">Tổng lương</th><th class="num">Thưởng</th><th class="num">BH NLĐ</th>
+              <th class="num">TN chịu thuế</th><th class="num">TN tính thuế</th><th class="num">Thuế TNCN</th><th>Tháng cuối</th></tr></thead>
+            <tbody>
+              @for (p of tncn.persons; track $index) {
+                <tr><td>{{ p.ten }}</td><td>{{ p.chuc_vu }}</td><td class="num">{{ vnd(p.o) }}</td><td class="num">{{ vnd(p.thuong_cong) }}</td>
+                  <td class="num">{{ vnd(p.x) }}</td><td class="num">{{ vnd(p.tnct) }}</td><td class="num">{{ vnd(p.aa) }}</td><td class="num">{{ vnd(p.ab) }}</td>
+                  <td>{{ p.thang_cuoi ? 'Có' : '' }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="hint">Chọn file bảng lương (vd <code>LUONG SM 2026.xlsx</code>) rồi bấm Tính.</p>
+      }
+    }
+  </section>
+</div>

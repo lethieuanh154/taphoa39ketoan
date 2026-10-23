@@ -1,0 +1,31 @@
+<div class="login-wrapper">
+  <div class="login-card">
+    <div class="login-logo">
+      <i class="fa-solid fa-calculator"></i>
+    </div>
+    <h1 class="login-title">Kế Toán Danh Nghiệp</h1>
+    <p class="login-sub">Song Minh</p>
+
+    @if (!needGmail) {
+      <button class="btn-primary" (click)="login()" [disabled]="loading">
+        <i class="fa-brands fa-google"></i>
+        {{ loading ? 'Đang đăng nhập...' : 'Đăng nhập bằng Google' }}
+      </button>
+      <p class="login-hint">Chỉ email đã được cấp quyền mới vào được.</p>
+    } @else {
+      <div class="gmail-step">
+        <p>Hộp thư hóa đơn <strong>{{ gmailAccount }}</strong> chưa cấp quyền đọc Gmail lâu dài cho KeToan.</p>
+        <p class="login-hint">Chỉ cần làm 1 lần: bấm "Kết nối Gmail", chọn đúng tài khoản {{ gmailAccount }} rồi đồng ý.</p>
+        <button class="btn-primary" (click)="connectGmail()" [disabled]="loading">
+          <i class="fa-solid fa-envelope"></i>
+          {{ loading ? 'Đang kết nối...' : 'Kết nối Gmail' }}
+        </button>
+        <button class="btn-link" (click)="skipGmail()" [disabled]="loading">Để sau</button>
+      </div>
+    }
+
+    @if (error) {
+      <div class="login-error">{{ error }}</div>
+    }
+  </div>
+</div>

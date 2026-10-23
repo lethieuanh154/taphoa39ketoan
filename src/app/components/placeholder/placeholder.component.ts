@@ -24,7 +24,7 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
           <p><strong>Module:</strong> {{ module }}</p>
           <p><strong>Dự kiến:</strong> Sẽ được triển khai trong phiên bản tiếp theo</p>
         </div>
-        <a routerLink="/accountant/dashboard" class="placeholder-back">
+        <a routerLink="/accountant-dashboard" class="placeholder-back">
           <i class="fa-solid fa-arrow-left"></i>
           Quay lại Dashboard
         </a>

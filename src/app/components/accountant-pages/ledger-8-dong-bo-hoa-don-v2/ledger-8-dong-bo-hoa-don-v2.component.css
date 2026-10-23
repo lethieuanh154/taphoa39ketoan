@@ -672,3 +672,11 @@
     width: 100%;
   }
 }
+
+/* Chọn thư mục XML (23/10/2026 — thay nguồn GDT) */
+.xml-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; font-size: 13px; }
+.xml-picker label.btn { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.xml-picker label.disabled { opacity: 0.6; pointer-events: none; }
+.xml-hint { color: #6b7280; }
+.xml-info { color: #1f2937; }
+.xml-error { color: #b91c1c; background: #fef2f2; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; font-size: 13px; }

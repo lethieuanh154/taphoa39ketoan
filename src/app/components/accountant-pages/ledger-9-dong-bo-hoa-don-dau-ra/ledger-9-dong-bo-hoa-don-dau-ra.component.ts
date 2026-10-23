@@ -1,890 +1,322 @@
 /**
- * LEDGER 9 - ĐỒNG BỘ HÓA ĐƠN ĐẦU RA (Output Invoices)
- * Đồng bộ hóa đơn từ Trang thuế với Hóa đơn KiotViet
- * Scalable component cho 100.000+ hóa đơn
- *
- * Features:
- * - Pagination với cursor-based navigation
- * - Filter theo ngày/tháng/năm/KH
- * - Mặc định filter theo ngày hôm nay (range)
- * - Local invoices load trực tiếp từ KiotViet API
- * - Reconciliation summary
- * - IndexedDB cache để giảm API calls
+ * LEDGER 9 - KIỂM TRA SỐ LƯỢNG HÓA ĐƠN ĐẦU RA (Tiện ích → Kiểm tra số lượng hóa đơn)
+ * Danh sách HĐ trong thư mục XML trên máy (app FDI tải từ cổng thuế — thư mục `sold`) ⇄ HĐĐT KiotViet (einvoice, qua
+ * KeToanBackEnd /api/einvoice-check/bills). Viết lại 23/10/2026 (user chọn nguồn so = HĐĐT KiotViet): bản cũ đọc HĐ "trang thuế"
+ * qua /api/v2/invoices/output và KiotViet qua /api/kiotviet/* — cả 2 route KHÔNG tồn tại trên KeToanBackEnd.
+ * Khóa so: mẫu số + ký hiệu + số HĐ. XML đọc ngay trên trình duyệt (utils/invoice-xml.util.ts), không tải lên máy chủ.
+ * MST công ty = CompanyService (popup ở MainLayout), chưa nhập thì tự nhận từ XML. XML đã đọc + HĐĐT đã lấy lưu IndexedDB
+ * (TienIchCacheService) → mở lại trang hiện ngay kết quả cũ, bấm "Lấy lại từ KiotViet" / chọn lại thư mục để cập nhật.
  */
-
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { Subject } from 'rxjs';
-import { takeUntil, finalize } from 'rxjs/operators';
+import { FormsModule } from '@angular/forms';
+import { httpErrorText } from '../../../services/auth.service';
+import { EinvoiceBill, EinvoiceCheckService } from '../../../services/einvoice-check.service';
+import { PeriodService } from '../../../services/period.service';
+import { CompanyService } from '../../../services/company.service';
+import { TienIchCacheService } from '../../../services/tien-ich-cache.service';
+import { LocalXmlInvoice, XmlReadResult, detectCompanyMst, readInvoiceFiles } from '../../../utils/invoice-xml.util';
 
-import { OutputInvoiceServiceV2, OutputInvoice, OutputInvoiceFilter, OutputInvoiceSource, OutputPagination, OutputReconciliationSummary, OutputReconcileStatus, OutputReconciliationResult, OutputFieldDiff } from '../output-invoice.service.v2';
-import { AccountantCacheService } from '../accountant-cache.service';
-import { KiotvietService, KiotVietInvoice } from '../../../services/kiotviet.service';
+const LOG = '[InvoiceCountOut]';
+const TOL = 1;
+const MAX_DAYS = 92;
+const CACHE_XML = 'xml-out';
+
+interface CachedXml { folder: string; result: XmlReadResult; }
+interface CachedBills { einvoice_url: string; bills: EinvoiceBill[]; }
+
+type RowStatus = 'mismatch' | 'only_xml' | 'only_kv' | 'match';
+
+interface CompareRow {
+  key: string;
+  status: RowStatus;
+  xml: LocalXmlInvoice | null;
+  kv: EinvoiceBill | null;
+  diffs: string[];
+}
 
 @Component({
   selector: 'app-ledger-9-dong-bo-hoa-don-dau-ra',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './ledger-9-dong-bo-hoa-don-dau-ra.component.html',
   styleUrls: ['./ledger-9-dong-bo-hoa-don-dau-ra.component.css']
 })
-export class Ledger9DongBoHoaDonDauRaComponent implements OnInit, OnDestroy {
-  // Filter form
-  filterForm: FormGroup;
+export class Ledger9DongBoHoaDonDauRaComponent {
+  private service = inject(EinvoiceCheckService);
+  private periodService = inject(PeriodService);
+  private companyService = inject(CompanyService);
+  private cache = inject(TienIchCacheService);
+  readonly periodLabel = this.periodService.label;
 
-  // Data - Tách riêng 2 nguồn để hiển thị song song
-  taxInvoices: OutputInvoice[] = [];       // Hóa đơn từ trang thuế (TAX_PORTAL_OUTPUT)
-  localInvoices: OutputInvoice[] = [];     // Hóa đơn từ Local (KiotViet) - hiển thị trên UI (phân trang)
-  allLocalInvoices: OutputInvoice[] = [];  // Tất cả hóa đơn KiotViet (trước phân trang)
-  kiotVietInvoices: KiotVietInvoice[] = []; // Raw data từ KiotViet API
+  fromDate = '';
+  toDate = '';
 
-  // Frontend pagination cho KiotViet (vì KiotViet API không hỗ trợ cursor pagination)
-  localCurrentPage = 0;
+  // XML trên máy
+  xmlInvoices: LocalXmlInvoice[] = [];
+  xmlFolder = '';
+  xmlReading = false;
+  xmlProgress = '';
+  xmlInfo = '';
+  xmlDates: [string, string] | null = null;
+  companyMst = '';
+  /** MST đã nhập khác MST tự nhận từ XML */
+  mstWarning = '';
+  /** thời điểm đọc thư mục (bản lưu IndexedDB) */
+  xmlSavedAt: number | null = null;
+  private rawXml: XmlReadResult | null = null;
 
-  // Pagination riêng cho từng nguồn
-  taxPagination: OutputPagination = {
-    hasNext: false,
-    hasPrev: false,
-    firstDocId: null,
-    lastDocId: null,
-    pageSize: 25,
-    count: 0
+  // HĐĐT KiotViet
+  loadingKv = false;
+  einvoiceUrl = '';
+  drafts: EinvoiceBill[] = [];
+  /** thời điểm lấy HĐĐT của kết quả đang xem */
+  kvFetchedAt: number | null = null;
+
+  // Kết quả
+  rows: CompareRow[] = [];
+  compared = false;
+  comparedRange = '';
+  counts = { xml: 0, kv: 0, match: 0, mismatch: 0, only_xml: 0, only_kv: 0 };
+  filter: '' | RowStatus = '';
+  q = '';
+  page = 1;
+  readonly pageSize = 100;
+  error = '';
+
+  readonly statusLabel: Record<RowStatus, string> = {
+    mismatch: 'Lệch số tiền', only_xml: 'Chỉ có trên XML', only_kv: 'Chỉ có trên KiotViet', match: 'Khớp'
   };
-  localPagination: OutputPagination = {
-    hasNext: false,
-    hasPrev: false,
-    firstDocId: null,
-    lastDocId: null,
-    pageSize: 25,
-    count: 0
-  };
+  readonly chips: { value: '' | RowStatus; label: string }[] = [
+    { value: '', label: 'Tất cả' }, { value: 'mismatch', label: 'Lệch số tiền' }, { value: 'only_xml', label: 'Chỉ XML' },
+    { value: 'only_kv', label: 'Chỉ KiotViet' }, { value: 'match', label: 'Khớp' }];
 
-  // Customers for dropdown
-  customers: string[] = [];
-
-  // Reconciliation summary
-  summary: OutputReconciliationSummary | null = null;
-
-  // Reconciliation results (chi tiết sai lệch)
-  reconciliationResults: OutputReconciliationResult[] = [];
-  selectedResult: OutputReconciliationResult | null = null;
-  showMismatchModal = false;
-  loadingResults = false;
-
-  // Loading states
-  loading = false;
-  loadingTax = false;        // Loading cho bảng TAX_PORTAL_OUTPUT
-  loadingLocal = false;      // Loading cho bảng KiotViet
-  loadingCustomers = false;
-  loadingSummary = false;
-  reconciling = false;
-  clearing = false;
-  importing = false;
-
-  // Current filter
-  currentFilter: OutputInvoiceFilter = {};
-
-  // Options
-  yearOptions: number[] = [];
-  monthOptions: { value: string; label: string }[] = [];
-
-  // Destroy subject
-  private destroy$ = new Subject<void>();
-
-  constructor(
-    private fb: FormBuilder,
-    private invoiceService: OutputInvoiceServiceV2,
-    private cacheService: AccountantCacheService,
-    private kiotvietService: KiotvietService
-  ) {
-    const currentYear = new Date().getFullYear();
-    const today = this.formatDateToDisplay(new Date());
-
-    this.filterForm = this.fb.group({
-      source: [''],           // '' = tất cả, 'TAX_PORTAL_OUTPUT', 'LOCAL'
-      filterType: ['range'],  // 'all', 'month', 'year', 'range' - Mặc định là 'range' (hôm nay)
-      monthKey: [`${currentYear}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`],
-      year: [currentYear],
-      fromDate: [today],
-      toDate: [today],
-      customerName: [''],
-      reconcileStatus: [''],  // '', 'PENDING', 'MATCHED', 'UNMATCHED', 'MISMATCH'
-      pageSize: [25]
+  constructor() {
+    effect(() => {
+      const p = this.periodService.period();
+      this.fromDate = p.from;
+      this.toDate = p.to;
     });
-
-    // Generate options
-    this.yearOptions = this.invoiceService.getYearOptions();
-    this.monthOptions = this.invoiceService.getMonthOptions(currentYear);
-  }
-
-  ngOnInit(): void {
-    console.log('Ledger 9 - Output Invoices initialized');
-
-    // Load customers for dropdown
-    this.loadCustomers();
-
-    // Load default data
-    this.loadDefault();
-
-    // Listen to year changes to update month options
-    this.filterForm.get('year')?.valueChanges
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(year => {
-        this.monthOptions = this.invoiceService.getMonthOptions(year);
-      });
-
-    // Listen to pageSize changes to update KiotViet pagination
-    this.filterForm.get('pageSize')?.valueChanges
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(() => {
-        // Reset về trang đầu và áp dụng lại phân trang với pageSize mới
-        if (this.allLocalInvoices.length > 0) {
-          this.localCurrentPage = 0;
-          this.applyLocalPagination();
-        }
-      });
-  }
-
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
-
-  // ==========================================================================
-  // LOAD METHODS
-  // ==========================================================================
-
-  loadDefault(): void {
-    this.applyFilter();
-  }
-
-  /**
-   * Apply filter and reload - Load cả 2 nguồn song song
-   */
-  applyFilter(forceReload = false): void {
-    const values = this.filterForm.value;
-    const baseFilter: OutputInvoiceFilter = {
-      pageSize: values.pageSize
-    };
-
-    // Date filter based on type
-    switch (values.filterType) {
-      case 'all':
-        break;
-      case 'month':
-        if (values.monthKey) {
-          baseFilter.monthKey = values.monthKey;
-        }
-        break;
-      case 'year':
-        if (values.year) {
-          baseFilter.year = values.year;
-        }
-        break;
-      case 'range':
-        if (values.fromDate) {
-          baseFilter.fromDate = this.parseDisplayDateToApi(values.fromDate);
-        }
-        if (values.toDate) {
-          baseFilter.toDate = this.parseDisplayDateToApi(values.toDate);
-        }
-        break;
-    }
-
-    // Customer filter
-    if (values.customerName) {
-      baseFilter.customerName = values.customerName;
-    }
-
-    // Status filter
-    if (values.reconcileStatus) {
-      baseFilter.reconcileStatus = values.reconcileStatus as OutputReconcileStatus;
-    }
-
-    this.currentFilter = baseFilter;
-
-    // Load cả 2 nguồn song song
-    this.loadTaxInvoices({ ...baseFilter, source: 'TAX_PORTAL_OUTPUT' }, forceReload);
-    this.loadLocalInvoices({ ...baseFilter, source: 'LOCAL' }, forceReload);
-    this.loadSummary(forceReload);
-  }
-
-  /**
-   * Load hóa đơn từ TAX_PORTAL_OUTPUT (trang thuế - đầu ra)
-   */
-  async loadTaxInvoices(filter: OutputInvoiceFilter, forceReload = false): Promise<void> {
-    this.loadingTax = true;
-
-    // Thử lấy từ cache trước (nếu không force reload)
-    if (!forceReload) {
-      const cached = await this.cacheService.getCachedOutputInvoices(filter);
-      if (cached) {
-        this.taxInvoices = cached.invoices;
-        this.taxPagination = cached.pagination;
-        this.loadingTax = false;
-        console.log('📦 TAX_PORTAL_OUTPUT loaded from cache:', cached.invoices.length, 'invoices');
-        return;
+    effect(() => {
+      const mst = this.companyService.mst();
+      if (this.rawXml) {
+        console.log(`${LOG} MST công ty đổi → ${mst || '(tự nhận)'}: lọc lại XML`);
+        this.applyXml();
+        this.compared = false;
       }
-    }
-
-    this.invoiceService.getInvoices(filter)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingTax = false)
-      )
-      .subscribe({
-        next: async (result) => {
-          this.taxInvoices = result.invoices;
-          this.taxPagination = result.pagination;
-          console.log('✅ TAX_PORTAL_OUTPUT:', result.invoices.length, 'invoices');
-          // Lưu vào cache
-          await this.cacheService.cacheOutputInvoices(filter, result.invoices, result.pagination);
-        },
-        error: (err) => {
-          console.error('Error loading TAX OUTPUT invoices:', err);
-        }
-      });
+    });
+    void this.restore();
   }
 
-  /**
-   * Load hóa đơn từ LOCAL (KiotViet API trực tiếp)
-   */
-  async loadLocalInvoices(filter: OutputInvoiceFilter, forceReload = false): Promise<void> {
-    this.loadingLocal = true;
+  /** Mở lại trang: XML đã đọc lần trước + HĐĐT đã lấy cho kỳ đang chọn (nếu có) → hiện ngay, không gọi máy chủ */
+  private async restore(): Promise<void> {
+    const c = await this.cache.get<CachedXml>(CACHE_XML);
+    if (!c || this.rawXml || this.xmlReading) return;
+    this.xmlFolder = c.data.folder;
+    this.rawXml = c.data.result;
+    this.xmlSavedAt = c.savedAt;
+    this.applyXml();
+    if (!this.fromDate || !this.toDate) ({ from: this.fromDate, to: this.toDate } = this.periodService.period());
+    console.log(`${LOG} Dùng XML đã đọc lúc ${this.viTime(c.savedAt)} ("${this.xmlFolder}", ${this.xmlInvoices.length} HĐ)`);
+    if (this.xmlInvoices.length && !this.rangeError) await this.compare(false, true);
+  }
 
+  async onXmlSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) return;
+    this.xmlFolder = (files[0] as any).webkitRelativePath?.split('/')[0] || `${files.length} file`;
+    this.xmlReading = true;
+    this.error = '';
+    this.xmlInfo = '';
+    this.compared = false;
     try {
-      // Lấy fromDate và toDate từ filter
-      let fromDate: string;
-      let toDate: string;
-
-      if (filter.fromDate && filter.toDate) {
-        fromDate = filter.fromDate;
-        toDate = filter.toDate;
-      } else if (filter.monthKey) {
-        // Nếu filter theo tháng, tính fromDate và toDate
-        const parts = filter.monthKey.split('-');
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        fromDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-        // Tính ngày cuối tháng
-        const lastDay = new Date(year, month, 0).getDate();
-        toDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;
-      } else if (filter.year) {
-        // Filter theo năm
-        fromDate = `${filter.year}-01-01`;
-        toDate = `${filter.year}-12-31`;
-      } else {
-        // Mặc định: hôm nay
-        const today = new Date();
-        fromDate = today.toISOString().split('T')[0];
-        toDate = fromDate;
-      }
-
-      console.log(`📡 Loading KiotViet invoices from ${fromDate} to ${toDate}...`);
-
-      // Gọi KiotViet API trực tiếp
-      const kiotVietInvoices = await this.kiotvietService.getInvoices(fromDate, toDate);
-      this.kiotVietInvoices = kiotVietInvoices;
-
-      // Convert KiotViet invoices sang OutputInvoice format và lưu tất cả
-      this.allLocalInvoices = this.convertKiotVietToOutputInvoices(kiotVietInvoices);
-
-      // Reset về trang đầu và áp dụng phân trang frontend
-      this.localCurrentPage = 0;
-      this.applyLocalPagination();
-
-      console.log(`✅ LOCAL (KiotViet): ${this.allLocalInvoices.length} total invoices loaded`);
-
-    } catch (err: any) {
-      console.error('Error loading KiotViet invoices:', err);
-      this.allLocalInvoices = [];
-      this.localInvoices = [];
-      this.localPagination = {
-        hasNext: false,
-        hasPrev: false,
-        firstDocId: null,
-        lastDocId: null,
-        pageSize: 0,
-        count: 0
-      };
-
-      // Hiển thị lỗi nếu là lỗi token
-      if (err.message?.includes('KIOTVIET_TOKEN_EXPIRED') || err.message?.includes('đăng nhập')) {
-        alert('Phiên đăng nhập KiotViet đã hết hạn. Vui lòng đăng nhập lại.');
-      }
+      const r = await readInvoiceFiles(files, (d, t) => this.xmlProgress = `${d}/${t} file`);
+      this.rawXml = r;
+      this.xmlSavedAt = Date.now();
+      this.applyXml();
+      console.log(`${LOG} Thư mục "${this.xmlFolder}": ${this.xmlInfo}`);
+      if (r.errors.length) console.warn(`${LOG} File XML lỗi:`, r.errors.slice(0, 10));
+      await this.cache.set<CachedXml>(CACHE_XML, { folder: this.xmlFolder, result: r });
+    } catch (e: any) {
+      console.error(`${LOG} Không đọc được thư mục XML: ${e?.message || e}`);
+      this.error = `Không đọc được thư mục XML: ${e?.message || e}`;
+      this.xmlInvoices = [];
+      this.rawXml = null;
     } finally {
-      this.loadingLocal = false;
+      this.xmlReading = false;
+      this.xmlProgress = '';
     }
   }
 
-  /**
-   * Áp dụng phân trang frontend cho KiotViet invoices
-   */
-  private applyLocalPagination(): void {
-    const pageSize = this.filterForm.value.pageSize || 25;
-    const startIndex = this.localCurrentPage * pageSize;
-    const endIndex = startIndex + pageSize;
-
-    // Lấy slice của data cho trang hiện tại
-    this.localInvoices = this.allLocalInvoices.slice(startIndex, endIndex);
-
-    // Tính toán pagination info
-    const totalCount = this.allLocalInvoices.length;
-    const totalPages = Math.ceil(totalCount / pageSize);
-
-    this.localPagination = {
-      hasNext: this.localCurrentPage < totalPages - 1,
-      hasPrev: this.localCurrentPage > 0,
-      firstDocId: this.localInvoices.length > 0 ? this.localInvoices[0].id : null,
-      lastDocId: this.localInvoices.length > 0 ? this.localInvoices[this.localInvoices.length - 1].id : null,
-      pageSize: pageSize,
-      count: totalCount  // Tổng số hóa đơn (không phải số hiển thị)
-    };
+  /** Lọc HĐ đầu ra (bên bán = MST công ty) từ XML đã đọc */
+  private applyXml(): void {
+    const r = this.rawXml;
+    if (!r) return;
+    const detected = detectCompanyMst(r.invoices, 'seller');
+    const set = this.companyService.mst();
+    this.companyMst = set || detected;
+    this.mstWarning = set && detected && set !== detected
+      ? `MST công ty đã nhập ${set} khác MST bên bán gặp nhiều nhất trong XML ${detected} — kiểm tra lại thư mục, hoặc bấm "MST" ở góc dưới để đổi.` : '';
+    if (this.mstWarning) console.warn(`${LOG} ${this.mstWarning}`);
+    this.xmlInvoices = r.invoices.filter(i => !this.companyMst || i.nbmst === this.companyMst);
+    const skipped = r.invoices.length - this.xmlInvoices.length;
+    const dates = this.xmlInvoices.map(i => i.tdlap).filter(Boolean).sort();
+    this.xmlDates = dates.length ? [dates[0], dates[dates.length - 1]] : null;
+    this.xmlInfo = `${this.xmlInvoices.length} HĐ đầu ra` + (this.xmlDates ? ` (ngày ${this.viDate(this.xmlDates[0])} → ${this.viDate(this.xmlDates[1])})` : '')
+      + ` · MST công ty ${this.companyMst || '?'}${set ? '' : ' (tự nhận)'} · đọc ${r.nFiles} file XML` + (skipped ? ` · bỏ ${skipped} HĐ khác` : '')
+      + (r.nNotInvoice ? ` · ${r.nNotInvoice} XML không phải HĐ` : '') + (r.nDuplicates ? ` · ${r.nDuplicates} trùng` : '')
+      + (r.errors.length ? ` · ${r.errors.length} file lỗi` : '');
+    this.error = this.xmlInvoices.length ? '' : 'Không tìm thấy HĐ đầu ra nào của MST công ty trong thư mục đã chọn (cần file XML hóa đơn điện tử hoặc ZIP chứa XML).';
   }
 
-  /**
-   * Convert KiotViet invoice sang OutputInvoice format
-   */
-  private convertKiotVietToOutputInvoices(kiotVietInvoices: KiotVietInvoice[]): OutputInvoice[] {
-    return kiotVietInvoices.map(inv => {
-      // Parse date từ KiotViet format
-      const purchaseDate = inv.PurchaseDate ? inv.PurchaseDate.split('T')[0] : '';
-
-      return {
-        id: String(inv.Id),
-        invoiceNo: inv.Code || '',
-        invoiceSymbol: '',
-        invoiceDate: purchaseDate,
-        issueDate: purchaseDate,
-        customerName: inv.CustomerName || 'Khách lẻ',
-        customerTaxCode: '',
-        customerAddress: inv.CustomerAddress || '',
-        totalBeforeVat: inv.SubTotal || inv.Total || 0,
-        vatRate: 0,
-        vatAmount: 0,
-        totalAmount: inv.TotalPayment || inv.Total || 0,
-        source: 'LOCAL' as OutputInvoiceSource,
-        reconcileStatus: 'PENDING' as OutputReconcileStatus,
-        createdAt: inv.CreatedDate,
-        updatedAt: inv.CreatedDate
-      };
-    });
+  /** Đặt khoảng ngày theo ngày HĐ trong thư mục XML */
+  useXmlDates(): void {
+    if (!this.xmlDates) return;
+    [this.fromDate, this.toDate] = this.xmlDates;
   }
 
-  /**
-   * Load trang tiếp cho TAX_PORTAL_OUTPUT
-   */
-  nextTaxPage(): void {
-    if (!this.taxPagination.hasNext || !this.taxPagination.lastDocId) return;
-
-    this.loadingTax = true;
-    const filter: OutputInvoiceFilter = { ...this.currentFilter, source: 'TAX_PORTAL_OUTPUT' };
-
-    this.invoiceService.getNextPage(filter, this.taxPagination.lastDocId)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingTax = false)
-      )
-      .subscribe({
-        next: (result) => {
-          this.taxInvoices = result.invoices;
-          this.taxPagination = result.pagination;
-        },
-        error: (err) => console.error('Error:', err)
-      });
+  get rangeError(): string {
+    if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) return 'Chọn Từ ngày ≤ Đến ngày';
+    const days = (Date.parse(this.toDate) - Date.parse(this.fromDate)) / 86400000 + 1;
+    return days > MAX_DAYS ? `Tối đa ${MAX_DAYS} ngày mỗi lần (đang chọn ${days} ngày)` : '';
   }
 
-  /**
-   * Load trang trước cho TAX_PORTAL_OUTPUT
-   */
-  prevTaxPage(): void {
-    if (!this.taxPagination.hasPrev || !this.taxPagination.firstDocId) return;
-
-    this.loadingTax = true;
-    const filter: OutputInvoiceFilter = { ...this.currentFilter, source: 'TAX_PORTAL_OUTPUT' };
-
-    this.invoiceService.getPrevPage(filter, this.taxPagination.firstDocId)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingTax = false)
-      )
-      .subscribe({
-        next: (result) => {
-          this.taxInvoices = result.invoices;
-          this.taxPagination = result.pagination;
-        },
-        error: (err) => console.error('Error:', err)
-      });
-  }
-
-  /**
-   * Load trang tiếp cho LOCAL (frontend pagination)
-   */
-  nextLocalPage(): void {
-    if (!this.localPagination.hasNext) return;
-    this.localCurrentPage++;
-    this.applyLocalPagination();
-  }
-
-  /**
-   * Load trang trước cho LOCAL (frontend pagination)
-   */
-  prevLocalPage(): void {
-    if (!this.localPagination.hasPrev) return;
-    this.localCurrentPage--;
-    this.applyLocalPagination();
-  }
-
-  /**
-   * Load customers for dropdown
-   */
-  loadCustomers(): void {
-    this.loadingCustomers = true;
-
-    this.invoiceService.getCustomers()
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingCustomers = false)
-      )
-      .subscribe({
-        next: (customers) => {
-          this.customers = customers;
-        },
-        error: (err) => console.error('Error loading customers:', err)
-      });
-  }
-
-  /**
-   * Load reconciliation summary
-   */
-  async loadSummary(forceReload = false): Promise<void> {
-    this.loadingSummary = true;
-    const values = this.filterForm.value;
-
-    let monthKey: string | undefined;
-    let year: number | undefined;
-
-    if (values.filterType === 'month') {
-      monthKey = values.monthKey;
-    } else if (values.filterType === 'year') {
-      year = values.year;
+  /** `force` = bỏ bản lưu, lấy lại HĐĐT từ máy chủ. `cacheOnly` (mở lại trang) = chỉ dùng bản lưu, không có thì thôi. */
+  async compare(force = false, cacheOnly = false): Promise<void> {
+    if (!this.xmlInvoices.length) {
+      console.warn(`${LOG} Chưa chọn thư mục XML → không so`);
+      this.error = 'Chọn thư mục XML hóa đơn đầu ra (app FDI tải về) trước.';
+      return;
     }
-
-    // Thử lấy từ cache trước
-    if (!forceReload) {
-      const cached = await this.cacheService.getCachedOutputSummary(monthKey, year);
+    if (this.rangeError) {
+      console.warn(`${LOG} Khoảng ngày không hợp lệ: ${this.fromDate} → ${this.toDate}`);
+      this.error = this.rangeError;
+      return;
+    }
+    const cacheKey = `einvoice-bills:${this.fromDate}:${this.toDate}`;
+    const cached = force ? null : await this.cache.get<CachedBills>(cacheKey);
+    if (cacheOnly && !cached) return;
+    this.loadingKv = true;
+    this.error = '';
+    try {
+      let res: CachedBills;
       if (cached) {
-        this.summary = cached;
-        this.loadingSummary = false;
-        console.log('📦 Output Summary loaded from cache');
-        return;
+        res = cached.data;
+        this.kvFetchedAt = cached.savedAt;
+        console.log(`${LOG} HĐĐT ${this.fromDate} → ${this.toDate}: dùng bản lưu lúc ${this.viTime(cached.savedAt)} (${res.bills.length} HĐ)`);
+      } else {
+        res = await this.service.listBills(this.fromDate, this.toDate);
+        this.kvFetchedAt = Date.now();
+        await this.cache.set<CachedBills>(cacheKey, { einvoice_url: res.einvoice_url, bills: res.bills });
       }
+      this.einvoiceUrl = res.einvoice_url;
+      const published = res.bills.filter(b => b.number);
+      this.drafts = res.bills.filter(b => !b.number);
+      this.build(published);
+      this.comparedRange = `${this.viDate(this.fromDate)} → ${this.viDate(this.toDate)}`;
+      console.log(`${LOG} ${this.comparedRange}: XML ${this.counts.xml}, HĐĐT ${this.counts.kv} (nháp ${this.drafts.length}) → khớp ${this.counts.match}, `
+        + `lệch ${this.counts.mismatch}, chỉ XML ${this.counts.only_xml}, chỉ KiotViet ${this.counts.only_kv}`);
+    } catch (e: any) {
+      console.error(`${LOG} Lấy HĐĐT KiotViet ${this.fromDate} → ${this.toDate} lỗi: ${httpErrorText(e)}`);
+      this.error = `Không lấy được HĐĐT KiotViet: ${e?.error?.detail || httpErrorText(e)}`;
+    } finally {
+      this.loadingKv = false;
     }
-
-    this.invoiceService.getReconciliationSummary(monthKey, year)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingSummary = false)
-      )
-      .subscribe({
-        next: async (summary) => {
-          this.summary = summary;
-          // Lưu vào cache
-          await this.cacheService.cacheOutputSummary(summary, monthKey, year);
-        },
-        error: (err) => console.error('Error loading summary:', err)
-      });
   }
 
-  // ==========================================================================
-  // IMPORT METHODS
-  // ==========================================================================
-
-  /**
-   * Upload and import XML files (output invoices from tax portal)
-   */
-  uploadXmlFiles(): void {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.xml';
-    input.multiple = true;
-
-    input.onchange = (event: any) => {
-      const files = Array.from(event.target.files) as File[];
-      if (files.length === 0) return;
-
-      this.importing = true;
-
-      this.invoiceService.importXml(files)
-        .pipe(
-          takeUntil(this.destroy$),
-          finalize(() => this.importing = false)
-        )
-        .subscribe({
-          next: async (result) => {
-            const msg = `Import hoàn tất!\n` +
-              `- Đã import: ${result.imported}\n` +
-              `- Trùng lặp: ${result.duplicates}\n` +
-              `- Lỗi: ${result.failed}`;
-            alert(msg);
-
-            // Invalidate cache và reload data
-            await this.cacheService.invalidateOutputBySource('TAX_PORTAL_OUTPUT');
-            this.loadCustomers();
-            this.applyFilter(true);
-          },
-          error: (err) => {
-            console.error('Error importing XML:', err);
-            alert('Lỗi import: ' + err.message);
-          }
-        });
-    };
-
-    input.click();
-  }
-
-  /**
-   * Reload local invoices từ KiotViet
-   */
-  reloadLocalInvoices(): void {
-    this.loadLocalInvoices({ ...this.currentFilter, source: 'LOCAL' }, true);
-  }
-
-  // ==========================================================================
-  // RECONCILIATION METHODS
-  // ==========================================================================
-
-  /**
-   * Run reconciliation
-   */
-  runReconciliation(): void {
-    const values = this.filterForm.value;
-    const monthKey = values.filterType === 'month' ? values.monthKey : undefined;
-
-    const confirmMsg = monthKey
-      ? `Bạn có muốn chạy đối chiếu cho tháng ${monthKey}?`
-      : 'Bạn có muốn chạy đối chiếu cho tất cả hóa đơn đầu ra?';
-
-    if (!confirm(confirmMsg)) return;
-
-    this.reconciling = true;
-
-    this.invoiceService.runReconciliation(monthKey)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.reconciling = false)
-      )
-      .subscribe({
-        next: (result) => {
-          const msg = `Đối chiếu hoàn tất!\n` +
-            `- Đã xử lý: ${result.processed}\n` +
-            `- Khớp: ${result.matched}\n` +
-            `- Thiếu: ${result.unmatched}\n` +
-            `- Sai số: ${result.mismatch}`;
-          alert(msg);
-
-          // Invalidate cache và reload tất cả data (force reload)
-          this.cacheService.clearAllOutputCache();
-          this.applyFilter(true);
-          this.loadReconciliationResults();
-        },
-        error: (err) => {
-          console.error('Error reconciling:', err);
-          alert('Lỗi đối chiếu: ' + err.message);
+  private build(bills: EinvoiceBill[]): void {
+    const key = (tpl: string, series: string, no: number) => `${tpl || '1'}${(series || '').toUpperCase()}-${no}`;
+    const xml = new Map<string, LocalXmlInvoice>();
+    for (const i of this.xmlInvoices) {
+      if (i.tdlap >= this.fromDate && i.tdlap <= this.toDate) xml.set(key(i.khmshdon, i.khhdon, i.shdon), i);
+    }
+    const kv = new Map<string, EinvoiceBill>();
+    for (const b of bills) kv.set(key(b.template, b.series, Number(b.number)), b);
+    const rows: CompareRow[] = [];
+    for (const k of new Set([...xml.keys(), ...kv.keys()])) {
+      const x = xml.get(k) || null;
+      const b = kv.get(k) || null;
+      const diffs: string[] = [];
+      if (x && b) {
+        const cmp: [string, number, number][] = [['Chưa thuế', x.tgtcthue, b.amount], ['Thuế', x.tgtthue, b.amount_vat], ['Tổng TT', x.tgtttbso, b.total]];
+        for (const [label, a, c] of cmp) {
+          if (Math.abs(a - c) > TOL) diffs.push(`${label}: XML ${this.vnd(a)} ≠ KiotViet ${this.vnd(c)}`);
         }
-      });
-  }
-
-  /**
-   * Load kết quả đối chiếu (chi tiết sai lệch)
-   */
-  loadReconciliationResults(status?: string): void {
-    this.loadingResults = true;
-
-    this.invoiceService.getReconciliationResults(status, 100)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.loadingResults = false)
-      )
-      .subscribe({
-        next: (response) => {
-          this.reconciliationResults = response.results;
-          console.log('📋 Loaded output reconciliation results:', response.count);
-        },
-        error: (err) => {
-          console.error('Error loading reconciliation results:', err);
-        }
-      });
-  }
-
-  /**
-   * Hiển thị chi tiết sai lệch cho 1 hóa đơn
-   */
-  showMismatchDetails(result: OutputReconciliationResult): void {
-    this.selectedResult = result;
-    this.showMismatchModal = true;
-  }
-
-  /**
-   * Đóng modal chi tiết sai lệch
-   */
-  closeMismatchModal(): void {
-    this.showMismatchModal = false;
-    this.selectedResult = null;
-  }
-
-  /**
-   * Xóa một kết quả đối chiếu
-   */
-  deleteReconciliationResult(result: OutputReconciliationResult): void {
-    const confirmMsg = `Bạn có chắc muốn xóa kết quả đối chiếu cho hóa đơn ${result.invoiceKey}?`;
-    if (!confirm(confirmMsg)) return;
-
-    this.invoiceService.deleteReconciliationResult(result.id)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (response) => {
-          if (response.success) {
-            this.reconciliationResults = this.reconciliationResults.filter(r => r.id !== result.id);
-            console.log('🗑️ Deleted reconciliation result:', result.id);
-          } else {
-            alert('Lỗi xóa: ' + response.message);
-          }
-        },
-        error: (err) => {
-          console.error('Error deleting reconciliation result:', err);
-          alert('Lỗi xóa: ' + err.message);
-        }
-      });
-  }
-
-  /**
-   * Lấy class CSS cho status đối chiếu
-   */
-  getReconcileResultStatusClass(status: string): string {
-    const classes: Record<string, string> = {
-      'MATCH': 'result-match',
-      'MISMATCH': 'result-mismatch',
-      'MISSING_LOCAL': 'result-missing',
-      'MISSING_TAX': 'result-missing'
-    };
-    return classes[status] || '';
-  }
-
-  /**
-   * Lấy label cho status đối chiếu
-   */
-  getReconcileResultStatusLabel(status: string): string {
-    const labels: Record<string, string> = {
-      'MATCH': 'Khớp',
-      'MISMATCH': 'Sai số',
-      'MISSING_LOCAL': 'Thiếu bên Local',
-      'MISSING_TAX': 'Thiếu bên Thuế'
-    };
-    return labels[status] || status;
-  }
-
-  /**
-   * Format giá trị sai lệch để hiển thị
-   */
-  formatDiffValue(diff: OutputFieldDiff): string {
-    if (diff.diffType === 'number') {
-      if (typeof diff.diff === 'number') {
-        const prefix = diff.diff > 0 ? '+' : '';
-        return prefix + this.formatCurrency(diff.diff);
       }
+      rows.push({ key: k, xml: x, kv: b, diffs, status: !x ? 'only_kv' : !b ? 'only_xml' : diffs.length ? 'mismatch' : 'match' });
     }
-    return String(diff.diff || '');
+    const order: Record<RowStatus, number> = { mismatch: 0, only_xml: 1, only_kv: 2, match: 3 };
+    rows.sort((a, b) => (order[a.status] - order[b.status]) || this.rowNo(b) - this.rowNo(a));
+    this.rows = rows;
+    this.counts = { xml: xml.size, kv: kv.size, match: 0, mismatch: 0, only_xml: 0, only_kv: 0 };
+    for (const r of rows) this.counts[r.status]++;
+    this.compared = true;
+    this.filter = '';
+    this.page = 1;
   }
 
-  /**
-   * Lấy số lượng field diffs (handle undefined/null)
-   */
-  getFieldDiffsCount(result: OutputReconciliationResult): number {
-    return result.fieldDiffs?.length || 0;
+  private rowNo(r: CompareRow): number {
+    return r.xml?.shdon ?? (Number(r.kv?.number) || 0);
   }
 
-  // ==========================================================================
-  // DELETE METHODS
-  // ==========================================================================
-
-  /**
-   * Clear invoices by source
-   */
-  clearBySource(source: OutputInvoiceSource): void {
-    const label = this.invoiceService.getSourceLabel(source);
-    const confirmed = confirm(
-      `⚠️ CẢNH BÁO!\n\n` +
-      `Bạn có chắc chắn muốn xóa TẤT CẢ hóa đơn từ ${label}?\n\n` +
-      `Hành động này KHÔNG THỂ hoàn tác!`
-    );
-
-    if (!confirmed) return;
-
-    this.clearing = true;
-
-    this.invoiceService.clearBySource(source)
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.clearing = false)
-      )
-      .subscribe({
-        next: async (result) => {
-          alert(`✅ Đã xóa ${result.deleted} hóa đơn từ ${label}`);
-          await this.cacheService.clearAllOutputCache();
-          this.applyFilter(true);
-          this.loadCustomers();
-        },
-        error: (err) => {
-          console.error('Error clearing:', err);
-          alert('Lỗi xóa: ' + err.message);
-        }
-      });
+  get filteredRows(): CompareRow[] {
+    let rows = this.filter ? this.rows.filter(r => r.status === this.filter) : this.rows;
+    const q = this.q.trim().toLowerCase();
+    if (q) rows = rows.filter(r => `${r.key} ${r.kv?.code || ''} ${r.xml?.nmten || ''}`.toLowerCase().includes(q));
+    return rows;
   }
 
-  /**
-   * Clear all invoices
-   */
-  clearAll(): void {
-    const confirmed = confirm(
-      `⚠️ CẢNH BÁO QUAN TRỌNG!\n\n` +
-      `Bạn có chắc chắn muốn xóa TẤT CẢ hóa đơn đầu ra?\n\n` +
-      `Hành động này KHÔNG THỂ hoàn tác!`
-    );
-
-    if (!confirmed) return;
-
-    const doubleConfirm = confirm(
-      `🔴 XÁC NHẬN LẦN CUỐI\n\n` +
-      `Nhấn OK để XÓA VĨNH VIỄN tất cả hóa đơn đầu ra.`
-    );
-
-    if (!doubleConfirm) return;
-
-    this.clearing = true;
-
-    this.invoiceService.clearAll()
-      .pipe(
-        takeUntil(this.destroy$),
-        finalize(() => this.clearing = false)
-      )
-      .subscribe({
-        next: async (result) => {
-          alert(`✅ Đã xóa ${result.taxDeleted} hóa đơn thuế + ${result.localDeleted} hóa đơn local`);
-          await this.cacheService.clearAllOutputCache();
-          this.applyFilter(true);
-          this.loadCustomers();
-        },
-        error: (err) => {
-          console.error('Error clearing all:', err);
-          alert('Lỗi xóa: ' + err.message);
-        }
-      });
+  get pageRows(): CompareRow[] {
+    const s = (this.page - 1) * this.pageSize;
+    return this.filteredRows.slice(s, s + this.pageSize);
   }
 
-  // ==========================================================================
-  // UTILITY METHODS
-  // ==========================================================================
+  get pageCount(): number { return Math.max(1, Math.ceil(this.filteredRows.length / this.pageSize)); }
 
-  formatDateToDisplay(date: Date): string {
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+  setFilter(f: '' | RowStatus): void {
+    this.filter = f;
+    this.page = 1;
   }
 
-  parseDisplayDateToApi(displayDate: string): string {
-    if (!displayDate) return '';
-    const parts = displayDate.split('/');
-    if (parts.length !== 3) return displayDate;
-    const [day, month, year] = parts;
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  billUrl(b: EinvoiceBill): string {
+    return `${this.einvoiceUrl}?id=${encodeURIComponent(b.id)}`;
   }
 
-  isValidDisplayDate(dateStr: string): boolean {
-    if (!dateStr) return false;
-    const regex = /^\d{2}\/\d{2}\/\d{4}$/;
-    if (!regex.test(dateStr)) return false;
-
-    const parts = dateStr.split('/');
-    const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10);
-    const year = parseInt(parts[2], 10);
-
-    if (month < 1 || month > 12) return false;
-    if (day < 1 || day > 31) return false;
-    if (year < 2000 || year > 2100) return false;
-
-    return true;
+  /** CSV (dấu ; · UTF-8 BOM) theo bộ lọc đang chọn */
+  exportCsv(): void {
+    const cell = (v: string | number | null | undefined) => {
+      let s = v === null || v === undefined ? '' : String(v);
+      if (/^[=+\-@]/.test(s)) s = `'${s}`;
+      return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const head = ['Kết quả', 'Ký hiệu - Số', 'Ngày XML', 'Người mua (XML)', 'Chưa thuế XML', 'Thuế XML', 'Tổng TT XML',
+      'Mã HĐ KiotViet', 'Ngày HĐĐT', 'Chưa thuế KiotViet', 'Thuế KiotViet', 'Tổng TT KiotViet', 'Chi tiết lệch'];
+    const lines = [head.join(';'), ...this.filteredRows.map(r => [
+      this.statusLabel[r.status], r.key, r.xml ? this.viDate(r.xml.tdlap) : '', r.xml?.nmten || '', r.xml?.tgtcthue, r.xml?.tgtthue,
+      r.xml?.tgtttbso, r.kv?.code || '', r.kv ? r.kv.date.slice(0, 10) : '', r.kv?.amount, r.kv?.amount_vat, r.kv?.total,
+      r.diffs.join(' | ')].map(cell).join(';'))];
+    const name = `kiem-tra-so-luong-hd-dau-ra_${this.fromDate}_${this.toDate}.csv`;
+    const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+    console.log(`${LOG} Xuất ${name} (${this.filteredRows.length} dòng)`);
   }
 
-  validateDateInput(fieldName: 'fromDate' | 'toDate'): void {
-    const value = this.filterForm.get(fieldName)?.value;
-    if (value && !this.isValidDisplayDate(value)) {
-      alert(`Ngày không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy`);
-      this.filterForm.patchValue({
-        [fieldName]: this.formatDateToDisplay(new Date())
-      });
-    }
+  viTime(ms: number | null): string {
+    return ms ? new Date(ms).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
   }
 
-  formatCurrency(amount: number | undefined): string {
-    return this.invoiceService.formatCurrency(amount);
+  viDate(iso: string): string {
+    const [y, m, d] = (iso || '').slice(0, 10).split('-');
+    return d ? `${d}/${m}/${y}` : iso;
   }
 
-  formatDate(dateStr: string | undefined): string {
-    return this.invoiceService.formatDate(dateStr);
-  }
-
-  getStatusLabel(status: OutputReconcileStatus | undefined): string {
-    return this.invoiceService.getStatusLabel(status);
-  }
-
-  getStatusClass(status: OutputReconcileStatus | undefined): string {
-    return this.invoiceService.getStatusClass(status);
-  }
-
-  getSourceLabel(source: OutputInvoiceSource): string {
-    return this.invoiceService.getSourceLabel(source);
-  }
-
-  resetFilter(): void {
-    const currentYear = new Date().getFullYear();
-    const today = this.formatDateToDisplay(new Date());
-
-    this.filterForm.reset({
-      source: '',
-      filterType: 'range',  // Mặc định là 'range' (hôm nay)
-      monthKey: `${currentYear}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`,
-      year: currentYear,
-      fromDate: today,
-      toDate: today,
-      customerName: '',
-      reconcileStatus: '',
-      pageSize: 25
-    });
-
-    this.applyFilter();
-    this.loadCustomers();
-  }
-
-  async forceReload(): Promise<void> {
-    console.log('🔄 Force reloading output data...');
-    await this.cacheService.clearAllOutputCache();
-    this.applyFilter(true);
-    this.loadCustomers();
-  }
-
-  trackByInvoice(index: number, invoice: OutputInvoice): string {
-    return invoice.id;
-  }
-
-  /**
-   * Tính tổng số trang cho KiotViet invoices
-   */
-  getTotalLocalPages(): number {
-    const pageSize = this.filterForm.value.pageSize || 25;
-    return Math.max(1, Math.ceil(this.allLocalInvoices.length / pageSize));
+  vnd(n: number | null | undefined): string {
+    return n === null || n === undefined ? '' : Math.round(n).toLocaleString('vi-VN');
   }
 }

@@ -57,6 +57,28 @@
     └── cai-dat
 ```
 
+> Cây trên là tên cũ, không khớp `app.routes.ts` (path thật dạng `*-page`). Menu hiện tại: mục dưới.
+
+## Menu 3 mục (22/10/2026) — `layouts/main-layout/menu.config.ts`
+
+Sidebar dựng từ `MENU_SECTIONS`: **Tiện ích** (link thẳng — Đối soát hóa đơn XML đứng đầu, trước Kiểm tra HĐ tự động (user 23/10/2026) — + nhóm Đối soát CK, Kiểm tra số lượng hóa đơn) · **Kế toán chi tiết** (nhóm 1–11) · **Thiết lập** (link thẳng).
+Thêm / bớt trang trong menu → sửa `menu.config.ts`, không sửa HTML. Nhóm chứa trang đang mở tự bung khi điều hướng.
+
+| Mục | Path | Component | Ghi chú |
+|-----|------|-----------|---------|
+| Tiện ích | `/invoice-check-page` | InvoiceCheckPageComponent (`loadComponent`) | Kiểm tra HĐ tự động (23/10/2026). `?run=<id>` = mở 1 lần kiểm. `noPeriodBar` |
+| Tiện ích | nhóm **Đối soát CK** → `/bank-reconciliation-page` | BankReconciliationPageComponent (`loadComponent`) | "Chuyển khoản HĐ đầu ra" (23/10/2026) — khoảng ngày theo thanh chọn kỳ / theo sao kê |
+| Tiện ích | nhóm **Đối soát CK** → `/bank-reconciliation-in-page` | PlaceholderComponent | "Chuyển khoản HĐ đầu vào" (HĐ mua ⇄ tiền trả NCC) — chờ làm (user 23/10/2026) |
+| Tiện ích | `/invoice-reconciliation-page` | InvoiceReconciliationPageComponent (`loadComponent`, tải riêng) | Đối soát hóa đơn XML (23/10/2026). `?run=<id>` = mở 1 lần đối soát |
+| Tiện ích (mục cuối, sau các nhóm — `tailItems`) | `/tax-figures-page` | TaxFiguresPageComponent (`loadComponent`) | Số liệu khai thuế (bước 5, 23/10/2026): 01/GTGT, PL142, bảng kê bán ra / mua vào, 05/KK-TNCN. `?run=<id>` |
+| Tiện ích | `/item-mapping-page` | ItemMappingPageComponent (`loadComponent`) | Ánh xạ hàng hóa (23/10/2026). `?run=<id>` (trống = lần đối soát mới nhất). `canDeactivate` hỏi lại khi còn thay đổi chưa lưu |
+| Tiện ích | nhóm **Kiểm tra số lượng hóa đơn** (đổi tên từ "Đồng bộ hóa đơn" 23/10/2026): `/accountant-pages/ledger-8-dong-bo-hoa-don-v2` (đầu vào: XML máy ⇄ Gmail), `/accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra` (đầu ra: XML máy ⇄ HĐĐT KiotViet) | | Trước là nhóm 0 "Kiểm tra hóa đơn tự động"; chuyển sang Tiện ích (user 22/10/2026) |
+| Kế toán chi tiết | 1. Danh mục … 10. Báo cáo, **11. Khóa sổ & Kiểm toán** (`period-lock-page`, `audit-trail-page`) | | |
+| Thiết lập | `/user-roles-page`, `/system-settings-page` | | Chuyển khỏi nhóm "Hệ thống" cũ |
+
+Route data `noPeriodBar: true` → ẩn thanh chọn kỳ (đang đặt cho 6 trang Danh mục + 2 trang Thiết lập).
+Link `/thue/mon-bai` (Lệ phí môn bài) có trong menu từ trước nhưng **chưa có route** → về dashboard.
+
 ---
 
 ## Chi tiết Routes
@@ -171,12 +193,16 @@
 
 ---
 
-## Route Guards (Chưa implement)
+## Route Guards
+
+Đã có (22/10/2026) — `guards/auth.guard.ts`:
+- `/login` → `LoginPageComponent`, `canActivate: [loginGuard]` (đã đăng nhập thì về `/accountant-dashboard`).
+- Route `''` (MainLayout + mọi page con, kể cả `**`) → `canActivate: [authGuard]`: chờ `AuthService.authState$.ready`,
+  chưa đăng nhập → `/login?returnUrl=<url>`.
 
 ```typescript
-// Planned guards:
-AuthGuard          // Kiểm tra đăng nhập
-RoleGuard          // Kiểm tra quyền
+// Còn dự kiến:
+RoleGuard          // Kiểm tra quyền (khi có phân quyền — user-roles-page)
 PeriodLockGuard    // Kiểm tra khóa sổ khi edit
 ```
 

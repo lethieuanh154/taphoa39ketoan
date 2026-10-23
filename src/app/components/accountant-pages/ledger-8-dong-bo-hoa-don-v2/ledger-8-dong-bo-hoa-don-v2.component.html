@@ -1,10 +1,10 @@
 <!--
   LEDGER 8 - ĐỐI CHIẾU HÓA ĐƠN ĐẦU VÀO
-  So sánh tự động Gmail vs GDT (hoadondientu.gdt.gov.vn)
+  Kiểm tra số lượng HĐ đầu vào: Gmail vs danh sách HĐ trong thư mục XML trên máy (app FDI) — 23/10/2026 bỏ GDT
 -->
 <div class="invoice-page">
   <!-- Page Title -->
-  <h2 class="page-title">ĐỐI CHIẾU HÓA ĐƠN ĐẦU VÀO</h2>
+  <h2 class="page-title">KIỂM TRA SỐ LƯỢNG HÓA ĐƠN ĐẦU VÀO</h2>
 
   <!-- Main Tab Bar -->
   <div class="main-tab-bar">
@@ -27,6 +27,20 @@
   <!-- FILTER SECTION -->
   <!-- ============================================ -->
   <div class="filter-section">
+    <h3 class="section-title">Danh sách HĐ trên máy (XML)</h3>
+    <div class="xml-picker">
+      <label class="btn btn-primary" [class.disabled]="xmlReading">
+        <i class="fa-solid" [ngClass]="xmlReading ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
+        {{ xmlReading ? ('Đang đọc ' + xmlProgress) : 'Chọn thư mục XML HĐ đầu vào' }}
+        <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
+      </label>
+      <span class="xml-hint" *ngIf="!xmlInfo && !xmlReading">Thư mục app FDI tải về (vd <code>...\T9\&lt;MST&gt;\purchase\xml</code>) — đọc ngay trên máy, không tải lên máy chủ. Có ZIP cũng được.</span>
+      <span class="xml-info" *ngIf="xmlInfo"><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
+        <span class="xml-hint" *ngIf="xmlSavedAt">· đọc lúc {{ viTime(xmlSavedAt) }} (đã lưu trên máy — FDI tải thêm thì chọn lại thư mục)</span></span>
+    </div>
+    <div class="xml-error" *ngIf="mstWarning"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstWarning }}</div>
+    <div class="xml-error" *ngIf="xmlError"><i class="fa-solid fa-triangle-exclamation"></i> {{ xmlError }}</div>
+
     <h3 class="section-title">Bộ lọc</h3>
 
     <form [formGroup]="filterForm" class="filter-form">
@@ -92,7 +106,7 @@
     <div class="action-center">
       <button class="btn btn-warning btn-large" (click)="runLiveReconciliation()" [disabled]="liveReconciling">
         <span *ngIf="!liveReconciling">
-          <i class="fa-solid fa-bolt"></i> Đối chiếu Gmail vs GDT
+          <i class="fa-solid fa-bolt"></i> Đối chiếu Gmail vs XML
         </span>
         <span *ngIf="liveReconciling">
           <i class="fa-solid fa-spinner fa-spin"></i> Đang đối chiếu...
@@ -102,11 +116,13 @@
   </div>
 
   <!-- ============================================ -->
-  <!-- LIVE RECONCILIATION RESULTS (Gmail vs GDT) -->
+  <!-- KẾT QUẢ ĐỐI CHIẾU (Gmail vs XML) -->
   <!-- ============================================ -->
   <div class="live-reconciliation-section" *ngIf="liveResults.length > 0 || liveReconciling">
     <div class="section-header">
-      <h3><i class="fa-solid fa-bolt"></i> Đối chiếu trực tiếp: Gmail vs GDT</h3>
+      <h3><i class="fa-solid fa-bolt"></i> Đối chiếu: Gmail vs thư mục XML</h3>
+      <span class="xml-hint" *ngIf="gmailFetchedAt && !liveReconciling">Gmail lấy lúc {{ viTime(gmailFetchedAt) }} (đã lưu trên máy) —
+        bấm <b>Tải lại</b> để lấy email mới</span>
       <div class="live-actions" *ngIf="liveResults.length > 0">
         <button class="btn btn-sm btn-primary" (click)="saveLiveResults()" [disabled]="liveSaving || liveSaved">
           <span *ngIf="liveSaving"><i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...</span>
@@ -123,7 +139,7 @@
         <div class="card-value">{{ liveGmailCount }}</div>
       </div>
       <div class="summary-card">
-        <div class="card-label">GDT</div>
+        <div class="card-label">XML</div>
         <div class="card-value">{{ liveGdtCount }}</div>
       </div>
       <div class="summary-card card-success">
@@ -135,7 +151,7 @@
         <div class="card-value">{{ liveSummary.missingGmail }}</div>
       </div>
       <div class="summary-card card-warning">
-        <div class="card-label">Thiếu GDT</div>
+        <div class="card-label">Thiếu XML</div>
         <div class="card-value">{{ liveSummary.missingGdt }}</div>
       </div>
       <div class="summary-card card-danger">
@@ -162,7 +178,7 @@
             <th rowspan="2">Tên NCC</th>
             <th rowspan="2">Ngày</th>
             <th colspan="3" class="th-group th-gmail">Gmail (Email)</th>
-            <th colspan="3" class="th-group th-gdt">GDT (Trang thuế)</th>
+            <th colspan="3" class="th-group th-gdt">XML (thư mục máy)</th>
             <th rowspan="2">Kết quả</th>
           </tr>
           <tr>
@@ -192,7 +208,7 @@
             <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
               {{ row.gmailData ? formatCurrency(row.gmailData.totalAmount) : '-' }}
             </td>
-            <!-- GDT amounts -->
+            <!-- XML amounts -->
             <td class="td-amount">
               {{ row.gdtData ? formatCurrency(row.gdtData.tgtcthue) : '-' }}
             </td>

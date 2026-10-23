@@ -776,6 +776,8 @@ export class InvoiceServiceV2 {
     daysBack?: number;
     pageSize?: number;
     parseAttachments?: boolean;
+    /** YYYY-MM-DD — chỉ lấy email tới hết ngày này (23/10/2026) */
+    beforeDate?: string;
   }): Observable<PortalLinksResponse> {
     const gmailUrl = `${(environment as any).ketoanBackendUrl}/api/gmail/portal-links`;
     let httpParams = new HttpParams();
@@ -785,6 +787,7 @@ export class InvoiceServiceV2 {
     if (params.daysBack) httpParams = httpParams.set('days_back', params.daysBack.toString());
     if (params.pageSize) httpParams = httpParams.set('page_size', params.pageSize.toString());
     if (params.parseAttachments) httpParams = httpParams.set('parse_attachments', 'true');
+    if (params.beforeDate) httpParams = httpParams.set('before_date', params.beforeDate);
 
     return this.http.get<PortalLinksResponse>(gmailUrl, { params: httpParams }).pipe(
       tap(r => console.log(`[Gmail portal-links] ${r.total} results, ${r.parseErrors || 0} errors`)),

@@ -1,0 +1,286 @@
+<div class="recon-page">
+  <header class="page-head">
+    <h1><i class="fa-solid fa-money-bill-transfer"></i> Chuyển khoản hóa đơn đầu ra</h1>
+    <p class="sub">Hóa đơn KiotViet thanh toán <b>chuyển khoản</b> ⇄ tiền vào trên <b>sao kê TPBank</b>, khớp theo số tiền.
+      Hóa đơn lấy qua máy chủ KeToan (lưu theo ngày) — không cần mở KiotViet.</p>
+  </header>
+
+  <!-- Thanh công cụ: chọn file + khoảng ngày + lấy HĐ -->
+  <div class="recon-toolbar">
+    <label class="file-picker" title="Chọn được nhiều file cùng lúc (vd 3 tháng của 1 quý)">
+      <i class="fa-solid fa-file-excel"></i>
+      <span>{{ bankFileName || 'Chọn file Bảng kê TPBank (.xlsx, chọn được nhiều file)' }}</span>
+      <input type="file" accept=".xlsx" multiple (change)="onFileSelected($event)" hidden>
+    </label>
+    @if (bank) {
+      <button type="button" class="btn-link" (click)="clearBank()" title="Bỏ sao kê, khoảng ngày về theo thanh chọn kỳ">
+        <i class="fa-solid fa-xmark"></i> Bỏ sao kê
+      </button>
+    }
+    @if (parsingFile) {
+      <span class="parsing"><i class="fa-solid fa-spinner fa-spin"></i> Đang đọc...</span>
+    }
+
+    <label class="date-field">Từ <input type="date" [(ngModel)]="fromDate"></label>
+    <label class="date-field">Đến <input type="date" [(ngModel)]="toDate"></label>
+    <button type="button" class="btn-primary" (click)="loadKiotViet()" [disabled]="loadingKv">
+      <i class="fa-solid" [ngClass]="loadingKv ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-down'"></i>
+      {{ loadingKv ? ('Đang lấy... ' + loadProgress) : 'Lấy hóa đơn KiotViet' }}
+    </button>
+    <button type="button" class="btn-outline" (click)="loadKiotViet(true)" [disabled]="loadingKv"
+      title="Lấy lại mọi ngày từ KiotViet: cập nhật trạng thái HĐĐT, HĐ đã sửa / hủy">
+      <i class="fa-solid fa-rotate"></i> Lấy lại từ KiotViet
+    </button>
+  </div>
+
+  @if (!bank) {
+    <div class="info-msg"><i class="fa-solid fa-calendar-day"></i> Khoảng ngày theo kỳ đang chọn: <b>{{ periodLabel() }}</b>
+      — import sao kê thì tự đặt theo ngày giao dịch trong file.</div>
+  }
+  @if (dateNote) {
+    <div class="info-msg"><i class="fa-solid fa-calendar-day"></i> {{ dateNote }}</div>
+  }
+  @if (kvLoaded && range) {
+    <div class="info-msg muted">
+      <i class="fa-solid fa-server"></i>
+      {{ invoiceCount | number }} HĐ CK {{ viDate(loadedFrom) }} → {{ viDate(loadedTo) }} · {{ syncNote }}
+      @if (range.oldest_sync) { · lấy từ KiotViet lúc {{ viSync(range.oldest_sync) }} (cũ nhất) }
+      @if (range.incomplete.length) { · <b class="warn">{{ range.incomplete.length }} ngày chưa hết ngày — có thể còn HĐ mới</b> }
+      · {{ range.auto_sync.enabled ? ('máy chủ tự lấy lại 7 ngày gần nhất lúc ' + range.auto_sync.time + ' hằng ngày') : 'lịch tự lấy trên máy chủ đang tắt' }}
+    </div>
+  }
+  @if (rangeChanged) {
+    <div class="info-msg warn-msg"><i class="fa-solid fa-triangle-exclamation"></i>
+      Khoảng ngày đã đổi ({{ viDate(fromDate) }} → {{ viDate(toDate) }}) — bấm <b>Lấy hóa đơn KiotViet</b> để đối soát lại.</div>
+  }
+
+  @if (error) {
+    <div class="recon-error"><i class="fa-solid fa-triangle-exclamation"></i> {{ error }}</div>
+  }
+
+  <!-- Tổng hợp -->
+  @if (canCompare) {
+    <div class="summary-bar" [class.balanced]="isBalanced">
+      <div class="sum-item">
+        <span>Tổng HĐ CK KiotViet</span>
+        <b class="val-kv">{{ formatVnd(kvTotal) }}</b>
+        <small>{{ invoiceCount }} hóa đơn ({{ itemCount }} khoản) ·
+          @if (invoiceUnmatched) { <b class="warn">{{ invoiceUnmatched }} lệch</b> } @else { khớp hết }</small>
+      </div>
+      <div class="sum-item">
+        <span>Tổng tiền vào TPBank</span>
+        <b class="val-in">{{ formatVnd(bankTotal) }}</b>
+        <small>{{ bankCount }} giao dịch ·
+          @if (bankUnmatched) { <b class="warn">{{ bankUnmatched }} lệch</b> } @else { khớp hết }</small>
+      </div>
+      <div class="sum-item">
+        <span>Chênh lệch</span>
+        <b [class.warn]="difference !== 0" [class.ok]="difference === 0">{{ formatVnd(difference) }}</b>
+        <small>{{ isBalanced ? '✅ Khớp hoàn toàn' : '⚠️ Có chênh lệch' }}@if (lateCount) { · {{ lateCount }} cặp lệch giờ }@if (excessExtraTotal) { · đã trừ {{ formatVnd(excessExtraTotal) }} CK dư trả lại khách }</small>
+      </div>
+    </div>
+  }
+
+  <!-- Tabs + xuất CSV — hiện ngay khi đã lấy HĐ: tab CK nhiều lần + CSV KHÔNG cần sao kê -->
+  @if (kvLoaded) {
+    <div class="recon-tabs">
+      <button type="button" class="tab" [class.active]="activeTab === 'all'" (click)="activeTab = 'all'" [disabled]="!bank"
+        [title]="bank ? '' : 'Cần import file Bảng kê TPBank để đối soát'">
+        <i class="fa-solid fa-scale-balanced"></i> Đối soát
+      </button>
+      <button type="button" class="tab" [class.active]="activeTab === 'multi'" (click)="activeTab = 'multi'">
+        <i class="fa-solid fa-layer-group"></i> CK nhiều lần ({{ multiInvoiceCount }})
+      </button>
+      <button type="button" class="tab" [class.active]="activeTab === 'excess'" (click)="activeTab = 'excess'">
+        <i class="fa-solid fa-money-bill-transfer"></i> CK dư ({{ excessRows.length }})
+      </button>
+      <button type="button" class="btn-csv" (click)="exportActiveCsv()" [disabled]="csvDisabled"
+        title="Xuất CSV (dấu ; · UTF-8) để kế toán so với file Excel ngân hàng">
+        <i class="fa-solid fa-file-csv"></i> Xuất CSV
+      </button>
+    </div>
+  }
+
+  <!-- TAB 1: Bảng canh hàng theo số tiền (2 cột song song) -->
+  @if (canCompare && activeTab === 'all') {
+    <div class="filter-chips">
+      <button type="button" [class.active]="viewFilter === 'all'" (click)="setViewFilter('all')">Tất cả</button>
+      <button type="button" [class.active]="viewFilter === 'issues'" (click)="setViewFilter('issues')">
+        Lệch ({{ invoiceUnmatched + bankUnmatched }})
+      </button>
+      <button type="button" [class.active]="viewFilter === 'late'" (click)="setViewFilter('late')">
+        Khớp lệch giờ ({{ lateCount }})
+      </button>
+    </div>
+
+    <div class="compare-grid">
+      <div class="compare-head">
+        <div class="col-head kv">
+          <span><i class="fa-solid fa-receipt"></i> Hóa đơn KiotViet ({{ itemCount }} khoản)</span>
+          <button type="button" class="sort-btn" (click)="toggleSort()" title="Đổi cách sắp xếp: Lệch lên đầu → Số tiền ↓ → Số tiền ↑">
+            <i class="fa-solid" [ngClass]="sortIcon"></i> {{ sortLabel }}
+          </button>
+        </div>
+        <div class="col-head bank">
+          <span><i class="fa-solid fa-building-columns"></i> Chuyển khoản TPBank ({{ bankCount }})</span>
+          <button type="button" class="sort-btn" (click)="toggleSort()" title="Đổi cách sắp xếp: Lệch lên đầu → Số tiền ↓ → Số tiền ↑">
+            <i class="fa-solid" [ngClass]="sortIcon"></i> {{ sortLabel }}
+          </button>
+        </div>
+      </div>
+
+      <div class="aligned-rows">
+        @for (row of pageRows; track $index) {
+          <div class="aligned-row">
+            <!-- Trái: HĐ KiotViet -->
+            <div class="cell kv-cell" [class.matched]="row.kind === 'matched'" [class.late]="row.kind === 'matched_late'"
+              [class.unmatched]="row.kind === 'invoice_only'" [class.blank]="!row.left">
+              @if (row.left) {
+                <div class="row-main">
+                  <span class="code">{{ row.left.code || '—' }}@if (row.left.partLabel) {<small class="part"> · {{ row.left.partLabel }}</small>}</span>
+                  <span class="sub time"><i class="fa-regular fa-clock"></i> {{ row.left.time }}@if (row.note) { · {{ row.note }} }</span>
+                </div>
+                <span class="amount">{{ formatVnd(row.left.total) }}</span>
+                <i class="mark fa-solid" [ngClass]="row.right ? 'fa-check' : 'fa-xmark'"></i>
+              }
+            </div>
+            <!-- Phải: GD TPBank -->
+            <div class="cell bank-cell" [class.matched]="row.kind === 'matched'" [class.late]="row.kind === 'matched_late'"
+              [class.unmatched]="row.kind === 'bank_only'" [class.blank]="!row.right">
+              @if (row.right) {
+                <div class="row-main">
+                  <span class="code">{{ row.right.counterparty || row.right.desc || '—' }}</span>
+                  <span class="sub time"><i class="fa-regular fa-clock"></i> {{ row.right.date }}@if (!row.left && row.note) { · {{ row.note }} }</span>
+                </div>
+                <span class="amount">{{ formatVnd(row.right.credit) }}</span>
+                <i class="mark fa-solid" [ngClass]="row.left ? 'fa-check' : 'fa-xmark'"></i>
+              }
+            </div>
+          </div>
+        }
+      </div>
+      @if (alignedRows.length === 0) {
+        <div class="empty">Không có dữ liệu.</div>
+      }
+    </div>
+
+    @if (alignedRows.length > pageSize) {
+      <div class="pager">
+        <button type="button" (click)="goPage(1)" [disabled]="page === 1" title="Trang đầu"><i class="fa-solid fa-angles-left"></i></button>
+        <button type="button" (click)="goPage(page - 1)" [disabled]="page === 1"><i class="fa-solid fa-angle-left"></i></button>
+        <span>Trang {{ page }} / {{ pageCount }} · {{ alignedRows.length | number }} dòng</span>
+        <button type="button" (click)="goPage(page + 1)" [disabled]="page === pageCount"><i class="fa-solid fa-angle-right"></i></button>
+        <button type="button" (click)="goPage(pageCount)" [disabled]="page === pageCount" title="Trang cuối"><i class="fa-solid fa-angles-right"></i></button>
+        <label>Mỗi trang
+          <select [(ngModel)]="pageSize" (ngModelChange)="onPageSize()">
+            @for (n of pageSizes; track n) { <option [ngValue]="n">{{ n }}</option> }
+          </select>
+        </label>
+      </div>
+    }
+  }
+
+  <!-- TAB 2: HĐ chuyển khoản nhiều lần (mỗi khoản 1 dòng) -->
+  @if (kvLoaded && activeTab === 'multi') {
+    <div class="multi-summary">
+      {{ multiInvoiceCount }} HĐ có ghi chú "chuyển khoản N lần"
+      @if (multiIssueCount) { · <b class="warn">{{ multiIssueCount }} ghi chú lệch / chưa tách được</b> }
+      @if (bank && multiUnmatchedCount) { · <b class="warn">{{ multiUnmatchedCount }} khoản không có GD</b> }
+      @if (!bank) { · <i>chưa import sao kê — CSV chỉ có danh sách HĐ, chưa có cột khớp giao dịch</i> }
+    </div>
+
+    <div class="multi-table-wrap">
+      <table class="multi-table">
+        <thead>
+          <tr>
+            <th>Mã HĐ</th><th>Giờ HĐ</th><th class="num">Tổng</th><th>Ghi chú</th>
+            <th>Khoản</th><th class="num">Số tiền</th>
+            @if (bank) { <th>Giao dịch khớp</th><th>Trạng thái</th> }
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of multiRows; track $index) {
+            <tr [class.group-start]="r.first">
+              <td class="code">{{ r.first ? r.code : '' }}</td>
+              <td>{{ r.first ? r.time : '' }}</td>
+              <td class="num">{{ r.first ? formatVnd(r.total) : '' }}</td>
+              <td>
+                @if (r.first) {
+                  {{ r.note }} <span class="note-status" [class.bad]="!r.noteOk">{{ r.noteStatus }}</span>
+                }
+              </td>
+              <td>{{ r.part }}</td>
+              <td class="num">{{ r.amount !== null ? formatVnd(r.amount) : '' }}</td>
+              @if (bank) {
+                <td class="txn">{{ r.txnText || '—' }}</td>
+                <td>
+                  <span class="kind" [ngClass]="r.kind">{{ r.kindLabel }}</span>
+                  @if (r.hint) { <small class="hint-inline">{{ r.hint }}</small> }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (multiRows.length === 0) {
+        <div class="empty">Không có HĐ nào ghi chú "chuyển khoản N lần" trong khoảng ngày này.</div>
+      }
+    </div>
+  }
+
+  <!-- TAB 3: HĐ khách chuyển khoản dư, đã trả lại tiền mặt (mỗi HĐ 1 dòng) -->
+  @if (kvLoaded && activeTab === 'excess') {
+    <div class="multi-summary">
+      {{ excessRows.length }} HĐ có ghi chú "chuyển khoản (dư) X, trả lại khách Y" (khớp GD theo số khách chuyển X)
+      @if (excessIssueCount) { · <b class="warn">{{ excessIssueCount }} ghi chú lệch / chưa tách được</b> }
+      @if (bank && excessUnmatchedCount) { · <b class="warn">{{ excessUnmatchedCount }} HĐ không có GD</b> }
+      @if (!bank) { · <i>chưa import sao kê — CSV chỉ có danh sách HĐ, chưa có cột khớp giao dịch</i> }
+    </div>
+
+    <div class="multi-table-wrap">
+      <table class="multi-table">
+        <thead>
+          <tr>
+            <th>Mã HĐ</th><th>Giờ HĐ</th><th class="num">Tổng HĐ</th><th>Ghi chú</th>
+            <th class="num">Khách chuyển</th><th class="num">Trả lại khách</th>
+            @if (bank) { <th>Giao dịch khớp</th><th>Trạng thái</th> }
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of excessRows; track $index) {
+            <tr class="group-start">
+              <td class="code">{{ r.code }}</td>
+              <td>{{ r.time }}</td>
+              <td class="num">{{ formatVnd(r.total) }}</td>
+              <td>{{ r.note }} <span class="note-status" [class.bad]="!r.noteOk">{{ r.noteStatus }}</span></td>
+              <td class="num">{{ formatVnd(r.transferred) }}</td>
+              <td class="num">{{ formatVnd(r.refund) }}</td>
+              @if (bank) {
+                <td class="txn">{{ r.txnText || '—' }}</td>
+                <td>
+                  <span class="kind" [ngClass]="r.kind">{{ r.kindLabel }}</span>
+                  @if (r.hint) { <small class="hint-inline">{{ r.hint }}</small> }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (excessRows.length === 0) {
+        <div class="empty">Không có HĐ nào ghi chú "chuyển khoản dư" trong khoảng ngày này.</div>
+      }
+    </div>
+  }
+
+  @if (!kvLoaded) {
+    <p class="hint">
+      Import file Bảng kê TPBank (chọn được nhiều file, vd cả quý) và bấm <b>Lấy hóa đơn KiotViet</b> để đối chiếu.
+      Chỉ cần danh sách HĐ <b>chuyển khoản nhiều lần</b>: chọn khoảng ngày rồi bấm <b>Lấy hóa đơn KiotViet</b>, không cần sao kê.
+      Đối soát <b>theo số tiền</b>: cùng số tiền xếp cùng hàng. HĐ ghi chú "chuyển khoản 2 lần 45 + 12" được tách thành từng khoản
+      (đơn vị nghìn). HĐ ghi chú "chuyển khoản (dư) 990, trả lại khách 891" được khớp với GD 990.000 (tab <b>CK dư</b>). Cặp trong
+      khung giờ [HĐ − 24h, HĐ + 30'] là <b>khớp</b>; cùng số tiền nhưng ngoài khung vẫn khớp, đánh dấu <b>lệch giờ</b> (vàng);
+      dòng dư 1 bên (đỏ) thì bên kia để trống.
+      Hóa đơn đã lấy được lưu theo ngày trên máy chủ — lần sau mở lại nhanh; ngày chưa lấy / chưa hết ngày tự lấy thêm từ KiotViet.
+    </p>
+  }
+</div>

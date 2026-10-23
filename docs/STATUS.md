@@ -1,26 +1,109 @@
 # Trạng thái hoàn thành - TapHoa39KeToan
 
-**Cập nhật**: 26/01/2025
-**Build status**: SUCCESS (1.74 MB)
+**Cập nhật**: 22/10/2026 (rà lại tầng dữ liệu — xem mục "Trạng thái thực tế")
+**Build status**: SUCCESS (1.74 MB, 26/01/2025)
 
 ---
 
 ## Tổng quan tiến độ
 
-```
-████████████████████████████████████████ 100%
-```
+> ⚠️ "100%" bên dưới (26/01/2025) chỉ tính **giao diện**. Kiểm tra code ngày 22/10/2026: **chưa page nào hoàn chỉnh về dữ liệu**.
 
 | Metric | Giá trị |
 |--------|---------|
-| Tổng routes | 39 |
-| Đã hoàn thành | 39 |
-| Còn placeholder | 0 |
-| Tiến độ | **100%** |
+| Mục menu nhóm 1–11 của Kế toán chi tiết (không tính Kiểm tra số lượng hóa đơn ledger-8/9, nay ở Tiện ích) | 39 |
+| Có giao diện | 39 (100%) |
+| Lưu thật một phần (KeToanBackEnd) | 6 |
+| Nguồn dữ liệu đã chết (GDT) | 4 |
+| Chỉ có dữ liệu demo / lưu trong bộ nhớ | 27 |
+| Chưa có chức năng / lỗi route | 2 |
+| **Hoàn chỉnh cả dữ liệu** | **0** |
 
 ---
 
-## ✅ ĐÃ HOÀN THÀNH (39/39)
+## ⏳ KẾ HOẠCH TIẾP THEO (21/10/2026)
+
+| Việc | Plan | Trạng thái |
+|---|---|---|
+| **KeToan thay Vietda + tái cấu trúc UI** — menu 3 mục Tiện ích / Kế toán chi tiết / Thiết lập (22/10); nhập HĐ → Đối soát CK → hạch toán; kiểm HĐ đầu ra trước phát hành hằng ngày; số liệu khai thuế để copy/paste; Pha 0 = bảo mật + trang đăng nhập Google | `../plan-ketoan-flow.md` | Chưa làm — hỏi user mục 5 trước khi code (câu 10 đã chốt 22/10: job KiotViet ở KeToanBackEnd) |
+| Bước 1: đối soát hóa đơn XML (đọc từ thư mục trên máy) + bảng kê + page tờ khai TNCN từ bảng lương | `../plan-doi-soat-web.md` | Chưa làm — hỏi user các quyết định ở mục 9 |
+| Tải XML hóa đơn từ cổng thuế (extension) | `../plan-gdt-extension.md` | **Hủy** |
+| "Đối soát CK", "Xuất bảng quy đổi" từ BanHang | `../plan-gdt-extension.md` mục 13 | Sau khi xong đối soát |
+
+---
+
+## ⚠️ TRẠNG THÁI THỰC TẾ — page chưa hoàn thành (kiểm tra code 22/10/2026)
+
+Ký hiệu: 🟡 lưu thật một phần · 🟠 giao diện xong, nguồn dữ liệu đã chết · 🔴 chỉ có dữ liệu demo / lưu trong bộ nhớ
+(F5 là mất) · ⛔ chưa có chức năng / lỗi. Nhóm theo menu mới (`../plan-ketoan-flow.md` mục 1). Route là route thật trong
+`app.routes.ts` (bảng "Giao diện đã có" bên dưới còn ghi tên route cũ).
+
+**Lỗi gốc:** phiếu thu / chi và phiếu kho đã ghi sổ **không sinh bút toán** sang Nhật ký chung. `journal.service`,
+`general-ledger.service`, `trial-balance.service` tự sinh dữ liệu demo (lệnh gọi API đang bị comment), nên Sổ cái, Cân đối
+tài khoản, CĐKT, KQKD, LCTT, Tờ khai GTGT đều ra **số giả**. Đây là mạch phải nối trước khi thay Vietda.
+
+### Tiện ích
+
+| Nhóm | Page | Route | TT | Thiếu / ghi chú |
+|---|---|---|---|---|
+| — | Kiểm tra HĐ tự động | `invoice-check-page` | 🟢 | 23/10/2026: job BE kiểm HĐ nháp einvoice 00:00 (bật `SCHEDULER_ENABLED` trên VPS) + Kiểm tra ngay; kiểm số học + thuế suất theo mã master (kế toán đặt / HĐ vào gần nhất); đặt thuế suất đúng ngay trên page. 23/10 thêm: so tổng tiền với HĐ bán KiotViet cùng mã, link mở đúng HĐ (`bills-invoice-vat?id=`). Chưa có: HĐ bán chưa chuyển nháp |
+| — | Đối soát CK → Chuyển khoản HĐ đầu ra | `bank-reconciliation-page` | 🟢 | 23/10/2026: port BanHang (utils mirror), HĐ CK qua KeToanBackEnd (Firestore theo ngày, job 00:20), phân trang. Chưa có: HĐ vào ↔ tiền trả NCC, sinh phiếu thu (bước 3) |
+| — | Đối soát hóa đơn XML | `invoice-reconciliation-page` | 🟡 | 23/10/2026: chạy được thật (upload → KeToanBackEnd `/api/reconciliation`, 15 tab như Excel của script). Chưa có: giá vốn bình quân + Bảng kê + Số liệu khai thuế (bước 5); chưa nối vào kho / hạch toán |
+| — | Số liệu khai thuế | `tax-figures-page` | 🟢 | 23/10/2026 (bước 5): 01/GTGT ([22] sửa được), PL142, bảng kê 01-1 (bảng + Excel mẫu), 05/KK-TNCN (bảng lương tải lên) — TNCN Q3/2026 khớp tờ khai đã nộp. Chưa thử 01/GTGT với thư mục XML thật cả quý |
+| — | Ánh xạ hàng hóa | `item-mapping-page` | 🟡 | 23/10/2026: sửa Mã master / Hệ số / Mã Vietda / Đã kiểm, tìm mã master KiotViet, lưu Firestore, Chạy lại đối soát. Chưa có: nhập hàng loạt `anh_xa_hang_hoa.xlsx` cũ lên máy chủ (hiện file chỉ dùng cho lần chạy có file đó) |
+| Kiểm tra số lượng hóa đơn (tên cũ "Đồng bộ hóa đơn", đổi 23/10/2026) | HĐ đầu vào (ledger-8) | `accountant-pages/ledger-8-dong-bo-hoa-don-v2` | 🟡 | 23/10/2026: bỏ GDT → chọn thư mục XML trên máy (FDI, đọc trong trình duyệt `utils/invoice-xml.util.ts`) ⇄ Gmail portal-links. Chưa thử với Gmail thật |
+| | HĐ đầu ra (ledger-9) | `accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra` | 🟢 | 23/10/2026 viết lại (bản cũ gọi `/api/v2/invoices/output` + `/api/kiotviet/*` — KeToanBackEnd không có): thư mục XML trên máy ⇄ HĐĐT KiotViet (`GET /api/einvoice-check/bills`) theo mẫu số + ký hiệu + số; khớp / lệch tiền / chỉ XML / chỉ KiotViet, CSV, link mở HĐĐT. `OutputInvoiceServiceV2` + `KiotvietService.getInvoices` nay không page nào dùng (chỉ còn kiểu trong `accountant-cache.service`) |
+
+### Kế toán chi tiết
+
+| Nhóm | Page | Route | TT | Thiếu / ghi chú |
+|---|---|---|---|---|
+| 1. Danh mục | Hệ thống tài khoản | `chart-of-accounts-page` | 🔴 | 70 TK cài sẵn trong code; thêm / sửa không lưu |
+| | Khách hàng | `customer-page` | 🔴 | `loadDemoData()` |
+| | Nhà cung cấp | `supplier-page` | 🔴 | `loadDemoData()` |
+| | Nhân viên | `employee-page` | 🔴 | `loadDemoData()` |
+| | Hàng hóa - Dịch vụ | `product-page` | 🔴 | `loadDemoData()`; chưa dùng mã Vietda / mã master (plan mục 3) |
+| | Ngân hàng | `bank-page` | 🔴 | `loadDemoData()` |
+| 2. Chứng từ | Phiếu thu, Phiếu chi | `cash-voucher-page/receipt`, `/payment` | 🟡 | Lưu thật (`/api/cash-vouchers`). Xuất Excel / PDF trả file rỗng "Demo". POSTED chưa sinh bút toán |
+| | Phiếu nhập kho, Phiếu xuất kho | `warehouse-page/receipt`, `/issue` | 🟡 | Phiếu lưu thật (warehouse-voucher API). Danh sách kho ở localStorage; hàng hóa / KH / NCC chọn từ danh mục demo |
+| | Chứng từ nghiệp vụ khác | `other-voucher-page` | 🔴 | `loadDemoData()` |
+| 3. Bán hàng | Hóa đơn bán ra | `accountant-pages/sales-invoice-page` | 🟠 | HĐ lấy từ GDT (đã chặn) + cache IndexedDB. Nút tạo phiếu thu + xuất kho từ HĐ dùng service thật |
+| | Sổ chi tiết TK 131 | `receivable-ledger-page` | 🟠 | HĐ từ GDT cache + phiếu thu thật |
+| 4. Mua hàng | Hóa đơn mua vào | `accountant-pages/purchase-invoice-page` | 🟠 | Như HĐ bán ra |
+| | Sổ chi tiết TK 331 | `payable-ledger-page` | 🟠 | HĐ từ GDT cache + phiếu chi thật |
+| 5. Kho | Thẻ kho | `stock-card-page` | 🟡 | Phiếu kho thật; danh mục hàng demo |
+| | Tổng hợp N-X-T | `inventory-report-page` | 🔴 | Số giả: tồn đầu = tồn − 10, nhập 20, xuất 10 |
+| | Giá vốn hàng bán (632) | `cogs-page` | 🔴 | `loadDemoData()`; phải đổi sang bình quân gia quyền (plan mục 2 bước 3) |
+| 6. Lương | Bảng lương | `payroll-page` | 🔴 | `loadDemoData()`; chưa đọc `LUONG SM 2026.xlsx` |
+| | Thanh toán lương | `salary-payment-page` | 🔴 | Lưu trong bộ nhớ, tạo từ bảng lương demo |
+| | BHXH, BHYT, BHTN | `insurance-page` | 🔴 | Lưu trong bộ nhớ, tạo từ bảng lương demo |
+| 7. Tiền | Sổ quỹ tiền mặt (111) | `cash-book-page` | 🟡 | Đọc phiếu thu / chi thật; số dư đầu kỳ ghi cứng 10.000.000 |
+| | Sổ tiền gửi NH (112) | `bank-book-page` | 🔴 | `DEFAULT_ENTRIES` + `loadDemoData()`; số dư đầu 50.000.000 demo |
+| 8. Thuế | Thuế GTGT | `vat-page` | 🔴 | localStorage + demo |
+| | Thuế TNCN | `pit-page` | 🔴 | Lưu trong bộ nhớ; mức giảm trừ cũ 11.000.000 / 4.400.000 (2026: 15.500.000 / 6.200.000) |
+| | Thuế TNDN | `cit-page` | 🔴 | Page tự tạo demo, không có service |
+| | Lệ phí môn bài | `thue/mon-bai` | ⛔ | Có trong menu nhưng **không có route** → bị đưa về Tổng quan |
+| 9. Sổ tổng hợp | Sổ nhật ký chung | `journal-page` | 🔴 | `generateDemoData()`, API bị comment |
+| | Sổ cái theo TK | `ledger-page` | 🔴 | `generateDemoAccounts/Entries()`; xuất toàn bộ sổ cái "đang phát triển" |
+| | Bảng cân đối TK | `trial-balance-page` | 🔴 | `generateDemoData()` |
+| 10. Báo cáo | Bảng cân đối kế toán | `balance-sheet-page` | 🔴 | Tính từ Cân đối TK demo |
+| | Báo cáo KQKD | `income-statement-page` | 🔴 | `buildDemoReport()`; xuất Excel / PDF trả file rỗng "Demo" |
+| | Lưu chuyển tiền tệ | `cash-flow-page` | 🔴 | `generateDemoInputData()` |
+| | Tờ khai thuế GTGT | `vat-declaration-page` | 🔴 | `loadDemoData()`; sẽ thay bằng page số liệu copy / paste HTKK (plan mục 2) |
+| | Báo cáo quản trị | `management-reports-page` | ⛔ | Chỉ có thẻ, bấm vào báo "Tính năng đang phát triển" |
+| Khóa sổ + Dấu vết | Khóa sổ kế toán | `period-lock-page` | 🔴 | Lưu trong bộ nhớ; quyền ghi cứng `CHIEF_ACCOUNTANT`; bước kiểm tra trước khi khóa luôn "pass" |
+| | Dấu vết kiểm toán | `audit-trail-page` | 🔴 | Lưu trong bộ nhớ (API bị comment); xuất báo cáo "đang phát triển" |
+
+### Thiết lập
+
+| Page | Route | TT | Thiếu / ghi chú |
+|---|---|---|---|
+| Phân quyền | `user-roles-page` | 🔴 | User / role ghi cứng trong component; nút "Lưu" chỉ hiện thông báo; chưa nối đăng nhập |
+| Cài đặt | `system-settings-page` | 🔴 | Nút "Lưu" chỉ hiện thông báo; sao lưu / khôi phục "đang phát triển" |
+
+---
+
+## GIAO DIỆN ĐÃ CÓ (39/39) — dữ liệu xem mục "Trạng thái thực tế"
 
 ### Dashboard (1/1) ✓
 | # | Tính năng | Route | Component |
@@ -219,9 +302,9 @@ src/app/services/
 | 6 | 52 - 80 triệu | 30% |
 | 7 | Trên 80 triệu | 35% |
 
-Giảm trừ: Bản thân 11 triệu/tháng, NPT 4.4 triệu/người/tháng
+Giảm trừ: Bản thân 11 triệu/tháng, NPT 4.4 triệu/người/tháng (mức cũ, `PITService` vẫn dùng; năm 2026: 15,5 triệu / 6,2 triệu)
 
-### Dependencies đã hoàn thành
+### Dependencies (thiết kế giao diện — 22/10/2026: phần lớn CHƯA nối dữ liệu thật, xem "Trạng thái thực tế")
 ```
 ✅ Danh mục KH/NCC/Hàng hóa → Hóa đơn, Phiếu kho
 ✅ Hóa đơn, Phiếu thu/chi → Công nợ 131/331
@@ -238,9 +321,9 @@ Giảm trừ: Bản thân 11 triệu/tháng, NPT 4.4 triệu/người/tháng
 
 ---
 
-## Hoàn thành!
+## Giao diện đã đủ (26/01/2025) — dữ liệu chưa (22/10/2026)
 
-Hệ thống kế toán TapHoa39KeToan đã hoàn thành **100%** với đầy đủ:
+Giao diện TapHoa39KeToan đã có **100%** (chưa nối dữ liệu thật — mục "Trạng thái thực tế"):
 - 11 module chức năng
 - 39 trang/màn hình
 - Tuân thủ Thông tư 133/2016/TT-BTC

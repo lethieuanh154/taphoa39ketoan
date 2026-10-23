@@ -1,0 +1,127 @@
+DEPLOY TapHoa39KeToan (Angular 19) LÊN VPS KẾ TOÁN
+VPS: 180.93.165.213 — domain: ketoan.songminhcr.com
+Setup server (Docker, firewall, DNS) + Backend: xem TapHoa39KeToanBackEnd/deployDataOnline (BƯỚC 1–9).
+Backend phải chạy trước: container taphoa39ketoanbackend ở 127.0.0.1:8001.
+
+🚀 BƯỚC 1 — Build Angular trên máy local
+
+cd TapHoa39KeToan
+ng build --configuration production
+
+Output nằm ở: dist/taphoa39ketoan/browser/
+
+environment.prod.ts phải để URL rỗng (FE + API cùng domain, gọi /api/... tương đối):
+  domainUrl: '',
+  apiUrl: '',
+  ketoanBackendUrl: '',
+
+🚀 BƯỚC 2 — Tạo thư mục trên server
+
+ssh root@180.93.165.213
+mkdir -p /apps/taphoa39ketoan
+
+🚀 BƯỚC 3 — Upload file build lên server
+
+Trên máy local:
+
+scp -r dist/taphoa39ketoan/browser/* root@180.93.165.213:/apps/taphoa39ketoan/
+
+🚀 BƯỚC 4 — Cấu hình Nginx (làm 1 lần — giống BƯỚC 12 bên TapHoa39KeToanBackEnd/deployDataOnline)
+
+Trên server, tạo file config:
+
+nano /etc/nginx/sites-available/taphoa39ketoan
+
+Nội dung:
+
+server {
+    listen 80;
+    server_name ketoan.songminhcr.com;
+
+    root /apps/taphoa39ketoan;
+    index index.html;
+
+    # Upload XML hoa don (/api/v2/invoices/import-xml)
+    client_max_body_size 20m;
+
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_vary on;
+    gzip_types application/json application/javascript text/css text/plain image/svg+xml;
+
+    # Angular SPA - moi route tra ve index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # index.html khong cache -> deploy ban moi la trinh duyet thay ngay
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    # Proxy API sang container FastAPI
+    location /api/ {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # portal-links (200 email) / Playwright scrape chay lau
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+}
+
+Kích hoạt config:
+
+ln -s /etc/nginx/sites-available/taphoa39ketoan /etc/nginx/sites-enabled/
+
+Xóa default config nếu conflict port 80:
+
+rm -f /etc/nginx/sites-enabled/default
+
+Test và reload:
+
+nginx -t
+systemctl reload nginx
+
+🚀 BƯỚC 5 — Kiểm tra
+
+Mở trình duyệt: http://ketoan.songminhcr.com
+- Trang Angular phải load được
+- http://ketoan.songminhcr.com/api/v2/invoices/providers phải trả JSON (proxy sang backend port 8001)
+
+🚀 BƯỚC 5.5 — Cài SSL (HTTPS) với Let's Encrypt
+
+Chỉ làm khi DNS đã trỏ đúng (máy local): nslookup ketoan.songminhcr.com 8.8.8.8 → 180.93.165.213
+
+apt install certbot python3-certbot-nginx -y
+certbot --nginx -d ketoan.songminhcr.com
+
+Certbot sẽ tự động sửa nginx config để redirect HTTP → HTTPS.
+SSL tự động renew (certbot đã cài timer). Kiểm tra renew: certbot renew --dry-run
+
+Sau khi cài SSL, kiểm tra: https://ketoan.songminhcr.com
+
+🚀 CẬP NHẬT SAU NÀY — Khi có thay đổi code
+
+Trên máy local:
+
+ng build --configuration production
+scp -r dist/taphoa39ketoan/browser/* root@180.93.165.213:/apps/taphoa39ketoan/
+
+Không cần restart nginx (chỉ là static files).
+Trình duyệt vẫn hiện bản cũ → Ctrl+F5.
+
+📝 GHI CHÚ
+- domainUrl / apiUrl / ketoanBackendUrl trong environment.prod.ts đã đổi thành '' (2026-10-14)
+  (trước đây trỏ Render songminhketoanbackend.onrender.com; apiUrl cũ api.taphoa39.com/api gọi nhầm sang Flask)
+- Nginx reverse proxy /api/ sang backend Docker (127.0.0.1:8001) → không cần CORS vì cùng origin
+- KHÔNG có WebSocket (FastAPI kế toán không dùng socket.io) → không cần header Upgrade như DatHang
+- Nút "Kết nối Gmail" cần redirect URI https://ketoan.songminhcr.com/api/gmail/auth/callback
+  trong Google Cloud Console (xem BƯỚC 14 bên TapHoa39KeToanBackEnd/deployDataOnline)
+- TapHoa39KeToanBackEnd phải đang chạy: docker ps | grep taphoa39ketoanbackend
+- Trang lên nhưng mọi dữ liệu lỗi 502 → backend chết: docker logs --tail 40 taphoa39ketoanbackend

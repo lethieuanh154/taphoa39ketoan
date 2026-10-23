@@ -322,3 +322,134 @@ formatDate(date: Date): string          // "15/01/2025"
 formatDateTime(date: Date): string      // "15/01/2025 14:30:00"
 numberToWords(num: number): string      // "Một triệu hai trăm..."
 ```
+
+---
+
+## AuthService + authInterceptor (đăng nhập — 22/10/2026)
+
+**Path**: `services/auth.service.ts`, `interceptors/auth.interceptor.ts`, `guards/auth.guard.ts`
+
+### Chức năng
+- Đăng nhập Google bằng Firebase Auth project **`quanlysongminh`** (`environment.firebaseGmail`, app tên `ketoan-auth`,
+  SDK `firebase` thuần — không dùng `@angular/fire`), scope `gmail.readonly`.
+- Email phải qua whitelist của KeToanBackEnd: `GET /api/auth/me` (401/403 → đăng xuất Firebase).
+- Access token Gmail lúc đăng nhập (~1 giờ) → `POST /api/gmail/auth/save` (BE chỉ lưu khi người đăng nhập = hộp thư hóa đơn).
+- `authInterceptor` gắn header `X-Id-Token` (Firebase ID token) cho mọi request HttpClient lên BE (URL tương đối `/...` hoặc
+  bắt đầu bằng `ketoanBackendUrl` / `apiUrl` / `domainUrl`). Request dùng `fetch()` trực tiếp KHÔNG được gắn.
+
+### Methods chính
+```typescript
+authState$: Observable<{ ready: boolean; user: User | null }>  // guard chờ ready
+signInWithGoogle(): Promise<void>      // popup Google → /api/auth/me → lưu access token Gmail
+logout(): Promise<void>                // signOut → /login
+getIdToken(): Promise<string | null>   // dùng cho interceptor
+getGmailStatus(): Observable<GmailStatus>  // /api/gmail/auth/status: account, hasTokens, hasRefreshToken
+connectGmail(): Promise<boolean>       // popup /api/gmail/auth/url (gọi trong handler click), lấy refresh token 1 lần
+```
+
+---
+
+## PeriodService — kỳ dùng chung (22/10/2026)
+
+**Path**: `services/period.service.ts` — trạng thái của thanh chọn kỳ (`components/shared/period-selector/`) ở MainLayout.
+
+### Chức năng
+- Loại kỳ: `today` · `week` (thứ Hai – Chủ nhật) · `month` · `quarter` · `year` · `custom` (Từ ngày – đến ngày).
+- Ngày dạng chuỗi `'YYYY-MM-DD'` theo giờ máy, `to` tính cả ngày cuối. Mặc định: tháng hiện tại. Lưu `localStorage`
+  key `ketoan_period` (đọc lỗi → về tháng hiện tại, có log `[Period]`).
+- **Page mới phải đọc kỳ từ đây** (không tự làm bộ lọc tháng/năm riêng). Page cũ (dữ liệu demo) **chưa nối** — nối khi viết lại.
+
+### Methods chính
+```typescript
+period: Signal<AccountingPeriod>          // { type, from, to }
+period$: Observable<AccountingPeriod>     // cho code RxJS (vd gọi API theo kỳ)
+label: Signal<string>                     // "Tháng 10/2026", "Quý 4/2026", "Tuần 19/10 – 25/10/2026"…
+selectPreset(type)                        // Hôm nay/Tuần này theo ngày hiện tại; Tháng/Quý/Năm theo đầu kỳ đang chọn
+setMonth(y, m) / setQuarter(y, q) / setYear(y)
+setCustom(from, to): string | null        // trả lý do lỗi (để hiện) hoặc null
+shift(1 | -1)                             // kỳ sau / kỳ trước, giữ loại kỳ (custom: dịch đúng số ngày)
+contains(date): boolean
+```
+
+---
+
+## ReconciliationService — đối soát hóa đơn XML (23/10/2026)
+
+**Path**: `services/reconciliation.service.ts` — API KeToanBackEnd `/api/reconciliation/*`, `/api/kiotviet/unit-conversion/*`
+(chi tiết: `TapHoa39KeToanBackEnd/docs/RECONCILIATION.md`).
+
+### Methods chính
+```typescript
+scanFolder(files): FolderScan            // lọc như doi_soat.py: XML/ZIP + (thư mục gốc) *luong*.xlsx, QUYDOI*.xlsx, anh_xa_hang_hoa.xlsx,
+                                         // bang_quy_doi_kiotviet*.json; bỏ thư mục script tự tạo, ~$...; cảnh báo .xlsm/~$cache1
+zipFiles(scan, onProgress): Promise<Blob>   // fflate Zip + ZipDeflate level 6, giữ giờ sửa file, nhả luồng mỗi 200 file
+upload(zip, scan, opts, onProgress): Promise<runId>   // XHR (withFetch không báo tiến trình upload), tự gắn X-Id-Token
+listRuns() / getRun(id) / deleteRun(id)
+getTab(id, key, query) / exportTab(id, key, title, 'xlsx'|'csv', query)   // query: page, pageSize, q, sort, desc, filters
+downloadReport(id) / downloadCloneZip(id)
+catalogStatus() / refreshCatalog() / downloadCatalog()   // bảng quy đổi ĐVT KiotViet
+rerun(id): Observable<newRunId>          // chạy lại với ánh xạ mới nhất (BE dùng dữ liệu đã phân tích)
+saveMapping(id, edits: MappingEdit[])     // {key, ma_master, he_so, ma_vietda, da_kiem} → {saved, removed, skipped}
+searchCatalog(q): Observable<CatalogItem[]>   // tìm mã master: code, name, unit, units[{unit, conversion}]
+```
+
+## BankReconciliationService — Đối soát CK (23/10/2026)
+
+`services/bank-reconciliation.service.ts` — `/api/bank-reconciliation/*` của KeToanBackEnd (HĐ CK KiotViet lưu theo ngày).
+```typescript
+getRange(from, to): Promise<TransferRange>   // invoices (tên trường KiotViet), days, missing, incomplete, oldest_sync, auto_sync
+sync(from, to)                               // nhờ BE lấy lại từ KiotViet (≤ 31 ngày)
+load(from, to, force, onProgress)            // đọc → lấy ngày thiếu / chưa đủ (force = mọi ngày) theo đoạn ≤ 7 ngày → đọc lại
+```
+Logic khớp: `utils/transfer-reconcile.util.ts` + `utils/tpbank-statement.util.ts` — **MIRROR giống hệt BanHang** (CLAUDE.md gốc).
+
+## EinvoiceCheckService — Kiểm tra HĐ tự động (23/10/2026)
+
+`services/einvoice-check.service.ts` — `/api/einvoice-check/*`.
+```typescript
+listRuns(): Promise<RunList>                 // busy, scheduler {enabled, jobs}, check_time, einvoice_url, runs
+start(scope: 'draft'|'accepted', from?, to?) // → id (409 khi đang kiểm)
+getRun(id)                                   // progress khi đang chạy; counts, bills, unknown, unmapped khi xong
+taxRates() / setTaxRate(master, name, rate)  // thuế suất đúng theo mã master; rate '' = bỏ thuế suất kế toán đặt
+listBills(from, to)                          // HĐĐT KiotViet mọi trạng thái ≤ 92 ngày (Kiểm tra số lượng HĐ đầu ra)
+setTaxRatesBulk(items)                       // xác nhận hàng loạt thuế suất đúng (mặt hàng chỉ dùng 1 thuế suất)
+```
+ReconciliationService thêm (bước 5): `getFigures(id)` (01/GTGT + PL142 + TNCN + định nghĩa dòng), `downloadBangKe(id)`,
+`tncnFromPayroll(file, from, to, toKhai[])`.
+```
+```
+- Tải file: HttpClient `responseType: 'blob'` (interceptor gắn token) → link tạm; tên file đặt ở FE (không đọc
+  `Content-Disposition` vì CORS dev không mở header này).
+
+## CompanyService — MST công ty dùng chung (23/10/2026)
+
+`services/company.service.ts` — MST công ty lưu `localStorage` `ketoan_company_mst` (theo trình duyệt, đăng xuất không xóa).
+```typescript
+mst: Signal<string>          // '' = chưa nhập
+setMst(value): string        // '' = đã lưu; khác = lý do lỗi (10 số, chi nhánh 10 số + "-" + 3 số)
+normalizeMst(v) / mstError(v)
+```
+- MainLayout: chưa có MST → **popup nhập** tự hiện (có "Để sau" — lần mở sau hỏi lại). Góc dưới sidebar (dưới "Gmail: …") hiện
+  `MST: …`, bấm vào để đổi; menu tài khoản cũng có "Đổi MST công ty".
+- Dùng ở: Kiểm tra số lượng HĐ đầu vào / đầu ra (lọc XML theo MST thay cho tự nhận; khác MST tự nhận → cảnh báo; đổi MST → lọc
+  lại ngay), Đối soát hóa đơn XML (ô "MST công ty" mặc định = MST này, sửa tay được cho 1 lần chạy).
+
+## TienIchCacheService — cache IndexedDB các trang Tiện ích (23/10/2026)
+
+`services/tien-ich-cache.service.ts` — DB `ketoan_tien_ich_cache`, store `entries` `{key, data, savedAt}` (qua IndexedDBService).
+```typescript
+get<T>(key, maxAgeMs?) / getMany<T>(keys) / set<T>(key, data) / setMany(items) / remove(key) / clearAll()
+```
+Lỗi IndexedDB chỉ log cảnh báo (trang chạy như không có cache). Mục quá 45 ngày tự xóa; **đăng xuất xóa hết** (AuthService.logout).
+
+| Khóa | Lưu gì | Ai dùng | Khi nào lấy lại |
+|---|---|---|---|
+| `xml-in` / `xml-out` | XML đã đọc từ thư mục (ledger-8 / ledger-9) | mở lại trang hiện ngay, không phải chọn lại thư mục | chọn lại thư mục |
+| `einvoice-bills:<from>:<to>` | HĐĐT KiotViet theo khoảng ngày | ledger-9 | nút "Lấy lại từ KiotViet" |
+| `gmail-links:<nhãn>:<from>:<to>` | link HĐ gốc Gmail (đã gộp số tiền scrape) | ledger-8 | nút "Tải lại" |
+| `ck-range:<from>:<to>` | HĐ CK của khoảng ngày kết thúc trước hôm nay > 8 ngày, đủ mọi ngày | BankReconciliationService.load | "Lấy lại từ KiotViet" (force) |
+| `check-run:<id>` | lần Kiểm tra HĐ đã xong / lỗi | EinvoiceCheckService.getRun | không đổi nữa |
+| `figures:<id>` | số liệu khai thuế của 1 lần đối soát | ReconciliationService.getFigures | không đổi nữa (xóa lần chạy → xóa) |
+
+Mở lại ledger-8 / ledger-9: có XML lưu + kết quả HĐĐT / Gmail lưu cho kỳ đang chọn → đối chiếu lại ngay từ bản lưu (không gọi máy chủ);
+trang ghi "đọc lúc … / lấy lúc … (đã lưu trên máy)".

@@ -1,0 +1,136 @@
+:host {
+  display: block;
+}
+
+.period-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 1rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.8rem;
+  color: #374151;
+}
+
+.period-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: #1e3a5f;
+}
+
+.period-presets {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background: #f3f4f6;
+  border-radius: 8px;
+}
+
+.preset-btn {
+  padding: 0.3rem 0.65rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #4b5563;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.preset-btn:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.preset-btn.active {
+  background: #2c5282;
+  color: #ffffff;
+}
+
+.period-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.step-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #4b5563;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+}
+
+.step-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.period-select,
+.period-date {
+  height: 26px;
+  padding: 0 0.4rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 0.75rem;
+}
+
+.period-label {
+  min-width: 120px;
+  text-align: center;
+  font-weight: 600;
+  color: #111827;
+}
+
+.period-sep {
+  color: #6b7280;
+}
+
+.apply-btn {
+  height: 26px;
+  padding: 0 0.65rem;
+  border: none;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: #ffffff;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.apply-btn:hover {
+  background: #2563eb;
+}
+
+.period-range {
+  margin-left: auto;
+  color: #6b7280;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.period-error {
+  margin-left: auto;
+  color: #dc2626;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .period-range,
+  .period-error {
+    margin-left: 0;
+  }
+}

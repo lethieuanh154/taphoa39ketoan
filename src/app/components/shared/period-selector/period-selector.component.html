@@ -1,0 +1,70 @@
+<div class="period-bar">
+  <span class="period-title"><i class="fa-regular fa-calendar"></i> Kỳ</span>
+
+  <div class="period-presets">
+    @for (p of presets; track p.type) {
+      <button type="button" class="preset-btn" [class.active]="period().type === p.type" (click)="selectPreset(p.type)">
+        {{ p.label }}
+      </button>
+    }
+  </div>
+
+  <div class="period-picker">
+    <button type="button" class="step-btn" (click)="shift(-1)" title="Kỳ trước">
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+
+    @switch (period().type) {
+      @case ('month') {
+        <select class="period-select" [ngModel]="month()" (ngModelChange)="onMonthChange($event)" aria-label="Tháng">
+          @for (m of months; track m) {
+            <option [ngValue]="m">Tháng {{ m }}</option>
+          }
+        </select>
+        <select class="period-select" [ngModel]="year()" (ngModelChange)="onYearChange($event)" aria-label="Năm">
+          @for (y of years; track y) {
+            <option [ngValue]="y">{{ y }}</option>
+          }
+        </select>
+      }
+      @case ('quarter') {
+        <select class="period-select" [ngModel]="quarter()" (ngModelChange)="onQuarterChange($event)" aria-label="Quý">
+          @for (q of quarters; track q) {
+            <option [ngValue]="q">Quý {{ q }}</option>
+          }
+        </select>
+        <select class="period-select" [ngModel]="year()" (ngModelChange)="onYearChange($event)" aria-label="Năm">
+          @for (y of years; track y) {
+            <option [ngValue]="y">{{ y }}</option>
+          }
+        </select>
+      }
+      @case ('year') {
+        <select class="period-select" [ngModel]="year()" (ngModelChange)="onYearChange($event)" aria-label="Năm">
+          @for (y of years; track y) {
+            <option [ngValue]="y">{{ y }}</option>
+          }
+        </select>
+      }
+      @case ('custom') {
+        <input type="date" class="period-date" [(ngModel)]="customFrom" aria-label="Từ ngày">
+        <span class="period-sep">–</span>
+        <input type="date" class="period-date" [(ngModel)]="customTo" aria-label="Đến ngày">
+        <button type="button" class="apply-btn" (click)="applyCustom()">Áp dụng</button>
+      }
+      @default {
+        <span class="period-label">{{ label() }}</span>
+      }
+    }
+
+    <button type="button" class="step-btn" (click)="shift(1)" title="Kỳ sau">
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+  </div>
+
+  @if (customError) {
+    <span class="period-error"><i class="fa-solid fa-circle-exclamation"></i> {{ customError }}</span>
+  } @else {
+    <span class="period-range">{{ rangeText() }}</span>
+  }
+</div>

@@ -1,0 +1,212 @@
+<div class="page">
+  <header class="page-head">
+    <div>
+      <h1><i class="fa-solid fa-link"></i> Ánh xạ hàng hóa</h1>
+      <p class="sub">Mỗi mặt hàng trên hóa đơn → <b>Mã master</b> KiotViet (mã của ĐVT nhỏ nhất) + <b>Hệ số quy đổi</b>
+        (1 ĐVT trên HĐ = bao nhiêu ĐVT master). Dòng <b>Cần xem</b> nằm trên cùng. Sửa xong bấm <b>Lưu</b> rồi
+        <b>Chạy lại đối soát</b>. Dòng đã sửa hoặc tick <b>Đã kiểm</b> được giữ cho mọi lần đối soát sau.</p>
+    </div>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">Lần đối soát</span>
+      <select class="input wide" [ngModel]="run?.id" (ngModelChange)="selectRun($event)" [disabled]="!runs.length">
+        @for (r of runs; track r.id) {
+          <option [ngValue]="r.id">{{ formatDate(r.created_at) }} · {{ r.folder_name }} · {{ r.summary?.period }}{{ r.source_run ? ' · chạy lại' : '' }}</option>
+        }
+      </select>
+      @if (!runs.length) {
+        <span class="hint">Chưa có lần đối soát nào — vào <a routerLink="/invoice-reconciliation-page">Đối soát hóa đơn XML</a> trước.</span>
+      }
+      @if (run?.summary; as s) {
+        <span class="hint">{{ s.n_items | number }} mặt hàng · {{ s.n_review | number }} cần xem · {{ s.n_saved_mappings ?? 0 | number }} dòng đã lưu trên máy chủ</span>
+      }
+    </div>
+
+    <div class="row actions">
+      <button type="button" class="btn btn-primary" (click)="save()" [disabled]="!edits.size || saving">
+        <i class="fa-solid fa-floppy-disk"></i> {{ saving ? 'Đang lưu...' : 'Lưu' }}
+        @if (edits.size) { <span class="pill">{{ edits.size }}</span> }
+      </button>
+      <button type="button" class="btn" (click)="discard()" [disabled]="!edits.size || saving">
+        <i class="fa-solid fa-rotate-left"></i> Bỏ thay đổi
+      </button>
+      <button type="button" class="btn" (click)="rerun()" [disabled]="!run || rerunning || !!edits.size"
+              title="Đối soát lại với ánh xạ mới nhất — không cần tải thư mục lên lại">
+        <i class="fa-solid fa-scale-balanced"></i> {{ rerunning ? 'Đang gửi...' : 'Chạy lại đối soát' }}
+      </button>
+      @if (edits.size) {
+        <span class="warn">{{ edits.size }} dòng đã sửa chưa lưu{{ invalidCount ? ' · ' + invalidCount + ' hệ số không hợp lệ' : '' }}</span>
+      }
+    </div>
+    @if (message) {
+      <div class="msg ok"><i class="fa-solid fa-circle-check"></i> {{ message }}</div>
+    }
+    @if (error) {
+      <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div>
+    }
+  </section>
+
+  @if (run && run.mapping_tabs?.length) {
+    <section class="card">
+      <nav class="tabs">
+        <button type="button" class="tab" [class.active]="activeTab === 'anh-xa-dau-vao'" (click)="selectTab('anh-xa-dau-vao')">
+          Đầu vào <span class="count">{{ tabCount('anh-xa-dau-vao') | number }}</span>
+        </button>
+        <button type="button" class="tab" [class.active]="activeTab === 'anh-xa-dau-ra'" (click)="selectTab('anh-xa-dau-ra')">
+          Đầu ra <span class="count">{{ tabCount('anh-xa-dau-ra') | number }}</span>
+        </button>
+      </nav>
+
+      <div class="toolbar">
+        <div class="search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="search" placeholder="Tìm mã / tên hàng (không cần dấu)..." [(ngModel)]="query.q" (ngModelChange)="queueReload()">
+        </div>
+        <div class="chips">
+          <span class="hint">Cần xem:</span>
+          @for (qk of quick; track qk.value) {
+            <button type="button" class="chip" [class.active]="quickValue === qk.value" (click)="setQuick(qk.value)">{{ qk.label }}</button>
+          }
+        </div>
+        @if (page) {
+          <span class="total">{{ page.total | number }} dòng</span>
+        }
+        @if (loading) {
+          <span class="hint"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</span>
+        }
+      </div>
+
+      @if (page) {
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                @for (c of columns; track c.header) {
+                  <th [style.min-width.px]="c.width" (click)="toggleSort(c)" [class.sorted]="query.sort === col[c.header]"
+                      [class.editable]="c.kind === 'master' || c.kind === 'factor' || c.kind === 'vietda' || c.kind === 'check'">
+                    {{ c.label }}
+                    @if (query.sort === col[c.header]) {
+                      <i class="fa-solid" [class.fa-arrow-down-wide-short]="query.desc" [class.fa-arrow-up-short-wide]="!query.desc"></i>
+                    }
+                  </th>
+                }
+              </tr>
+              <tr class="filter-row">
+                @for (c of columns; track c.header) {
+                  <th>
+                    @if (c.filter) {
+                      <input type="text" [(ngModel)]="filters[c.header]" (ngModelChange)="queueReload()" placeholder="Lọc..."
+                             [attr.aria-label]="'Lọc ' + c.label">
+                    }
+                  </th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of page.rows; track key(row)) {
+                <tr [class.edited]="isEdited(row)" [class.review]="!!raw(row, 'Cần xem')">
+                  @for (c of columns; track c.header) {
+                    @switch (c.kind) {
+                      @case ('check') {
+                        <td class="center">
+                          <input type="checkbox" [ngModel]="current(row).da_kiem" (ngModelChange)="setChecked(row, $event)"
+                                 title="Đã kiểm — khóa dòng cho các lần sau">
+                          @if (isEdited(row)) {
+                            <button type="button" class="undo" (click)="revert(row)" title="Hoàn tác dòng này">
+                              <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                          }
+                        </td>
+                      }
+                      @case ('master') {
+                        <td class="edit">
+                          <div class="master">
+                            <input type="text" [ngModel]="current(row).ma_master" (ngModelChange)="setMaster(row, $event)"
+                                   placeholder="(chưa có)" [attr.aria-label]="'Mã master ' + raw(row, 'Tên hàng (HĐ)')">
+                            <button type="button" class="icon" (click)="openSearch(row)" title="Tìm mã master trong KiotViet">
+                              <i class="fa-solid fa-magnifying-glass"></i>
+                            </button>
+                          </div>
+                        </td>
+                      }
+                      @case ('factor') {
+                        <td class="edit">
+                          <input type="text" inputmode="decimal" class="num" [class.invalid]="isFactorInvalid(row)"
+                                 [ngModel]="factorValue(row)" (ngModelChange)="setFactor(row, $event)" placeholder="(trống)"
+                                 [attr.aria-label]="'Hệ số ' + raw(row, 'Tên hàng (HĐ)')">
+                        </td>
+                      }
+                      @case ('vietda') {
+                        <td class="edit">
+                          <input type="text" [ngModel]="current(row).ma_vietda" (ngModelChange)="setVietda(row, $event)"
+                                 [attr.aria-label]="'Mã Vietda ' + raw(row, 'Tên hàng (HĐ)')">
+                        </td>
+                      }
+                      @default {
+                        <td [class.num]="c.kind === 'num' || c.kind === 'qty'" [class.flag]="c.header === 'Cần xem'"
+                            [title]="text(row, c)">{{ text(row, c) }}</td>
+                      }
+                    }
+                  }
+                </tr>
+                @if (searchKey === key(row)) {
+                  <tr class="search-row">
+                    <td [attr.colspan]="columns.length">
+                      <div class="search-panel">
+                        <div class="search-head">
+                          <b>Tìm mã master cho:</b> {{ raw(row, 'Tên hàng (HĐ)') }} ({{ raw(row, 'ĐVT (HĐ)') }})
+                          <input type="search" [(ngModel)]="searchQ" (keyup.enter)="runSearch()" placeholder="Mã hàng / mã vạch / tên">
+                          <button type="button" class="btn small" (click)="runSearch()" [disabled]="searching">Tìm</button>
+                          <button type="button" class="btn small" (click)="searchKey = null">Đóng</button>
+                        </div>
+                        @if (searching) { <div class="hint"><i class="fa-solid fa-spinner fa-spin"></i> Đang tìm...</div> }
+                        @if (searchError) { <div class="msg error">{{ searchError }}</div> }
+                        @if (!searching && !searchError && !searchItems.length) { <div class="hint">Không thấy mã nào — thử tên ngắn hơn hoặc mã vạch.</div> }
+                        <ul>
+                          @for (it of searchItems; track it.code) {
+                            <li>
+                              <button type="button" class="link" (click)="pick(row, it)" title="Chọn mã này (giữ hệ số đang có)">
+                                <b>{{ it.code }}</b> {{ it.name }} <span class="hint">({{ it.unit }})</span>
+                              </button>
+                              <span class="units">
+                                @for (u of it.units; track u.unit) {
+                                  <button type="button" class="chip" (click)="pick(row, it, u.conversion)"
+                                          [title]="'Chọn mã ' + it.code + ' + hệ số ' + u.conversion">
+                                    {{ u.unit }} = {{ u.conversion }}
+                                  </button>
+                                }
+                              </span>
+                            </li>
+                          }
+                        </ul>
+                        <div class="hint">Bấm tên để chọn mã; bấm 1 ĐVT để chọn mã + hệ số của ĐVT đó (ĐVT trên HĐ thường khớp 1 ĐVT KiotViet).</div>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              } @empty {
+                <tr><td class="empty" [attr.colspan]="columns.length">{{ page.count ? 'Không có dòng nào khớp bộ lọc' : 'Không có mặt hàng' }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pager">
+          <button type="button" class="btn small" (click)="goTo(1)" [disabled]="query.page <= 1"><i class="fa-solid fa-angles-left"></i></button>
+          <button type="button" class="btn small" (click)="goTo(query.page - 1)" [disabled]="query.page <= 1"><i class="fa-solid fa-angle-left"></i></button>
+          <span>Trang {{ query.page | number }} / {{ pageCount | number }}</span>
+          <button type="button" class="btn small" (click)="goTo(query.page + 1)" [disabled]="query.page >= pageCount"><i class="fa-solid fa-angle-right"></i></button>
+          <button type="button" class="btn small" (click)="goTo(pageCount)" [disabled]="query.page >= pageCount"><i class="fa-solid fa-angles-right"></i></button>
+          <label class="hint">Mỗi trang
+            <select [ngModel]="query.pageSize" (ngModelChange)="changePageSize($event)">
+              @for (s of pageSizes; track s) { <option [ngValue]="s">{{ s }}</option> }
+            </select>
+          </label>
+          <span class="hint">Thay đổi chưa lưu được giữ khi chuyển trang / lọc.</span>
+        </div>
+      }
+    </section>
+  }
+</div>

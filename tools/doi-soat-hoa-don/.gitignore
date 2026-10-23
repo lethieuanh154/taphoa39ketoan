@@ -1,0 +1,8 @@
+# Du lieu thue that — KHONG commit
+*.xlsx
+*.xml
+*.zip
+*.pdf
+*.json
+*/
+!.gitignore

@@ -1,0 +1,102 @@
+<div class="st">
+  <div class="st-toolbar">
+    <div class="st-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="search" placeholder="Tìm trong bảng (không cần dấu)..." [(ngModel)]="query.q" (ngModelChange)="queueReload()">
+    </div>
+    @if (page) {
+      <span class="st-total">
+        {{ page.total | number }} dòng
+        @if (page.total !== page.count) {
+          <span class="st-muted">/ {{ page.count | number }}</span>
+        }
+      </span>
+    }
+    @if (loading) {
+      <span class="st-muted"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</span>
+    }
+    @if (source?.export) {
+      <div class="st-actions">
+        <button type="button" class="st-btn" (click)="export('xlsx')" [disabled]="exporting || !page?.total"
+                title="Xuất đúng các dòng đang lọc">
+          <i class="fa-solid fa-file-excel"></i> Excel
+        </button>
+        <button type="button" class="st-btn" (click)="export('csv')" [disabled]="exporting || !page?.total"
+                title="Xuất đúng các dòng đang lọc">
+          <i class="fa-solid fa-file-csv"></i> CSV
+        </button>
+      </div>
+    }
+  </div>
+
+  @if (error) {
+    <div class="st-error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div>
+  }
+
+  @if (page) {
+    <div class="st-wrap">
+      <table>
+        <thead>
+          <tr>
+            @for (h of page.headers; track $index; let i = $index) {
+              <th [style.min-width.px]="width(i)" (click)="toggleSort(i)" [class.sorted]="query.sort === i"
+                  title="Bấm để sắp xếp">
+                {{ h }}
+                @if (query.sort === i) {
+                  <i class="fa-solid" [class.fa-arrow-down-wide-short]="query.desc" [class.fa-arrow-up-short-wide]="!query.desc"></i>
+                }
+              </th>
+            }
+          </tr>
+          <tr class="st-filter-row">
+            @for (h of page.headers; track $index; let i = $index) {
+              <th>
+                <input type="text" [(ngModel)]="filters[i]" (ngModelChange)="queueReload()" placeholder="Lọc..."
+                       [attr.aria-label]="'Lọc cột ' + h">
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of page.rows; track $index) {
+            <tr>
+              @for (h of page.headers; track $index; let i = $index) {
+                <td [class.num]="type(i) === 'number'" [class.wrap]="page.wrap">{{ cell(row, i) }}</td>
+              }
+            </tr>
+          } @empty {
+            <tr>
+              <td class="st-empty" [attr.colspan]="page.headers.length">
+                {{ page.count ? 'Không có dòng nào khớp bộ lọc' : 'Không có dữ liệu' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="st-pager">
+      <button type="button" class="st-btn" (click)="goTo(1)" [disabled]="query.page <= 1" title="Trang đầu">
+        <i class="fa-solid fa-angles-left"></i>
+      </button>
+      <button type="button" class="st-btn" (click)="goTo(query.page - 1)" [disabled]="query.page <= 1" title="Trang trước">
+        <i class="fa-solid fa-angle-left"></i>
+      </button>
+      <span>Trang {{ query.page | number }} / {{ pageCount | number }}</span>
+      <button type="button" class="st-btn" (click)="goTo(query.page + 1)" [disabled]="query.page >= pageCount" title="Trang sau">
+        <i class="fa-solid fa-angle-right"></i>
+      </button>
+      <button type="button" class="st-btn" (click)="goTo(pageCount)" [disabled]="query.page >= pageCount" title="Trang cuối">
+        <i class="fa-solid fa-angles-right"></i>
+      </button>
+      <label class="st-muted">
+        Mỗi trang
+        <select [ngModel]="query.pageSize" (ngModelChange)="changePageSize($event)">
+          @for (s of pageSizes; track s) {
+            <option [ngValue]="s">{{ s }}</option>
+          }
+        </select>
+      </label>
+    </div>
+  }
+</div>

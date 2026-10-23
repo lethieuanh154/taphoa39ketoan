@@ -1,9 +1,11 @@
 import { Routes } from '@angular/router';
 import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
+import { authGuard, loginGuard } from './guards/auth.guard';
+import { LoginPageComponent } from './components/login-page/login-page.component';
+import { PlaceholderComponent } from './components/placeholder/placeholder.component';
 
 // Components
 import { AccountantDashboardComponent } from './components/accountant-dashboard/accountant-dashboard.component';
-import { PlaceholderComponent } from './components/placeholder/placeholder.component';
 import { JournalPageComponent } from './components/journal-page/journal-page.component';
 import { LedgerPageComponent } from './components/ledger-page/ledger-page.component';
 import { TrialBalancePageComponent } from './components/trial-balance-page/trial-balance-page.component';
@@ -52,9 +54,12 @@ import { SalesInvoicePageComponent } from './components/accountant-pages/sales-i
  * Dành cho Công ty TNHH 1 thành viên - Doanh nghiệp nhỏ & vừa
  */
 export const routes: Routes = [
+  // Đăng nhập Google (ngoài layout, không cần guard đăng nhập)
+  { path: 'login', component: LoginPageComponent, canActivate: [loginGuard] },
   {
     path: '',
     component: MainLayoutComponent,
+    canActivate: [authGuard],
     children: [
       // ═══════════════════════════════════════════════════════════════════
       // DASHBOARD
@@ -63,20 +68,58 @@ export const routes: Routes = [
       { path: 'accountant-dashboard', component: AccountantDashboardComponent },
 
       // ═══════════════════════════════════════════════════════════════════
-      // 0. ĐỒNG BỘ HÓA ĐƠN
+      // TIỆN ÍCH (menu 3 mục, 22/10/2026)
+      // ═══════════════════════════════════════════════════════════════════
+      // Kiểm tra HĐ tự động (bước 4, 23/10/2026) — kết quả job kiểm HĐ nháp einvoice của KeToanBackEnd. ?run=<id>
+      {
+        path: 'invoice-check-page',
+        loadComponent: () => import('./components/invoice-check-page/invoice-check-page.component')
+          .then(m => m.InvoiceCheckPageComponent),
+        data: { noPeriodBar: true }
+      },
+      // Đối soát CK (bước 2, 23/10/2026) — HĐ CK KiotViet (qua KeToanBackEnd) ⇄ sao kê TPBank; khoảng ngày theo thanh chọn kỳ
+      {
+        path: 'bank-reconciliation-page',
+        loadComponent: () => import('./components/bank-reconciliation-page/bank-reconciliation-page.component')
+          .then(m => m.BankReconciliationPageComponent)
+      },
+      // Số liệu khai thuế (bước 5, 23/10/2026) — mục cuối Tiện ích: 01/GTGT, PL142, bảng kê, 05/KK-TNCN. ?run=<id>
+      {
+        path: 'tax-figures-page',
+        loadComponent: () => import('./components/tax-figures-page/tax-figures-page.component')
+          .then(m => m.TaxFiguresPageComponent)
+      },
+      // Đối soát CK — chuyển khoản HĐ đầu vào (HĐ mua ⇄ tiền trả NCC): chưa làm (user 23/10/2026: pending)
+      { path: 'bank-reconciliation-in-page', component: PlaceholderComponent, data: { title: 'Chuyển khoản hóa đơn đầu vào', module: 'Tiện ích — Đối soát CK: HĐ đầu vào ⇄ tiền trả nhà cung cấp trên sao kê (chưa làm)' } },
+      // Đối soát hóa đơn XML (Pha 1 bước 3) — tải riêng khi mở trang (kèm thư viện nén ZIP fflate)
+      {
+        path: 'invoice-reconciliation-page',
+        loadComponent: () => import('./components/invoice-reconciliation-page/invoice-reconciliation-page.component')
+          .then(m => m.InvoiceReconciliationPageComponent)
+      },
+      // Ánh xạ hàng hóa (Pha 1 bước 4) — ?run=<id>; hỏi lại khi rời trang còn thay đổi chưa lưu
+      {
+        path: 'item-mapping-page',
+        loadComponent: () => import('./components/item-mapping-page/item-mapping-page.component')
+          .then(m => m.ItemMappingPageComponent),
+        canDeactivate: [(c: { canLeave(): boolean }) => c.canLeave()]
+      },
+
+      // ═══════════════════════════════════════════════════════════════════
+      // TIỆN ÍCH — ĐỒNG BỘ HÓA ĐƠN (ledger-8/9)
       // ═══════════════════════════════════════════════════════════════════
       { path: 'accountant-pages/ledger-8-dong-bo-hoa-don-v2', component: Ledger8DongBoHoaDonV2Component },
       { path: 'accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra', component: Ledger9DongBoHoaDonDauRaComponent },
 
       // ═══════════════════════════════════════════════════════════════════
-      // 1. DANH MỤC KẾ TOÁN
+      // 1. DANH MỤC KẾ TOÁN (không theo kỳ → ẩn thanh chọn kỳ)
       // ═══════════════════════════════════════════════════════════════════
-      { path: 'chart-of-accounts-page', component: ChartOfAccountsPageComponent },
-      { path: 'customer-page', component: CustomerPageComponent },
-      { path: 'supplier-page', component: SupplierPageComponent },
-      { path: 'employee-page', component: EmployeePageComponent },
-      { path: 'product-page', component: ProductPageComponent },
-      { path: 'bank-page', component: BankPageComponent },
+      { path: 'chart-of-accounts-page', component: ChartOfAccountsPageComponent, data: { noPeriodBar: true } },
+      { path: 'customer-page', component: CustomerPageComponent, data: { noPeriodBar: true } },
+      { path: 'supplier-page', component: SupplierPageComponent, data: { noPeriodBar: true } },
+      { path: 'employee-page', component: EmployeePageComponent, data: { noPeriodBar: true } },
+      { path: 'product-page', component: ProductPageComponent, data: { noPeriodBar: true } },
+      { path: 'bank-page', component: BankPageComponent, data: { noPeriodBar: true } },
 
       // ═══════════════════════════════════════════════════════════════════
       // 2. CHỨNG TỪ KẾ TOÁN
@@ -143,12 +186,16 @@ export const routes: Routes = [
       { path: 'management-reports-page', component: ManagementReportsPageComponent },
 
       // ═══════════════════════════════════════════════════════════════════
-      // 11. HỆ THỐNG & QUẢN TRỊ
+      // 11. KHÓA SỔ & KIỂM TOÁN
       // ═══════════════════════════════════════════════════════════════════
       { path: 'period-lock-page', component: PeriodLockPageComponent },
       { path: 'audit-trail-page', component: AuditTrailPageComponent },
-      { path: 'user-roles-page', component: UserRolesPageComponent },
-      { path: 'system-settings-page', component: SystemSettingsPageComponent },
+
+      // ═══════════════════════════════════════════════════════════════════
+      // THIẾT LẬP
+      // ═══════════════════════════════════════════════════════════════════
+      { path: 'user-roles-page', component: UserRolesPageComponent, data: { noPeriodBar: true } },
+      { path: 'system-settings-page', component: SystemSettingsPageComponent, data: { noPeriodBar: true } },
     ],
   },
   // Catch-all redirect

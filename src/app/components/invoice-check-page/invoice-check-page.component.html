@@ -1,0 +1,317 @@
+<div class="page">
+  <header class="page-head">
+    <h1><i class="fa-solid fa-rotate"></i> Kiểm tra hóa đơn tự động</h1>
+    <p class="sub">Máy chủ đọc HĐ đầu ra <b>nháp</b> (chưa phát hành) trên HĐĐT KiotViet và kiểm <b>thuế suất</b> từng dòng (theo mã
+      master: kế toán đặt, hoặc thuế suất HĐ đầu vào gần nhất) + <b>số tiền</b> (thuế từng dòng, bảng tổng hợp thuế suất, tổng HĐ).
+      Chỉ đọc — không sửa, không phát hành HĐ. Sửa HĐ trên trang HĐĐT KiotViet rồi phát hành như bình thường.</p>
+  </header>
+
+  <!-- ═══════════ LỊCH + KIỂM TRA NGAY ═══════════ -->
+  <section class="card">
+    <div class="row">
+      @if (list) {
+        @if (list.scheduler.enabled) {
+          <span class="badge ok"><i class="fa-solid fa-clock"></i> Tự kiểm lúc {{ list.check_time }} hằng ngày (giờ VN)</span>
+          @for (j of list.scheduler.jobs; track j.name) {
+            @if (j.name === 'einvoice_check') {
+              <span class="hint">Lần tới {{ viTime(j.next_at) }}@if (j.last_result) { · lần trước: {{ j.last_result }} }</span>
+            }
+          }
+        } @else {
+          <span class="badge off"><i class="fa-solid fa-clock"></i> Lịch tự kiểm đang TẮT trên máy chủ này</span>
+          <span class="hint">(bật SCHEDULER_ENABLED=true trong .env của KeToanBackEnd trên VPS) — vẫn bấm Kiểm tra ngay được</span>
+        }
+      }
+    </div>
+    <div class="row">
+      <label class="radio"><input type="radio" name="scope" value="draft" [(ngModel)]="scope"> HĐ nháp còn tồn (chưa phát hành)</label>
+      <label class="radio"><input type="radio" name="scope" value="accepted" [(ngModel)]="scope"> HĐ đã phát hành (CQT chấp nhận)</label>
+      @if (scope === 'accepted') {
+        <label class="date-field">Từ <input type="date" [(ngModel)]="fromDate"></label>
+        <label class="date-field">Đến <input type="date" [(ngModel)]="toDate"></label>
+        <span class="hint">tối đa 7 ngày / lần (~180 HĐ / ngày, đọc từng HĐ mất ~0,5 giây)</span>
+      }
+      <button type="button" class="btn btn-primary" (click)="startCheck()" [disabled]="starting || !!list?.busy">
+        <i class="fa-solid" [ngClass]="starting ? 'fa-spinner fa-spin' : 'fa-play'"></i>
+        {{ list?.busy ? 'Đang kiểm...' : 'Kiểm tra ngay' }}
+      </button>
+      <button type="button" class="btn" (click)="setView('rates')" title="Xem / đặt thuế suất đúng theo mã master">
+        <i class="fa-solid fa-percent"></i> Thuế suất đúng theo mã master
+      </button>
+    </div>
+    @if (error) { <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div> }
+    @if (msg) { <div class="msg ok"><i class="fa-solid fa-circle-check"></i> {{ msg }}</div> }
+  </section>
+
+  <!-- ═══════════ KẾT QUẢ 1 LẦN KIỂM ═══════════ -->
+  @if (run) {
+    <section class="card">
+      <div class="result-head">
+        <h2>Lần kiểm {{ viTime(run.started_at) }}</h2>
+        <span class="hint">{{ run.trigger === 'schedule' ? 'Lịch tự động' : run.created_by }} · {{ run.scope_label }}
+          @if (run.scope === 'accepted') { {{ viDate(run.from) }} → {{ viDate(run.to) }} } @else { (ngày HĐ từ {{ viDate(run.from) }}) }
+          @if (run.duration_s) { · {{ run.duration_s }} giây }</span>
+        @if (einvoiceUrl) {
+          <a class="btn small" [href]="einvoiceUrl" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở HĐĐT KiotViet</a>
+        }
+      </div>
+
+      @if (run.status === 'running') {
+        <div class="progress">
+          <div class="bar"><div class="fill" [style.width.%]="percent(run)"></div></div>
+          <span>{{ run.progress?.label }} @if (run.progress?.total) { — {{ run.progress?.done }}/{{ run.progress?.total }} HĐ }</span>
+        </div>
+      } @else if (run.status === 'error') {
+        <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> Lần kiểm lỗi: {{ run.error }}</div>
+      } @else {
+        <div class="stats">
+          <div class="stat"><b>{{ run.counts.checked | number }}</b><small>HĐ đã kiểm{{ run.counts.read_errors ? ' (' + run.counts.read_errors + ' không đọc được)' : '' }}</small></div>
+          <div class="stat" [class.bad]="run.counts.bills_error"><b>{{ run.counts.bills_error | number }}</b><small>HĐ có lỗi</small></div>
+          <div class="stat" [class.warnc]="run.counts.bills_warn"><b>{{ run.counts.bills_warn | number }}</b><small>HĐ cần xem</small></div>
+          <div class="stat good"><b>{{ run.counts.bills_ok | number }}</b><small>HĐ không lỗi</small></div>
+          <div class="stat" [class.warnc]="run.counts.unknown_masters"><b>{{ run.counts.unknown_masters | number }}</b><small>mặt hàng chưa biết thuế suất đúng</small></div>
+        </div>
+        @if (run.counts.bills === 0) {
+          <div class="msg ok"><i class="fa-solid fa-circle-check"></i> Không có HĐ {{ run.scope === 'draft' ? 'nháp nào cần phát hành' : 'nào' }} trong khoảng này.</div>
+        }
+        @if (run.counts.kinds && kindsText(run)) { <p class="hint">Loại: {{ kindsText(run) }}</p> }
+        @if (run.counts.catalog_refreshed) {
+          <p class="hint"><i class="fa-solid fa-rotate"></i> Có mã hàng mới chưa có trong bảng quy đổi → máy đã tự lấy lại bảng quy đổi từ KiotViet.</p>
+        }
+        @if (run.counts.kv_compared !== null && run.counts.kv_compared !== undefined) {
+          <p class="hint"><i class="fa-solid fa-scale-balanced"></i> Đã so tổng tiền {{ run.counts.kv_compared | number }} HĐ với HĐ bán KiotViet cùng mã.</p>
+        }
+      }
+      @for (w of run.warnings; track $index) { <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> {{ w }}</div> }
+
+      @if (run.status === 'done') {
+        <div class="tabs">
+          <button type="button" class="tab" [class.active]="view === 'issues'" (click)="setView('issues')">HĐ có lỗi / cần xem <span class="count">{{ issueBills.length }}</span></button>
+          <button type="button" class="tab" [class.active]="view === 'all'" (click)="setView('all')">Tất cả HĐ <span class="count">{{ run.bills?.length || 0 }}</span></button>
+          <button type="button" class="tab" [class.active]="view === 'unknown'" (click)="setView('unknown')">Chưa biết thuế suất đúng <span class="count">{{ run.unknown?.length || 0 }}</span></button>
+          @if (run.unmapped?.length) {
+            <button type="button" class="tab" [class.active]="view === 'unmapped'" (click)="setView('unmapped')">Mã không có trong bảng quy đổi <span class="count">{{ run.unmapped?.length }}</span></button>
+          }
+          <button type="button" class="tab" [class.active]="view === 'rates'" (click)="setView('rates')">Thuế suất đúng theo mã master</button>
+        </div>
+
+        <!-- HĐ -->
+        @if (view === 'issues' || view === 'all') {
+          <div class="toolbar">
+            <div class="search"><i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" [(ngModel)]="q" (ngModelChange)="page = 1" placeholder="Mã HĐ, số HĐĐT, mã / tên hàng..."></div>
+            @if (view === 'all') {
+              <div class="chips">
+                @for (c of levelChips; track c.value) {
+                  <button type="button" class="chip" [class.active]="levelFilter === c.value" (click)="levelFilter = c.value; page = 1">{{ c.label }}</button>
+                }
+              </div>
+            }
+            <span class="total">{{ filteredBills.length | number }} HĐ</span>
+          </div>
+          @if (run.truncated && view === 'all') { <p class="hint">Kết quả lớn: máy chủ chỉ lưu HĐ có lỗi / cần xem.</p> }
+          <div class="wrap">
+            <table>
+              <thead>
+                <tr><th>Mã HĐ</th><th>HĐĐT</th><th>Ngày</th><th>TT</th><th class="num">Chưa thuế</th><th class="num">Thuế</th>
+                  <th class="num">Tổng TT</th><th>Kết quả</th><th>Chi tiết</th></tr>
+              </thead>
+              <tbody>
+                @for (b of pageBills; track b.id) {
+                  <tr [ngClass]="'lv-' + b.level">
+                    <td class="code">
+                      <a class="link" [href]="billUrl(b)" target="_blank" rel="noopener" title="Mở đúng HĐ này trên HĐĐT KiotViet">{{ b.code }} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                      <button type="button" class="link" (click)="copy(b.code)" title="Copy mã HĐ"><i class="fa-regular fa-copy"></i></button>
+                    </td>
+                    <td class="nowrap">{{ b.series }}{{ b.number ? '-' + b.number : '' }}</td>
+                    <td class="nowrap">{{ billTime(b.date) }}</td>
+                    <td>{{ b.payment }}</td>
+                    <td class="num">{{ vnd(b.amount) }}</td>
+                    <td class="num">{{ vnd(b.amount_vat) }}</td>
+                    <td class="num">{{ vnd(b.total) }}</td>
+                    <td><span class="level" [ngClass]="b.level">{{ levelLabel[b.level] }}</span></td>
+                    <td class="issues">
+                      @for (i of b.issues; track $index) {
+                        <div class="issue" [ngClass]="i.level">
+                          <b>{{ i.kind }}</b>
+                          @if (i.line) { <span class="ln">dòng {{ i.line }} · {{ i.code }} {{ i.name }}</span> }
+                          <span>{{ i.message }}</span>
+                          @if (i.master && i.master !== i.code) { <span class="ln">(mã master {{ i.master }})</span> }
+                          @if (i.master) {
+                            @if (savedRate(i)) {
+                              <span class="saved">đã đặt {{ savedRate(i) }} cho {{ i.master }}</span>
+                            } @else {
+                              <span class="fix">
+                                @if (i.expected && i.current) {
+                                  <button type="button" class="btn tiny" (click)="saveRate(i.master!, i.master_name || '', i.current!)" [disabled]="savingRate === i.master"
+                                    title="HĐ đúng, thuế suất đúng của mặt hàng là {{ i.current }}">Đúng là {{ i.current }}</button>
+                                  @if (i.source === 'input') {
+                                    <button type="button" class="btn tiny" (click)="saveRate(i.master!, i.master_name || '', i.expected!)" [disabled]="savingRate === i.master"
+                                      title="Khóa thuế suất {{ i.expected }} cho mã master {{ i.master }}">Khóa {{ i.expected }}</button>
+                                  }
+                                } @else if (i.current) {
+                                  <button type="button" class="btn tiny" (click)="saveRate(i.master!, i.master_name || '', i.current!)" [disabled]="savingRate === i.master">Đặt {{ i.current }} là đúng</button>
+                                }
+                              </span>
+                            }
+                          }
+                        </div>
+                      } @empty { <span class="hint">—</span> }
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="9" class="empty">{{ view === 'issues' ? 'Không có HĐ nào có lỗi / cần xem 🎉' : 'Không có HĐ.' }}</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (filteredBills.length > pageSize) {
+            <div class="pager">
+              <button type="button" (click)="page = page - 1" [disabled]="page === 1"><i class="fa-solid fa-angle-left"></i></button>
+              <span>Trang {{ page }} / {{ pageCount(filteredBills.length) }}</span>
+              <button type="button" (click)="page = page + 1" [disabled]="page >= pageCount(filteredBills.length)"><i class="fa-solid fa-angle-right"></i></button>
+            </div>
+          }
+        }
+
+        <!-- Mặt hàng chưa biết thuế suất đúng -->
+        @if (view === 'unknown') {
+          <div class="explain">
+            <b>Vì sao có bảng này?</b> Để biết dòng hàng trên HĐ ghi thuế suất đúng hay sai, máy cần biết <b>thuế suất đúng</b> của mặt
+            hàng đó. Máy lấy từ 2 nguồn: (1) <b>kế toán đặt</b>; (2) thuế suất trên <b>HĐ mua vào gần nhất</b> của cùng mặt hàng — máy tự
+            lấy mỗi lần chạy <b>Đối soát hóa đơn XML</b> có HĐ đầu vào. Các mặt hàng dưới đây chưa có nguồn nào nên <b>chưa kiểm được
+            thuế suất</b> (số tiền vẫn được kiểm).
+            <br>Cách xử lý: chạy <b>Đối soát hóa đơn XML</b> với thư mục HĐ đầu vào + đầu ra (máy lấy cả thuế suất trên HĐ ra đã phát hành)
+            — máy tự điền phần lớn; hoặc nếu thuế suất đang dùng đã được kiểm, bấm <b>Xác nhận</b> bên dưới. Áp dụng từ lần kiểm sau.
+          </div>
+          @if (singleRateUnknown.length) {
+            <div class="row">
+              <button type="button" class="btn btn-primary" (click)="confirmAllUnknown()" [disabled]="savingRate === '*'">
+                <i class="fa-solid" [ngClass]="savingRate === '*' ? 'fa-spinner fa-spin' : 'fa-check-double'"></i>
+                Xác nhận thuế suất đang dùng cho {{ singleRateUnknown.length }} mặt hàng
+              </button>
+              <span class="hint">chỉ mặt hàng mà mọi dòng trên HĐ đang kiểm dùng cùng 1 thuế suất; mặt hàng có nhiều thuế suất phải chọn từng dòng</span>
+            </div>
+          }
+          <div class="wrap">
+            <table>
+              <thead><tr><th>Mã master</th><th>Tên</th><th>Mã trên HĐ</th><th>Đang dùng trên HĐ</th><th>Thuế suất đúng</th></tr></thead>
+              <tbody>
+                @for (u of run.unknown || []; track u.master_code) {
+                  <tr [class.lv-warn]="(u.rates | keyvalue).length > 1">
+                    <td class="code">{{ u.master_code }}</td>
+                    <td>{{ u.master_name || u.name }}</td>
+                    <td class="small">{{ u.codes.join(', ') }}</td>
+                    <td>{{ ratesText(u.rates) }}</td>
+                    <td class="nowrap">
+                      @if (savedRate(u)) {
+                        <span class="saved">đã đặt {{ savedRate(u) }}</span>
+                      } @else {
+                        <select [ngModel]="rateDraft[u.master_code] || topRate(u)" (ngModelChange)="rateDraft[u.master_code] = $event">
+                          @for (v of validRates; track v) { <option [value]="v">{{ v }}</option> }
+                        </select>
+                        <button type="button" class="btn tiny" (click)="saveRate(u.master_code, u.master_name, rateDraft[u.master_code] || topRate(u))"
+                          [disabled]="savingRate === u.master_code">Lưu</button>
+                      }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="5" class="empty">Mọi mặt hàng đều đã có thuế suất đúng.</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (view === 'unmapped') {
+          <p class="hint">Mã hàng trên HĐĐT không có trong bảng quy đổi KiotViet, kể cả sau khi máy đã tự lấy lại bảng quy đổi (hàng đã xóa /
+            đổi mã trên KiotViet?) → không biết mã master, chưa kiểm được thuế suất. Kiểm mã hàng này trên KiotViet.</p>
+          <div class="wrap">
+            <table>
+              <thead><tr><th>Mã hàng</th><th>Tên</th><th>Đang dùng trên HĐ</th></tr></thead>
+              <tbody>
+                @for (u of run.unmapped || []; track u.code) {
+                  <tr><td class="code">{{ u.code }}</td><td>{{ u.name }}</td><td>{{ ratesText(u.rates) }}</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    </section>
+  }
+
+  <!-- Thuế suất đúng theo mã master (không cần lần kiểm) -->
+  @if (view === 'rates') {
+    <section class="card">
+      <h2>Thuế suất đúng theo mã master</h2>
+      <p class="hint">Nguồn theo thứ tự ưu tiên: <b>Kế toán đặt</b> · <b>HĐ ra</b> đã phát hành gần nhất (đã được kế toán kiểm) · <b>HĐ vào</b>
+        gần nhất — HĐ ra / vào tự cập nhật mỗi lần Đối soát hóa đơn XML. Sai so với Kế toán đặt / HĐ ra = Lỗi, so với HĐ vào = Cần xem.</p>
+      <div class="toolbar">
+        <div class="search"><i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" [(ngModel)]="rateQ" (ngModelChange)="ratePage = 1" placeholder="Mã / tên master, thuế suất..."></div>
+        <span class="total">{{ filteredRates.length | number }} mã master</span>
+        <button type="button" class="btn small" (click)="loadRates()"><i class="fa-solid fa-rotate"></i> Tải lại</button>
+      </div>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Mã master</th><th>Tên</th><th>Thuế suất đúng</th><th>Nguồn</th><th>HĐ vào gần nhất</th><th>Đặt thuế suất</th></tr></thead>
+          <tbody>
+            @for (r of pageRates; track r.master_code) {
+              <tr>
+                <td class="code">{{ r.master_code }}</td>
+                <td>{{ r.master_name }}</td>
+                <td><b>{{ r.rate || '—' }}</b></td>
+                <td><span class="src" [class.manual]="r.source === 'manual'">{{ r.source === 'manual' ? 'Kế toán đặt' : r.source === 'output' ? 'HĐ ra' : r.source === 'input' ? 'HĐ vào' : '—' }}</span></td>
+                <td class="small">@if (r.input) { {{ r.input.rate }} · {{ r.input.ky_hieu }}-{{ r.input.so }} · {{ viDate(r.input.date) }} · {{ r.input.seller_name }} }</td>
+                <td class="nowrap">
+                  <select [ngModel]="rateDraft[r.master_code] ?? (r.manual?.rate || '')" (ngModelChange)="rateDraft[r.master_code] = $event">
+                    <option value="">(theo HĐ vào)</option>
+                    @for (v of validRates; track v) { <option [value]="v">{{ v }}</option> }
+                  </select>
+                  <button type="button" class="btn tiny" (click)="saveRate(r.master_code, r.master_name, rateDraft[r.master_code] ?? (r.manual?.rate || ''))"
+                    [disabled]="savingRate === r.master_code || rateDraft[r.master_code] === undefined">Lưu</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6" class="empty">{{ ratesLoaded ? 'Chưa có — chạy Đối soát hóa đơn XML (có HĐ đầu vào) để máy tự lấy thuế suất theo mã master.' : 'Đang tải...' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (filteredRates.length > pageSize) {
+        <div class="pager">
+          <button type="button" (click)="ratePage = ratePage - 1" [disabled]="ratePage === 1"><i class="fa-solid fa-angle-left"></i></button>
+          <span>Trang {{ ratePage }} / {{ pageCount(filteredRates.length) }}</span>
+          <button type="button" (click)="ratePage = ratePage + 1" [disabled]="ratePage >= pageCount(filteredRates.length)"><i class="fa-solid fa-angle-right"></i></button>
+        </div>
+      }
+    </section>
+  }
+
+  <!-- ═══════════ CÁC LẦN KIỂM GẦN ĐÂY ═══════════ -->
+  @if (list?.runs?.length) {
+    <section class="card">
+      <h2>Các lần kiểm gần đây</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Thời gian</th><th>Ai chạy</th><th>Phạm vi</th><th class="num">HĐ</th><th class="num">Lỗi</th><th class="num">Cần xem</th><th>Trạng thái</th><th></th></tr></thead>
+          <tbody>
+            @for (r of list!.runs; track r.id) {
+              <tr [class.current]="run?.id === r.id">
+                <td class="nowrap">{{ viTime(r.started_at) }}</td>
+                <td>{{ r.trigger === 'schedule' ? 'Lịch tự động' : r.created_by }}</td>
+                <td>{{ r.scope_label }}@if (r.scope === 'accepted') { {{ viDate(r.from) }} → {{ viDate(r.to) }} }</td>
+                <td class="num">{{ r.counts.bills ?? '' }}</td>
+                <td class="num" [class.bad-text]="r.counts.bills_error">{{ r.counts.bills_error ?? '' }}</td>
+                <td class="num">{{ r.counts.bills_warn ?? '' }}</td>
+                <td>{{ r.status === 'done' ? 'Xong' : r.status === 'running' ? 'Đang kiểm' : 'Lỗi' }}</td>
+                <td><button type="button" class="btn tiny" (click)="openRun(r.id)" [disabled]="loadingRun">Xem</button></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  } @else if (list && !run) {
+    <p class="hint">Chưa có lần kiểm nào — bấm <b>Kiểm tra ngay</b>.</p>
+  }
+</div>

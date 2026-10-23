@@ -1,6 +1,6 @@
 <div class="main-container">
   <!-- ═══════════════════════════════════════════════════════════════════════════
-       SIDEBAR: Menu 12 Phân hệ Kế toán Doanh nghiệp
+       SIDEBAR: Menu 3 mục — Tiện ích · Kế toán chi tiết · Thiết lập (menu.config.ts)
        Theo Thông tư 133/2016/TT-BTC & định hướng Thông tư 99/2025/TT-BTC
        Hệ thống độc lập - TapHoa39KeToan
   ═══════════════════════════════════════════════════════════════════════════ -->
@@ -26,373 +26,111 @@
           <span class="nav-text" *ngIf="!isSidebarCollapsed">Tổng quan</span>
         </a>
 
-        <div class="nav-divider"></div>
+        @for (section of sections; track section.key) {
+          <div class="nav-divider"></div>
 
-        <!-- ═══════════════════════════════════════════════════════════════════
-             0. KIỂM TRA HÓA ĐƠN TỰ ĐỘNG
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('kiemTraHoaDon')">
-            <span class="nav-number">0.</span>
-            <i class="fa-solid fa-rotate nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Kiểm tra hóa đơn tự động</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['kiemTraHoaDon']"
-               [class.fa-chevron-right]="!expandedGroups['kiemTraHoaDon']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['kiemTraHoaDon'] && !isSidebarCollapsed">
-            <a routerLink="/accountant-pages/ledger-8-dong-bo-hoa-don-v2" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-file-import"></i> Hóa đơn đầu vào
-            </a>
-            <a routerLink="/accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-file-export"></i> Hóa đơn đầu ra
-            </a>
-          </div>
-        </div>
+          <!-- Mục cấp 1 -->
+          <div class="nav-section">
+            <div class="nav-section-header" (click)="toggleSection(section.key)" [title]="section.label">
+              <i class="fa-solid nav-icon" [ngClass]="section.icon"></i>
+              <span class="nav-text" *ngIf="!isSidebarCollapsed">{{ section.label }}</span>
+              <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
+                 [class.fa-chevron-down]="expandedSections[section.key]"
+                 [class.fa-chevron-right]="!expandedSections[section.key]"></i>
+            </div>
 
-        <!-- ═══════════════════════════════════════════════════════════════════
-             1. DANH MỤC KẾ TOÁN
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('danhMuc')">
-            <span class="nav-number">1.</span>
-            <i class="fa-solid fa-folder-tree nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Danh mục kế toán</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['danhMuc']"
-               [class.fa-chevron-right]="!expandedGroups['danhMuc']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['danhMuc'] && !isSidebarCollapsed">
-            <a routerLink="/chart-of-accounts-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-sitemap"></i> Hệ thống tài khoản
-            </a>
-            <a routerLink="/customer-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-user-tie"></i> Khách hàng
-            </a>
-            <a routerLink="/supplier-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-truck-field"></i> Nhà cung cấp
-            </a>
-            <a routerLink="/employee-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-id-badge"></i> Nhân viên
-            </a>
-            <a routerLink="/product-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-boxes-stacked"></i> Hàng hóa - Dịch vụ
-            </a>
-            <a routerLink="/bank-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-building-columns"></i> Ngân hàng
-            </a>
-          </div>
-        </div>
+            @if (expandedSections[section.key]) {
+              <div class="nav-section-items">
+                <!-- Link thẳng (Tiện ích, Thiết lập) -->
+                @for (item of section.items ?? []; track item.route) {
+                  <a [routerLink]="item.route" routerLinkActive="active" class="nav-link section-link" [title]="item.label">
+                    <i class="fa-solid nav-icon" [ngClass]="item.icon"></i>
+                    <span class="nav-text" *ngIf="!isSidebarCollapsed">{{ item.label }}</span>
+                  </a>
+                }
 
-        <!-- ═══════════════════════════════════════════════════════════════════
-             2. CHỨNG TỪ KẾ TOÁN
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('chungTu')">
-            <span class="nav-number">2.</span>
-            <i class="fa-solid fa-file-invoice nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Chứng từ kế toán</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['chungTu']"
-               [class.fa-chevron-right]="!expandedGroups['chungTu']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['chungTu'] && !isSidebarCollapsed">
-            <a routerLink="/cash-voucher-page/receipt" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-arrow-down"></i> Phiếu thu
-            </a>
-            <a routerLink="/cash-voucher-page/payment" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-arrow-up"></i> Phiếu chi
-            </a>
-            <a routerLink="/warehouse-page/receipt" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-box-archive"></i> Phiếu nhập kho
-            </a>
-            <a routerLink="/warehouse-page/issue" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-truck-ramp-box"></i> Phiếu xuất kho
-            </a>
-            <a routerLink="/other-voucher-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-file-circle-plus"></i> Chứng từ nghiệp vụ khác
-            </a>
-          </div>
-        </div>
+                <!-- Nhóm mở/đóng (Đối soát CK, Kiểm tra số lượng hóa đơn, Kế toán chi tiết) -->
+                @for (group of section.groups ?? []; track group.key) {
+                  <div class="nav-group">
+                    <div class="nav-group-header" (click)="toggleGroup(group.key)" [title]="group.label">
+                      @if (group.number) {
+                        <span class="nav-number">{{ group.number }}</span>
+                      }
+                      <i class="fa-solid nav-icon" [ngClass]="group.icon"></i>
+                      <span class="nav-text" *ngIf="!isSidebarCollapsed">{{ group.label }}</span>
+                      <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
+                         [class.fa-chevron-down]="expandedGroups[group.key]"
+                         [class.fa-chevron-right]="!expandedGroups[group.key]"></i>
+                    </div>
+                    <div class="nav-group-items" *ngIf="expandedGroups[group.key] && !isSidebarCollapsed">
+                      @for (item of group.items; track item.route) {
+                        @if (item.subgroup) {
+                          <span class="nav-subgroup-label">{{ item.subgroup }}</span>
+                        }
+                        <a [routerLink]="item.route" routerLinkActive="active" class="nav-sublink">
+                          <i class="fa-solid" [ngClass]="item.icon"></i> {{ item.label }}
+                        </a>
+                      }
+                    </div>
+                  </div>
+                }
 
-        <!-- ═══════════════════════════════════════════════════════════════════
-             3. BÁN HÀNG & CÔNG NỢ PHẢI THU
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('banHang')">
-            <span class="nav-number">3.</span>
-            <i class="fa-solid fa-cart-shopping nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Bán hàng & Công nợ thu</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['banHang']"
-               [class.fa-chevron-right]="!expandedGroups['banHang']"></i>
+                <!-- Link thẳng sau các nhóm (Tiện ích: Số liệu khai thuế) -->
+                @for (item of section.tailItems ?? []; track item.route) {
+                  <a [routerLink]="item.route" routerLinkActive="active" class="nav-link section-link" [title]="item.label">
+                    <i class="fa-solid nav-icon" [ngClass]="item.icon"></i>
+                    <span class="nav-text" *ngIf="!isSidebarCollapsed">{{ item.label }}</span>
+                  </a>
+                }
+              </div>
+            }
           </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['banHang'] && !isSidebarCollapsed">
-            <a routerLink="/accountant-pages/sales-invoice-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-file-invoice-dollar"></i> Hóa đơn bán ra
-            </a>
-            <a routerLink="/receivable-ledger-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-hand-holding-dollar"></i> Sổ chi tiết TK 131
-            </a>
-          </div>
-        </div>
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             4. MUA HÀNG & CÔNG NỢ PHẢI TRẢ
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('muaHang')">
-            <span class="nav-number">4.</span>
-            <i class="fa-solid fa-truck nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Mua hàng & Công nợ trả</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['muaHang']"
-               [class.fa-chevron-right]="!expandedGroups['muaHang']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['muaHang'] && !isSidebarCollapsed">
-            <a routerLink="/accountant-pages/purchase-invoice-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-file-import"></i> Hóa đơn mua vào
-            </a>
-            <a routerLink="/payable-ledger-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-credit-card"></i> Sổ chi tiết TK 331
-            </a>
-          </div>
-        </div>
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             5. KHO & GIÁ VỐN
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('kho')">
-            <span class="nav-number">5.</span>
-            <i class="fa-solid fa-warehouse nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Kho & Giá vốn</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['kho']"
-               [class.fa-chevron-right]="!expandedGroups['kho']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['kho'] && !isSidebarCollapsed">
-            <a routerLink="/stock-card-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-clipboard-list"></i> Thẻ kho
-            </a>
-            <a routerLink="/inventory-report-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-chart-simple"></i> Tổng hợp N-X-T
-            </a>
-            <a routerLink="/cogs-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-calculator"></i> Giá vốn hàng bán (632)
-            </a>
-          </div>
-        </div>
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             6. LƯƠNG & CÁC KHOẢN TRÍCH
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('luong')">
-            <span class="nav-number">6.</span>
-            <i class="fa-solid fa-money-bill-wave nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Lương & Trích theo lương</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['luong']"
-               [class.fa-chevron-right]="!expandedGroups['luong']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['luong'] && !isSidebarCollapsed">
-            <a routerLink="/payroll-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-table"></i> Bảng lương
-            </a>
-            <a routerLink="/salary-payment-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-money-check"></i> Thanh toán lương
-            </a>
-            <a routerLink="/insurance-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-shield-halved"></i> BHXH, BHYT, BHTN
-            </a>
-          </div>
-        </div>
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             7. TIỀN & NGÂN HÀNG
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('tien')">
-            <span class="nav-number">7.</span>
-            <i class="fa-solid fa-wallet nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Tiền & Ngân hàng</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['tien']"
-               [class.fa-chevron-right]="!expandedGroups['tien']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['tien'] && !isSidebarCollapsed">
-            <a routerLink="/cash-book-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-cash-register"></i> Sổ quỹ tiền mặt (111)
-            </a>
-            <a routerLink="/bank-book-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-university"></i> Sổ tiền gửi NH (112)
-            </a>
-          </div>
-        </div>
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             8. THUẾ
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('thue')">
-            <span class="nav-number">8.</span>
-            <i class="fa-solid fa-landmark nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Thuế</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['thue']"
-               [class.fa-chevron-right]="!expandedGroups['thue']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['thue'] && !isSidebarCollapsed">
-            <a routerLink="/vat-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-percent"></i> Thuế GTGT
-            </a>
-            <a routerLink="/pit-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-user-minus"></i> Thuế TNCN
-            </a>
-            <a routerLink="/cit-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-building"></i> Thuế TNDN
-            </a>
-            <a routerLink="/thue/mon-bai" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-scroll"></i> Lệ phí môn bài
-            </a>
-          </div>
-        </div>
-
-        <div class="nav-divider"></div>
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             9. SỔ KẾ TOÁN TỔNG HỢP
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('soTongHop')">
-            <span class="nav-number">9.</span>
-            <i class="fa-solid fa-book nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Sổ kế toán tổng hợp</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['soTongHop']"
-               [class.fa-chevron-right]="!expandedGroups['soTongHop']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['soTongHop'] && !isSidebarCollapsed">
-            <a routerLink="/journal-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-book-open"></i> Sổ nhật ký chung
-            </a>
-            <a routerLink="/ledger-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-book-bookmark"></i> Sổ cái theo TK
-            </a>
-            <a routerLink="/trial-balance-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-scale-balanced"></i> Bảng cân đối TK
-            </a>
-          </div>
-        </div>
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             10. BÁO CÁO TÀI CHÍNH
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('baoCao')">
-            <span class="nav-number">10.</span>
-            <i class="fa-solid fa-chart-pie nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Báo cáo</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['baoCao']"
-               [class.fa-chevron-right]="!expandedGroups['baoCao']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['baoCao'] && !isSidebarCollapsed">
-            <!-- Báo cáo tài chính -->
-            <span class="nav-subgroup-label">Báo cáo tài chính</span>
-            <a routerLink="/balance-sheet-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-file-invoice-dollar"></i> Bảng cân đối kế toán
-            </a>
-            <a routerLink="/income-statement-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-file-lines"></i> Báo cáo KQKD
-            </a>
-            <a routerLink="/cash-flow-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-money-bill-transfer"></i> Lưu chuyển tiền tệ
-            </a>
-            <!-- Báo cáo thuế -->
-            <span class="nav-subgroup-label">Báo cáo thuế</span>
-            <a routerLink="/vat-declaration-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-file-invoice"></i> Tờ khai thuế GTGT
-            </a>
-            <!-- Báo cáo quản trị -->
-            <span class="nav-subgroup-label">Báo cáo quản trị</span>
-            <a routerLink="/management-reports-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-chart-line"></i> Báo cáo quản trị
-            </a>
-          </div>
-        </div>
-
-        <div class="nav-divider"></div>
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             11. HỆ THỐNG & QUẢN TRỊ
-        ═══════════════════════════════════════════════════════════════════ -->
-        <div class="nav-group">
-          <div class="nav-group-header" (click)="toggleGroup('heThong')">
-            <span class="nav-number">11.</span>
-            <i class="fa-solid fa-cogs nav-icon"></i>
-            <span class="nav-text" *ngIf="!isSidebarCollapsed">Hệ thống</span>
-            <i class="fa-solid nav-chevron" *ngIf="!isSidebarCollapsed"
-               [class.fa-chevron-down]="expandedGroups['heThong']"
-               [class.fa-chevron-right]="!expandedGroups['heThong']"></i>
-          </div>
-          <div class="nav-group-items" *ngIf="expandedGroups['heThong'] && !isSidebarCollapsed">
-            <a routerLink="/period-lock-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-lock"></i> Khóa sổ kế toán
-            </a>
-            <a routerLink="/audit-trail-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-clock-rotate-left"></i> Dấu vết kiểm toán
-            </a>
-            <a routerLink="/user-roles-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-user-shield"></i> Phân quyền
-            </a>
-            <a routerLink="/system-settings-page" routerLinkActive="active" class="nav-sublink">
-              <i class="fa-solid fa-gear"></i> Cài đặt
-            </a>
-          </div>
-        </div>
+        }
 
       </div>
     </nav>
 
-    <!-- HDDT Profile Footer -->
+    <!-- Tài khoản đăng nhập + Gmail hộp thư hóa đơn -->
     <div class="sidebar-footer">
-      <div class="hddt-profile" (click)="toggleProfileMenu()" [class.connected]="isHddtConnected">
+      <div class="hddt-profile" (click)="toggleProfileMenu()" [class.connected]="gmailConnected">
         <div class="hddt-avatar">
-          <i class="fa-solid" [class.fa-link]="isHddtConnected" [class.fa-link-slash]="!isHddtConnected"></i>
+          <i class="fa-solid fa-user"></i>
         </div>
         <div class="hddt-info" *ngIf="!isSidebarCollapsed">
-          @if (isHddtConnected && hddtProfileName) {
-            <span class="hddt-name">{{ hddtProfileName }}</span>
-            <span class="hddt-mst">{{ hddtUsername }}</span>
+          <span class="hddt-name">{{ userEmail }}</span>
+          @if (gmailConnected) {
+            <span class="hddt-mst">Gmail: đã kết nối</span>
           } @else {
-            <span class="hddt-name hddt-disconnected">Chua ket noi HDDT</span>
+            <span class="hddt-mst hddt-disconnected">Gmail: chưa kết nối</span>
           }
+          <button type="button" class="hddt-mst hddt-mst-btn" [class.hddt-disconnected]="!companyMst()"
+                  (click)="openMstDialog($event)" title="MST công ty — bấm để đổi">
+            MST: {{ companyMst() || 'chưa nhập' }} <i class="fa-solid fa-pen"></i>
+          </button>
         </div>
       </div>
 
       <!-- Dropdown menu -->
       @if (showProfileMenu && !isSidebarCollapsed) {
         <div class="profile-dropdown">
-          @if (isHddtConnected) {
-            <div class="dropdown-header">
-              <span class="dropdown-label">Hoa don dien tu</span>
-              <span class="dropdown-value">{{ hddtProfileName }}</span>
-              <span class="dropdown-mst">MST: {{ hddtUsername }}</span>
-            </div>
-            <div class="dropdown-divider"></div>
-            <button class="dropdown-item" (click)="openLoginDialog()">
-              <i class="fa-solid fa-rotate"></i> Doi tai khoan
-            </button>
-            <button class="dropdown-item dropdown-logout" (click)="hddtLogout()">
-              <i class="fa-solid fa-right-from-bracket"></i> Ngat ket noi
-            </button>
-          } @else {
-            <button class="dropdown-item" (click)="openLoginDialog()">
-              <i class="fa-solid fa-right-to-bracket"></i> Dang nhap HDDT
+          <div class="dropdown-header">
+            <span class="dropdown-label">Đăng nhập</span>
+            <span class="dropdown-value">{{ userEmail }}</span>
+            <span class="dropdown-mst">Hộp thư hóa đơn: {{ gmailAccount || '—' }}</span>
+            <span class="dropdown-mst">MST công ty: {{ companyMst() || '—' }}</span>
+          </div>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item" (click)="openMstDialog($event)">
+            <i class="fa-solid fa-building"></i> {{ companyMst() ? 'Đổi MST công ty' : 'Nhập MST công ty' }}
+          </button>
+          @if (!gmailConnected) {
+            <button class="dropdown-item" (click)="connectGmail()">
+              <i class="fa-solid fa-envelope"></i> Kết nối Gmail
             </button>
           }
+          <button class="dropdown-item dropdown-logout" (click)="logout()">
+            <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+          </button>
         </div>
       }
     </div>
@@ -400,10 +138,32 @@
   </aside>
 
   <!-- Main Content -->
-  <main class="main-content" (click)="showProfileMenu = false">
+  <!-- KHÔNG viết (click)="showProfileMenu = false": biểu thức trả false → Angular gọi preventDefault() → chặn mở hộp thoại
+       chọn file, tick checkbox / radio trong mọi trang -->
+  <main class="main-content" (click)="closeProfileMenu()">
+    @if (showPeriodBar) {
+      <app-period-selector class="period-bar-host"></app-period-selector>
+    }
     <router-outlet></router-outlet>
   </main>
 
-  <!-- HDDT Token Dialog -->
-  <app-hddt-token-dialog #tokenDialog (tokenSaved)="onTokenSaved()"></app-hddt-token-dialog>
+  <!-- MST công ty (CompanyService): tự hiện khi chưa nhập; bấm "MST: …" ở góc dưới sidebar để đổi -->
+  @if (showMstDialog) {
+    <div class="mst-backdrop">
+      <form class="mst-dialog" (ngSubmit)="saveMst()" role="dialog" aria-labelledby="mst-title">
+        <h3 id="mst-title"><i class="fa-solid fa-building"></i> MST công ty</h3>
+        <p class="mst-hint">Dùng cho các trang Tiện ích (Đối soát hóa đơn XML, Kiểm tra số lượng hóa đơn) để nhận HĐ đầu vào / đầu ra
+          của công ty. Lưu trên trình duyệt này.</p>
+        <input class="mst-input" name="mst" [(ngModel)]="mstDraft" placeholder="VD: 0402318272" maxlength="14"
+               autocomplete="off" inputmode="numeric" autofocus>
+        @if (mstDialogError) {
+          <div class="mst-error"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstDialogError }}</div>
+        }
+        <div class="mst-actions">
+          <button type="button" class="mst-btn" (click)="closeMstDialog()">{{ companyMst() ? 'Hủy' : 'Để sau' }}</button>
+          <button type="submit" class="mst-btn mst-btn-primary">Lưu</button>
+        </div>
+      </form>
+    </div>
+  }
 </div>

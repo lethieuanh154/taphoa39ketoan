@@ -266,11 +266,124 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 
 ### Chức năng
 - Master layout với sidebar navigation
-- 12 menu groups (expandable)
+- Menu 3 mục (22/10/2026) dựng từ `menu.config.ts`: Tiện ích (gồm nhóm Đối soát CK, Kiểm tra số lượng hóa đơn) · Kế toán chi tiết (nhóm 1–11) · Thiết lập — chi tiết ở
+  `docs/ROUTES.md` mục "Menu 3 mục". Mặc định mở Tiện ích + Kế toán chi tiết; nhóm chứa trang đang mở tự bung khi điều hướng.
+- Thanh chọn kỳ `<app-period-selector>` dính trên đầu vùng nội dung (ẩn khi route data `noPeriodBar: true`)
 - RouterOutlet cho child components
-- Export/Print buttons (placeholder)
 - Responsive design
+- Cuối sidebar (22/10/2026): email đang đăng nhập + trạng thái Gmail của hộp thư hóa đơn; menu "Kết nối Gmail" (khi
+  chưa có refresh token) và "Đăng xuất". Đã bỏ popup `shared/hddt-token-dialog` (đăng nhập cổng thuế GDT — GDT chặn tự động).
+- MST công ty (23/10/2026, `CompanyService`): chưa nhập → popup nhập tự hiện; dòng `MST: …` dưới trạng thái Gmail ở góc dưới
+  sidebar, bấm để đổi (cũng có trong menu tài khoản).
 
-### Menu Groups (mặc định expanded)
-- soTongHop: true
-- heThong: true
+---
+
+## InvoiceReconciliationPageComponent — Tiện ích "Đối soát hóa đơn XML" (23/10/2026)
+
+**Path**: `components/invoice-reconciliation-page/` — route `/invoice-reconciliation-page` (lazy).
+
+- Bảng quy đổi ĐVT KiotViet: trạng thái + "Cập nhật bảng quy đổi" + "Tải JSON".
+- "Chọn thư mục" (`<input webkitdirectory>`) → tóm tắt file sẽ gửi (XML, ZIP, bảng lương, danh mục Vietda, ánh xạ) → kỳ
+  tính thuế: **theo thanh chọn kỳ** (mặc định) hoặc tự nhận quý → MST (tùy chọn) → **Đối soát**: nén (0–20%) → upload
+  (20–50%) → máy chủ chạy (tiến trình theo bước của BE).
+- Kết quả: thẻ số liệu (HĐ vào / ra, mặt hàng cần xem, ngoại lệ Cao / TB / Thấp), lưu ý của script, 15 tab (bỏ "Huong dan" —
+  nội dung thành khung "Hướng dẫn đọc tab này"), tải Excel đầy đủ / ZIP XML quy đổi. Bảng = `app-server-table`.
+- "Các lần đối soát gần đây" (lưu 7 ngày trên máy chủ): Xem / Xóa. Lần đang xem nằm trên URL `?run=<id>`.
+
+## BankReconciliationPageComponent — Tiện ích "Đối soát CK" (23/10/2026)
+
+**Path**: `components/bank-reconciliation-page/` — route `/bank-reconciliation-page` (lazy). Port BanHang cùng tên.
+
+- Chọn 1 / nhiều file Bảng kê TPBank (.xlsx, `utils/tpbank-statement.util.ts`) → khoảng ngày = ngày GD thực tế trong file;
+  chưa import → theo thanh chọn kỳ (`PeriodService`). "Bỏ sao kê" → về theo kỳ.
+- **Lấy hóa đơn KiotViet** → `BankReconciliationService.load()`: đọc HĐ CK đã lưu trên máy chủ; ngày chưa lấy / chưa hết ngày →
+  máy chủ lấy từ KiotViet (≤ 7 ngày / lần, có tiến trình). **Lấy lại từ KiotViet** = mọi ngày (cập nhật trạng thái HĐĐT).
+- Khớp theo số tiền + 3 tab Đối soát / CK nhiều lần / CK dư + Xuất CSV: y BanHang (`utils/transfer-reconcile.util.ts`).
+  Khác BanHang: bảng 2 cột **phân trang** (100–1000 dòng / trang, KeToan chưa có `@angular/cdk`), bỏ nút "Đánh sao HĐ thiếu".
+
+## TaxFiguresPageComponent — Tiện ích "Số liệu khai thuế" (bước 5, 23/10/2026)
+
+**Path**: `components/tax-figures-page/` — route `/tax-figures-page?run=<id>` (lazy), mục CUỐI của Tiện ích (`tailItems` trong menu).
+
+- Chọn lần đối soát (mặc định mới nhất; nhắc khi khác kỳ đang chọn). Chỉ hiện số để copy / paste HTKK — nút copy = số thuần.
+- **01/GTGT**: dòng theo thứ tự HTKK (`tk_rows` của BE); ô **[22]** sửa được → tính lại [40a] [40] [41] [43] ngay (nhớ theo lần
+  đối soát trong localStorage `ketoan_v22_<id>`, nút Mặc định); cột Đã nộp / Kết quả khi thư mục có XML tờ khai cùng kỳ.
+- **Phụ lục 142**: [06] [08] [09] + bảng I / II (server-table). **Bảng kê bán ra / mua vào**: server-table (lọc cột Nhóm, xuất
+  Excel / CSV theo bộ lọc) + nút tải bảng kê Excel theo mẫu 01-1.
+- **05/KK-TNCN**: từ bảng lương trong thư mục đối soát, hoặc chọn file bảng lương (+ XML tờ khai đã nộp để so) → tính theo kỳ đang
+  chọn (`POST /api/reconciliation/tncn`); bảng chi tiết theo người.
+
+## Ledger8 / Ledger9 — Tiện ích "Kiểm tra số lượng hóa đơn" (23/10/2026)
+
+- Đọc thư mục XML HĐĐT trên máy (app FDI) bằng `utils/invoice-xml.util.ts` (`readInvoiceFiles` — XML + ZIP lồng, `DOMParser`,
+  khóa trùng MST bán | ký hiệu | số; `detectCompanyMst(invoices, 'buyer' | 'seller')`) — không tải XML lên máy chủ.
+- **Đầu vào** (`ledger-8-dong-bo-hoa-don-v2`): giữ HĐ bên mua = công ty → đối chiếu với Gmail portal-links (thay GDT), kỳ mặc định
+  theo thanh chọn kỳ. Logic so khớp `_matchAndCompare` giữ nguyên (trường `gdtData` nay là dữ liệu XML). Gmail thiếu MST (HAR
+  23/10: 17/20 email) → khớp số HĐ + ký hiệu (bỏ chữ số mẫu số đầu); Gmail lấy đúng kỳ (`before_date`, page_size 500).
+- **Đầu ra** (`ledger-9-dong-bo-hoa-don-dau-ra`, viết lại): giữ HĐ bên bán = công ty → so với HĐĐT KiotViet đã phát hành
+  (`EinvoiceCheckService.listBills`, ≤ 92 ngày) theo mẫu số + ký hiệu + số → Khớp / Lệch số tiền (chưa thuế, thuế, tổng TT) /
+  Chỉ XML / Chỉ KiotViet; nháp chỉ đếm. Lọc, tìm, phân trang 100, Xuất CSV, link mở HĐ trên einvoiceapp.
+- (23/10/2026) Cả 2 trang: MST công ty lấy từ `CompanyService` (chưa nhập mới tự nhận; khác MST tự nhận → cảnh báo). XML đã đọc,
+  HĐĐT / link Gmail đã lấy lưu IndexedDB (`TienIchCacheService`) → quay lại trang hiện ngay kết quả cũ; "Lấy lại từ KiotViet" /
+  "Tải lại" / chọn lại thư mục để cập nhật.
+
+## InvoiceCheckPageComponent — Tiện ích "Kiểm tra HĐ tự động" (23/10/2026)
+
+**Path**: `components/invoice-check-page/` — route `/invoice-check-page?run=<id>` (lazy, không thanh chọn kỳ).
+
+- Trạng thái lịch tự kiểm của máy chủ; **Kiểm tra ngay**: HĐ nháp còn tồn (mặc định) hoặc HĐ CQT đã chấp nhận (≤ 7 ngày) →
+  hỏi tiến trình mỗi 1,5 giây.
+- Kết quả: thống kê (HĐ lỗi / cần xem / không lỗi / mặt hàng chưa biết thuế suất đúng), tab HĐ có lỗi (mặc định) · Tất cả HĐ ·
+  Chưa biết thuế suất đúng (có khung giải thích nguồn thuế suất) · Mã không có trong bảng quy đổi · Thuế suất đúng theo mã master.
+  Mã HĐ = link mở đúng HĐ trên einvoiceapp (`?id=`) + nút copy. Lệch tiền ≥ 1đ (kể cả do KiotViet làm tròn) = Lỗi (user 23/10/2026).
+- Đặt thuế suất đúng: tại dòng lỗi ("Đúng là 10%" / "Khóa 8%"), tại bảng chưa có thuế suất, hoặc bảng thuế suất (chọn / bỏ) →
+  `PUT /tax-rates`, áp dụng từ lần kiểm sau. Lịch sử các lần kiểm.
+
+## ItemMappingPageComponent — Tiện ích "Ánh xạ hàng hóa" (23/10/2026)
+
+**Path**: `components/item-mapping-page/` — route `/item-mapping-page?run=<id>` (lazy, `canDeactivate` → `canLeave()`).
+
+- Chọn lần đối soát (mặc định mới nhất) → tab Đầu vào / Đầu ra (bảng `anh-xa-*` của BE, phân trang / tìm / lọc / sắp xếp ở BE).
+- Sửa được (cột vàng): **Đã kiểm** (checkbox), **Mã master** (+ nút tìm theo mã / mã vạch / tên trong bảng quy đổi KiotViet;
+  bấm tên = chọn mã, bấm 1 ĐVT = chọn mã + hệ số của ĐVT đó), **Hệ số** (nhận `24`, `0.5`, `1.234,5`; sai → ô đỏ, không cho
+  lưu), **Mã Vietda**. "SL quy đổi" tính lại ngay khi sửa hệ số.
+- Lọc nhanh theo cờ "Cần xem": Chưa ghép · Thiếu hệ số · Tin cậy thấp · Lệch ĐVT. Thay đổi chưa lưu giữ khi chuyển trang /
+  lọc; hoàn tác từng dòng hoặc "Bỏ thay đổi"; rời trang / đóng tab khi chưa lưu → hỏi lại.
+- **Lưu** → `PUT /runs/{id}/mapping` (cột "Đã lưu" = Có) → **Chạy lại đối soát** → mở lần chạy mới ở trang Đối soát.
+- Trang Đối soát có nút "Sửa ánh xạ hàng hóa (n cần xem)"; lần chạy lại ghi "Chạy lại" và ẩn nút tải XML quy đổi.
+
+## ServerTableComponent — bảng phân trang phía máy chủ (23/10/2026)
+
+**Path**: `components/shared/server-table/` — `<app-server-table [source]="...">`, `source: ServerTableSource`
+`{ id, load(query) → Observable<TabPage>, export?(format, query) }`. Đổi `id` → về trang 1, xóa lọc.
+
+- Tìm (không cần dấu), lọc từng cột (dòng ô lọc dưới tiêu đề), bấm tiêu đề để sắp xếp (tăng → giảm → bỏ), phân trang
+  20–500 dòng, xuất Excel / CSV đúng bộ lọc. Gõ xong 0,4 giây mới gọi BE.
+- Định dạng theo `formats` (mã định dạng Excel của script: `#,##0`, `#,##0.00`, `#,##0.###`, `0.0%`), ngày `dd/mm/yyyy`,
+  số không có định dạng (số HĐ, STT) hiện nguyên. **Bảng mới có nhiều dòng nên dùng component này.**
+
+---
+
+## PeriodSelectorComponent (22/10/2026)
+
+**Path**: `components/shared/period-selector/` — đặt trong MainLayout, không đặt lại trong từng page.
+
+- Nút: Hôm nay · Tuần này · Tháng · Quý · Năm · Từ ngày – đến ngày; nút ◀ ▶ = kỳ trước / kỳ sau.
+- Tháng / Quý / Năm: chọn bằng dropdown (năm 2020 → năm sau); Từ ngày – đến ngày: 2 ô ngày + "Áp dụng" (lỗi hiện ngay
+  trên thanh). Bên phải hiện khoảng ngày thật của kỳ.
+- Trạng thái nằm ở `PeriodService` (`docs/SERVICES.md`).
+
+---
+
+## LoginPageComponent (22/10/2026)
+
+**Path**: `components/login-page/` — route `/login` (ngoài MainLayout, `loginGuard`)
+
+### Chức năng
+- Nút "Đăng nhập bằng Google" → `AuthService.signInWithGoogle()`; lỗi whitelist / popup bị chặn / máy chủ không phản hồi
+  hiện ngay trên trang.
+- Đăng nhập xong mà hộp thư hóa đơn chưa có refresh token Gmail → bước "Kết nối Gmail" (1 lần) hoặc "Để sau".
+- Xong → `returnUrl` (chỉ nhận đường dẫn nội bộ) hoặc `/accountant-dashboard`.
+
+### Dependencies
+- AuthService
