@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { httpErrorText } from '../../services/auth.service';
 import { PeriodService } from '../../services/period.service';
+import { V22_KEY, recalcGtgt } from '../../utils/gtgt.util';
 import {
   CompareRow, ReconciliationRun, ReconciliationService, TaxFigures, TkRow, TncnFigures, TncnRow
 } from '../../services/reconciliation.service';
@@ -17,7 +18,6 @@ import { ServerTableComponent, ServerTableSource } from '../shared/server-table/
  * Nút copy = số thuần (không dấu chấm). [22] sửa được → tính lại [40a] [40] [41] [43] ngay trên trang.
  */
 const LOG = '[TaxFigures]';
-const V22_KEY = 'ketoan_v22_';
 
 type View = 'gtgt' | 'pl142' | 'bk-ra' | 'bk-vao' | 'tncn';
 
@@ -136,15 +136,7 @@ export class TaxFiguresPageComponent implements OnInit {
 
   // ===== 01/GTGT: [22] → [40a] [40] [41] [43] (doi_soat.compute_tax) =====
   recalc(): void {
-    const base = { ...(this.fig?.tax?.tk || {}) };
-    const n = (c: string) => Number(base[c] || 0);
-    base['22'] = Math.round(this.v22 || 0);
-    const x = n('36') - base['22'] + n('37') - n('38') - n('39a');
-    base['40a'] = x > 0 ? x : 0;
-    base['40'] = base['40a'] - n('40b');
-    base['41'] = x < 0 ? -x : 0;
-    base['43'] = base['41'] - n('42');
-    this.tk = base;
+    this.tk = recalcGtgt(this.fig?.tax?.tk || {}, this.v22);
   }
 
   onV22(): void {

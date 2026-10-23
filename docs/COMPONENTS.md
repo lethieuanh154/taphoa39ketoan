@@ -1,19 +1,26 @@
 # Components - TapHoa39KeToan
 
-## 1. AccountantDashboardComponent
+## 1. AccountantDashboardComponent — Tổng quan (dữ liệu thật từ 23/10/2026)
 
 **Path**: `components/accountant-dashboard/`
-**Route**: `/dashboard`
+**Route**: `/accountant-dashboard` (trang chủ)
 
 ### Chức năng
-- Hiển thị KPI tổng quan: Doanh thu, Chi phí, Lợi nhuận, VAT, Tiền mặt
-- Bộ lọc kỳ: Tháng / Quý / Năm
-- Quick actions: Tạo phiếu thu/chi, hóa đơn
-- Recent activity feed
-- Period lock/unlock status
+Theo kỳ ở thanh chọn kỳ (PeriodService); mỗi khối tải riêng, 1 nguồn lỗi chỉ báo lỗi ở khối đó; đổi kỳ nhanh không bị kết quả cũ ghi đè.
+- **Thuế GTGT**: lần Đối soát hóa đơn XML (đã xong) có kỳ ĐÚNG kỳ đang chọn → [34] [35] [23] [25] [40] [43]; [22] = số kế toán nhập ở
+  Số liệu khai thuế (localStorage `ketoan_v22_<run>`), chưa nhập thì [22] trong XML tờ khai kỳ trước; tính [40]/[43] bằng
+  `utils/gtgt.util.ts` `recalcGtgt` (dùng chung với trang Số liệu khai thuế). Kỳ chưa có lần đối soát → trạng thái trống + link
+  Đối soát hóa đơn XML / lần đối soát gần nhất (không hiện số).
+- **Chứng từ & kiểm tra**: phiếu thu / chi (`/api/cash-vouchers/statistics`, không tính phiếu hủy — KHÔNG phải số dư 111/112),
+  phiếu nhập / xuất kho (`/api/warehouse-vouchers/statistics`), lần Kiểm tra HĐ tự động gần nhất (lỗi / cảnh báo, lịch BẬT/TẮT).
+- **Hoạt động trong kỳ**: phiếu thu / chi, phiếu kho (bỏ phiếu hủy) + lần đối soát XML tạo trong kỳ → 10 mục mới nhất.
+- Thao tác nhanh: Đối soát hóa đơn XML, Kiểm tra HĐ tự động, Đối soát CK, Số liệu khai thuế, Phiếu thu / chi.
+- ĐÃ BỎ (23/10/2026): số liệu giả, thẻ Chi phí / Lợi nhuận / số dư 111-112 (chưa có sổ cái + số dư đầu kỳ thật), bộ chọn kỳ riêng,
+  nút Khóa sổ giả (PeriodLockService vẫn là demo).
 
 ### Dependencies
-- AccountantService, PeriodLockService
+- PeriodService, ReconciliationService (listRuns, getFigures — có cache IndexedDB), CashVoucherApiService, WarehouseVoucherApiService,
+  EinvoiceCheckService
 
 ---
 
@@ -320,6 +327,11 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - **Đầu vào** (`ledger-8-dong-bo-hoa-don-v2`): giữ HĐ bên mua = công ty → đối chiếu với Gmail portal-links (thay GDT), kỳ mặc định
   theo thanh chọn kỳ. Logic so khớp `_matchAndCompare` giữ nguyên (trường `gdtData` nay là dữ liệu XML). Gmail thiếu MST (HAR
   23/10: 17/20 email) → khớp số HĐ + ký hiệu (bỏ chữ số mẫu số đầu); Gmail lấy đúng kỳ (`before_date`, page_size 500).
+  Ghép viết lại 23/10/2026 (`_matchAndCompare`, sau lần chạy Gmail thật tháng 10: 143 email chỉ ra 101 dòng): email không đọc
+  được số HĐ → dòng "Gmail không đọc được số HĐ" (có tiêu đề + nút mở email); chỉ gộp email cùng số + ký hiệu + MST + người
+  gửi ("N email"), cùng số khác ký hiệu / người gửi = HĐ khác; mỗi HĐ XML ghép 1 email, email khác trúng HĐ đã ghép cộng vào số
+  email của dòng; email chưa lấy được số tiền hiện "?" thay vì 0 đ. Thẻ tổng thêm "Chưa có số tiền", "Gmail không đọc được số
+  HĐ", "Email gửi trùng" + dòng cộng đối chiếu số email.
 - **Đầu ra** (`ledger-9-dong-bo-hoa-don-dau-ra`, viết lại): giữ HĐ bên bán = công ty → so với HĐĐT KiotViet đã phát hành
   (`EinvoiceCheckService.listBills`, ≤ 92 ngày) theo mẫu số + ký hiệu + số → Khớp / Lệch số tiền (chưa thuế, thuế, tổng TT) /
   Chỉ XML / Chỉ KiotViet; nháp chỉ đếm. Lọc, tìm, phân trang 100, Xuất CSV, link mở HĐ trên einvoiceapp.

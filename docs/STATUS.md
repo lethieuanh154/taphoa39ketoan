@@ -108,7 +108,7 @@ tài khoản, CĐKT, KQKD, LCTT, Tờ khai GTGT đều ra **số giả**. Đây 
 ### Dashboard (1/1) ✓
 | # | Tính năng | Route | Component |
 |---|-----------|-------|-----------|
-| 1 | Dashboard KPI | `/dashboard` | AccountantDashboardComponent |
+| 1 | Tổng quan (dữ liệu thật 23/10/2026: GTGT từ Đối soát XML, phiếu thu/chi, kho, Kiểm tra HĐ) | `/accountant-dashboard` | AccountantDashboardComponent |
 
 ### Danh mục (6/6) ✓
 | # | Tính năng | Route | Component |

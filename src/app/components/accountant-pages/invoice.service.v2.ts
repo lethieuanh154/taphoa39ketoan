@@ -286,8 +286,18 @@ export interface PortalLink {
 export interface LiveReconcileRow {
   invoiceKey: string;
   matchKey: string;
-  status: 'MATCH' | 'MISMATCH' | 'MISSING_GMAIL' | 'MISSING_GDT' | 'NO_AMOUNT';
+  /** NO_INVOICE_NO (23/10/2026) = email không đọc được số HĐ — trước đây bị bỏ qua không hiện */
+  status: 'MATCH' | 'MISMATCH' | 'MISSING_GMAIL' | 'MISSING_GDT' | 'NO_AMOUNT' | 'NO_INVOICE_NO';
+  /** số email Gmail cùng 1 HĐ (> 1 = NCC gửi lại / nhiều email cùng HĐ) */
+  gmailCount?: number;
+  /** thread / message Gmail của email (mở email gốc) */
+  gmailThreadId?: string;
+  /** ghi chú khớp (vd khớp theo số HĐ khi email thiếu MST + ký hiệu, có nhiều HĐ XML cùng số) */
+  note?: string;
   gmailData?: {
+    gmailFrom?: string;
+    gmailSubject?: string;
+    hasAmounts?: boolean;
     invoiceNo: string;
     invoiceSymbol: string;
     supplierTaxCode: string;

@@ -680,3 +680,38 @@
 .xml-hint { color: #6b7280; }
 .xml-info { color: #1f2937; }
 .xml-error { color: #b91c1c; background: #fef2f2; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; font-size: 13px; }
+
+/* 23/10/2026: email không đọc được số HĐ, email gửi trùng, mở email gốc */
+.live-results-table tr.live-no-number {
+  background: #fffbeb;
+}
+.live-status-badge.live-no-number {
+  background: #fde68a;
+  color: #78350f;
+}
+.btn-mail {
+  border: none;
+  background: none;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 11px;
+}
+.mail-count {
+  display: inline-block;
+  margin-left: 2px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.mail-subject {
+  display: block;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}

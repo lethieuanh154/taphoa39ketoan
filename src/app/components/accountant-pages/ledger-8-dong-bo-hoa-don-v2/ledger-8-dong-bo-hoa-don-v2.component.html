@@ -158,7 +158,24 @@
         <div class="card-label">Sai số</div>
         <div class="card-value">{{ liveSummary.mismatch }}</div>
       </div>
+      <div class="summary-card" *ngIf="liveSummary.noAmount">
+        <div class="card-label">Chưa có số tiền</div>
+        <div class="card-value">{{ liveSummary.noAmount }}</div>
+      </div>
+      <div class="summary-card card-warning" *ngIf="liveSummary.noInvoiceNo">
+        <div class="card-label">Gmail không đọc được số HĐ</div>
+        <div class="card-value">{{ liveSummary.noInvoiceNo }}</div>
+      </div>
+      <div class="summary-card" *ngIf="liveSummary.dupEmails" title="Email gửi thêm của HĐ đã có trong bảng (NCC gửi lại) — đã gộp vào dòng của HĐ đó">
+        <div class="card-label">Email gửi trùng</div>
+        <div class="card-value">{{ liveSummary.dupEmails }}</div>
+      </div>
     </div>
+    <p class="xml-hint" *ngIf="liveResults.length > 0">
+      Gmail {{ liveGmailCount }} email = {{ liveSummary.total - liveSummary.missingGmail - liveSummary.noInvoiceNo }} HĐ ghép được
+      + {{ liveSummary.noInvoiceNo }} email không đọc được số HĐ + {{ liveSummary.dupEmails }} email gửi trùng.
+      "Gmail không đọc được số HĐ": bấm <i class="fa-solid fa-envelope"></i> để mở email, đối chiếu tay.
+    </p>
 
     <!-- Status log -->
     <div *ngIf="liveStatusLog.length > 0" class="status-log-section" style="background:#1e1e1e;color:#d4d4d4;font-family:monospace;font-size:12px;padding:10px 14px;border-radius:6px;margin-bottom:12px;max-height:160px;overflow-y:auto;">
@@ -193,20 +210,28 @@
         <tbody>
           <tr *ngFor="let row of liveResults; let i = index" [ngClass]="getLiveStatusClass(row.status)">
             <td>{{ i + 1 }}</td>
-            <td>{{ row.gdtData?.shdon || row.gmailData?.invoiceNo || '-' }}</td>
+            <td>{{ row.gdtData?.shdon || row.gmailData?.invoiceNo || '-' }}
+              <button type="button" class="btn-mail" *ngIf="row.gmailThreadId" (click)="openLiveGmail(row)" title="Mở email gốc trong Gmail">
+                <i class="fa-solid fa-envelope"></i></button>
+              <span class="mail-count" *ngIf="(row.gmailCount || 0) > 1" title="Số email Gmail của HĐ này (NCC gửi lại)">{{ row.gmailCount }} email</span>
+            </td>
             <td>{{ row.gdtData?.khhdon || row.gmailData?.invoiceSymbol || '-' }}</td>
             <td>{{ row.gdtData?.nbmst || row.gmailData?.supplierTaxCode || '-' }}</td>
-            <td class="td-name" [title]="row.gdtData?.nbten || row.gmailData?.supplierName || ''">{{ row.gdtData?.nbten || row.gmailData?.supplierName || '-' }}</td>
+            <td class="td-name" [title]="row.gdtData?.nbten || row.gmailData?.supplierName || row.gmailData?.gmailFrom || ''">
+              {{ row.gdtData?.nbten || row.gmailData?.supplierName || row.gmailData?.gmailFrom || '-' }}
+              <small class="mail-subject" *ngIf="row.status === 'NO_INVOICE_NO'" [title]="row.gmailData?.gmailSubject || ''">{{ row.gmailData?.gmailSubject }}</small>
+            </td>
             <td>{{ row.gdtData ? formatGdtDate(row.gdtData.tdlap) : (row.gmailData?.invoiceDate | date:'dd/MM/yyyy') }}</td>
             <!-- Gmail amounts -->
+            <!-- email chưa lấy được số tiền (không đính kèm XML, cổng NCC chặn tải) → '?' thay vì 0 đ -->
             <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
-              {{ row.gmailData ? formatCurrency(row.gmailData.totalBeforeVat) : '-' }}
+              {{ row.gmailData ? (row.gmailData.hasAmounts ? formatCurrency(row.gmailData.totalBeforeVat) : '?') : '-' }}
             </td>
             <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
-              {{ row.gmailData ? formatCurrency(row.gmailData.vatAmount) : '-' }}
+              {{ row.gmailData ? (row.gmailData.hasAmounts ? formatCurrency(row.gmailData.vatAmount) : '?') : '-' }}
             </td>
             <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
-              {{ row.gmailData ? formatCurrency(row.gmailData.totalAmount) : '-' }}
+              {{ row.gmailData ? (row.gmailData.hasAmounts ? formatCurrency(row.gmailData.totalAmount) : '?') : '-' }}
             </td>
             <!-- XML amounts -->
             <td class="td-amount">
@@ -228,6 +253,7 @@
                   {{ d.fieldLabel }}: {{ formatDiffValue(d) }}
                 </small>
               </div>
+              <div class="diff-detail" *ngIf="row.note"><small>{{ row.note }}</small></div>
             </td>
           </tr>
         </tbody>

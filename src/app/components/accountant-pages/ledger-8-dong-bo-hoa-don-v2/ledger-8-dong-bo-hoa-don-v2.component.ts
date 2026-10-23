@@ -76,7 +76,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   // === Live Reconciliation (Gmail vs GDT) ===
   liveReconciling = false;
   liveResults: LiveReconcileRow[] = [];
-  liveSummary = { total: 0, matched: 0, missingGmail: 0, missingGdt: 0, mismatch: 0, noAmount: 0 };
+  liveSummary = { total: 0, matched: 0, missingGmail: 0, missingGdt: 0, mismatch: 0, noAmount: 0, noInvoiceNo: 0, dupEmails: 0 };
   liveGmailCount = 0;
   liveGdtCount = 0;
   liveSaving = false;
@@ -680,132 +680,161 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Ghép email Gmail ⇄ HĐ XML (viết lại 23/10/2026 sau khi chạy Gmail thật tháng 10: 143 email chỉ ra 101 dòng):
+   * - Email không đọc được số HĐ → dòng "Gmail không đọc được số HĐ" (trước bị bỏ qua, không hiện).
+   * - Gộp email chỉ khi CÙNG số HĐ + ký hiệu + MST + người gửi (NCC gửi lại) → 1 dòng ghi "N email". Cùng số HĐ mà khác ký hiệu /
+   *   MST / người gửi là HĐ khác nhau → không gộp (trước gộp theo "số|MST", email thiếu MST trùng số đè nhau).
+   * - Ghép XML: cùng số HĐ; email có MST thì phải cùng MST bán; có ký hiệu thì phải cùng ký hiệu (bỏ chữ số mẫu số đầu:
+   *   "1C26TYT" = "C26TYT"). Mỗi HĐ XML ghép 1 email; email khác cũng trúng HĐ XML đã ghép → cộng vào số email của dòng đó.
+   */
   private _matchAndCompare(gmailLinks: PortalLink[], gdtInvoices: LocalXmlInvoice[]): void {
-    // Build maps with normalized keys
-    const gmailMap = new Map<string, PortalLink>();
-    for (const pl of gmailLinks) {
-      const key = this._makeMatchKey(pl.invoiceNo, pl.supplierTaxCode);
-      console.log(`[Gmail] raw="${pl.invoiceNo}" taxCode="${pl.supplierTaxCode}" → key="${key}"`);
-      if (key && key !== '|') gmailMap.set(key, pl);
-      else console.warn(`[Gmail] SKIPPED (empty key): invoiceNo="${pl.invoiceNo}" from="${pl.gmailFrom}"`);
-    }
-
-    const gdtMap = new Map<string, LocalXmlInvoice>();
-    for (const inv of gdtInvoices) {
-      const key = this._makeMatchKey(String(inv.shdon), inv.nbmst);
-      console.log(`[XML]   raw="${inv.shdon}" taxCode="${inv.nbmst}" → key="${key}"`);
-      if (key && key !== '|') gdtMap.set(key, inv);
-      else console.warn(`[XML]   SKIPPED (empty key): shdon="${inv.shdon}"`);
-    }
-
-    console.log(`[Reconcile] Gmail keys (${gmailMap.size}):`, [...gmailMap.keys()]);
-    console.log(`[Reconcile] XML keys   (${gdtMap.size}):`, [...gdtMap.keys()]);
-
-    // Gmail thiếu MST (HAR 23/10/2026: 17/20 email không có MST, 15/20 có ký hiệu) → khớp theo số HĐ + KÝ HIỆU (bỏ chữ số
-    // mẫu số đầu: "1C26TYT" = "C26TYT"); chỉ khi email không có ký hiệu mới khớp theo số HĐ (lấy HĐ XML đầu tiên cùng số)
     const symbolOf = (s: string) => (s || '').toUpperCase().replace(/^\d/, '').trim();
-    const resolvedGmailMap = new Map<string, PortalLink>();
-    for (const [key, pl] of gmailMap) {
-      if (key.endsWith('|')) {
-        const noOnly = key.slice(0, -1);
-        const sameNo = [...gdtMap.entries()].filter(([k]) => k.startsWith(noOnly + '|'));
-        const sym = symbolOf(pl.invoiceSymbol || '');
-        const hit = sym ? sameNo.find(([, x]) => symbolOf(x.khhdon) === sym) : sameNo[0];
-        const gdtKey = hit?.[0];
-        if (sym && !hit && sameNo.length) console.warn(`${LOG} Gmail số ${noOnly} ký hiệu ${sym}: có ${sameNo.length} HĐ XML cùng số nhưng khác ký hiệu → không khớp`);
-        if (gdtKey) {
-          console.log(`[Reconcile] Gmail "${key}" → resolved to GDT key "${gdtKey}"`);
-          resolvedGmailMap.set(gdtKey, pl);
-        } else {
-          resolvedGmailMap.set(key, pl);
-        }
+    const senderOf = (s: string) => ((s || '').match(/<([^>]+)>/)?.[1] || s || '').trim().toLowerCase();
+
+    // 1. Gom email: bỏ email trùng (cùng số + ký hiệu + MST + người gửi)
+    type GmailEntry = { pl: PortalLink; no: string; sym: string; mst: string; count: number };
+    const entries = new Map<string, GmailEntry>();
+    const noNumber: PortalLink[] = [];
+    for (const pl of gmailLinks) {
+      const no = /\d/.test(pl.invoiceNo || '') ? this._normalizeInvoiceNo(pl.invoiceNo) : '';
+      if (!no) {
+        noNumber.push(pl);
+        continue;
+      }
+      const sym = symbolOf(pl.invoiceSymbol || '');
+      const mst = this._normalizeTaxCode(pl.supplierTaxCode);
+      const id = `${no}|${sym}|${mst}|${senderOf(pl.gmailFrom)}`;
+      const e = entries.get(id);
+      if (e) {
+        e.count++;
+        if (!e.pl.hasAmounts && pl.hasAmounts) e.pl = pl;   // giữ email có số tiền
       } else {
-        resolvedGmailMap.set(key, pl);
+        entries.set(id, { pl, no, sym, mst, count: 1 });
       }
     }
-    console.log(`[Reconcile] Resolved Gmail keys:`, [...resolvedGmailMap.keys()]);
 
-    const allKeys = new Set([...resolvedGmailMap.keys(), ...gdtMap.keys()]);
+    // 2. XML theo số HĐ
+    const xmlByNo = new Map<string, LocalXmlInvoice[]>();
+    for (const inv of gdtInvoices) {
+      const no = this._normalizeInvoiceNo(String(inv.shdon));
+      xmlByNo.set(no, [...(xmlByNo.get(no) || []), inv]);
+    }
+
     const results: LiveReconcileRow[] = [];
-    const summary = { total: 0, matched: 0, missingGmail: 0, missingGdt: 0, mismatch: 0, noAmount: 0 };
+    const summary = { total: 0, matched: 0, missingGmail: 0, missingGdt: 0, mismatch: 0, noAmount: 0, noInvoiceNo: 0, dupEmails: 0 };
+    const rowOfXml = new Map<LocalXmlInvoice, LiveReconcileRow>();
 
-    for (const key of allKeys) {
-      const gm = resolvedGmailMap.get(key);
-      const gdt = gdtMap.get(key);
-      summary.total++;
-
-      const row: LiveReconcileRow = {
-        invoiceKey: gdt ? `${gdt.khmshdon}${gdt.khhdon}-${gdt.shdon}` : (gm?.invoiceNo || key),
-        matchKey: key,
-        status: 'MATCH',
-        fieldDiffs: [],
-      };
-
-      if (gm) {
-        row.gmailData = {
-          invoiceNo: gm.invoiceNo || '',
-          invoiceSymbol: gm.invoiceSymbol || '',
-          supplierTaxCode: gm.supplierTaxCode || '',
-          supplierName: gm.supplierName || '',
-          totalBeforeVat: gm.totalBeforeVat || 0,
-          vatAmount: gm.vatAmount || 0,
-          totalAmount: gm.totalAmount || 0,
-          invoiceDate: gm.invoiceDate || gm.issueDate || '',
-          parseSource: gm.parseSource || 'none',
-        };
-      }
-
+    // 3. Ghép từng email
+    for (const e of entries.values()) {
+      let cands = xmlByNo.get(e.no) || [];
+      if (e.mst) cands = cands.filter(x => this._normalizeTaxCode(x.nbmst) === e.mst);
+      if (e.sym) cands = cands.filter(x => symbolOf(x.khhdon) === e.sym);
+      const free = cands.filter(x => !rowOfXml.has(x));
+      const gdt = free[0];
       if (gdt) {
-        row.gdtData = {
-          shdon: gdt.shdon,
-          khhdon: gdt.khhdon,
-          nbmst: gdt.nbmst,
-          nbten: gdt.nbten,
-          tgtcthue: gdt.tgtcthue,
-          tgtthue: gdt.tgtthue,
-          tgtttbso: gdt.tgtttbso,
-          tdlap: gdt.tdlap,
-        };
-      }
-
-      if (gm && gdt) {
-        if (!gm.hasAmounts) {
-          row.status = 'NO_AMOUNT';
-          summary.noAmount++;
-        } else {
-          const diffs = this._compareAmounts(gm, gdt);
-          if (diffs.length > 0) {
-            row.status = 'MISMATCH';
-            row.fieldDiffs = diffs;
-            summary.mismatch++;
-          } else {
-            summary.matched++;
-          }
+        const row = this._liveRow(e.pl, gdt, e.count);
+        if (free.length > 1) {
+          row.note = `Email thiếu ${e.mst ? 'ký hiệu' : e.sym ? 'MST' : 'MST + ký hiệu'}: có ${free.length} HĐ XML cùng số ${e.no} — đã ghép HĐ đầu tiên, kiểm tra lại`;
+          console.warn(`${LOG} ${row.note}`);
         }
-      } else if (!gm) {
-        row.status = 'MISSING_GMAIL';
-        summary.missingGmail++;
+        rowOfXml.set(gdt, row);
+        results.push(row);
+      } else if (cands.length) {
+        // HĐ XML đã ghép với email khác → email này là bản gửi thêm của cùng HĐ
+        const row = rowOfXml.get(cands[0])!;
+        row.gmailCount = (row.gmailCount || 1) + e.count;
+        if (!row.gmailData?.hasAmounts && e.pl.hasAmounts) Object.assign(row, this._liveRow(e.pl, cands[0], row.gmailCount));
+        console.log(`${LOG} Email số ${e.no} (${senderOf(e.pl.gmailFrom)}) cùng HĐ XML đã ghép → cộng vào dòng (${row.gmailCount} email)`);
       } else {
-        row.status = 'MISSING_GDT';
-        summary.missingGdt++;
+        results.push(this._liveRow(e.pl, null, e.count));
       }
+    }
 
+    // 4. HĐ XML không có email
+    for (const inv of gdtInvoices) {
+      if (!rowOfXml.has(inv)) results.push(this._liveRow(null, inv, 0));
+    }
+
+    // 5. Email không đọc được số HĐ
+    for (const pl of noNumber) {
+      const row = this._liveRow(pl, null, 1);
+      row.status = 'NO_INVOICE_NO';
       results.push(row);
     }
 
-    // Sort: MISMATCH first, then MISSING, then MATCH
-    const statusOrder: Record<string, number> = { 'MISMATCH': 0, 'MISSING_GMAIL': 1, 'MISSING_GDT': 2, 'NO_AMOUNT': 3, 'MATCH': 4 };
+    for (const r of results) {
+      summary.total++;
+      if (r.status === 'MATCH') summary.matched++;
+      else if (r.status === 'MISMATCH') summary.mismatch++;
+      else if (r.status === 'MISSING_GMAIL') summary.missingGmail++;
+      else if (r.status === 'MISSING_GDT') summary.missingGdt++;
+      else if (r.status === 'NO_AMOUNT') summary.noAmount++;
+      else if (r.status === 'NO_INVOICE_NO') summary.noInvoiceNo++;
+      if ((r.gmailCount || 0) > 1) summary.dupEmails += (r.gmailCount || 0) - 1;
+    }
+
+    const statusOrder: Record<string, number> = { 'MISMATCH': 0, 'MISSING_GMAIL': 1, 'MISSING_GDT': 2, 'NO_INVOICE_NO': 3, 'NO_AMOUNT': 4, 'MATCH': 5 };
     results.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
 
     this.liveResults = results;
     this.liveSummary = summary;
-    console.log('⚖️ Live reconciliation done:', summary);
+    console.log(`${LOG} Ghép xong: ${gmailLinks.length} email → ${entries.size} HĐ khác nhau + ${noNumber.length} email không đọc được số HĐ; `
+      + `XML ${gdtInvoices.length}`, summary);
+    if (noNumber.length) console.warn(`${LOG} ${noNumber.length} email không đọc được số HĐ (hiện thành dòng riêng)`);
   }
 
-  private _makeMatchKey(invoiceNo: string, taxCode: string): string {
-    const normalNo = this._normalizeInvoiceNo(invoiceNo);
-    const normalTax = this._normalizeTaxCode(taxCode);
-    return `${normalNo}|${normalTax}`;
+  /** 1 dòng kết quả từ email (có thể null) + HĐ XML (có thể null) */
+  private _liveRow(gm: PortalLink | null, gdt: LocalXmlInvoice | null, gmailCount: number): LiveReconcileRow {
+    const row: LiveReconcileRow = {
+      invoiceKey: gdt ? `${gdt.khmshdon}${gdt.khhdon}-${gdt.shdon}` : (gm?.invoiceNo || gm?.gmailSubject || ''),
+      matchKey: gdt ? `${gdt.shdon}|${gdt.nbmst}` : `${gm?.invoiceNo || ''}|${gm?.supplierTaxCode || ''}`,
+      status: 'MATCH',
+      fieldDiffs: [],
+      gmailCount,
+      gmailThreadId: gm ? (gm.gmailThreadId || gm.gmailId) : undefined,
+    };
+    if (gm) {
+      row.gmailData = {
+        gmailFrom: gm.gmailFrom || '',
+        gmailSubject: gm.gmailSubject || '',
+        hasAmounts: !!gm.hasAmounts,
+        invoiceNo: gm.invoiceNo || '',
+        invoiceSymbol: gm.invoiceSymbol || '',
+        supplierTaxCode: gm.supplierTaxCode || '',
+        supplierName: gm.supplierName || '',
+        totalBeforeVat: gm.totalBeforeVat || 0,
+        vatAmount: gm.vatAmount || 0,
+        totalAmount: gm.totalAmount || 0,
+        invoiceDate: gm.invoiceDate || gm.issueDate || '',
+        parseSource: gm.parseSource || 'none',
+      };
+    }
+    if (gdt) {
+      row.gdtData = {
+        shdon: gdt.shdon, khhdon: gdt.khhdon, nbmst: gdt.nbmst, nbten: gdt.nbten,
+        tgtcthue: gdt.tgtcthue, tgtthue: gdt.tgtthue, tgtttbso: gdt.tgtttbso, tdlap: gdt.tdlap,
+      };
+    }
+    if (gm && gdt) {
+      if (!gm.hasAmounts) {
+        row.status = 'NO_AMOUNT';
+      } else {
+        row.fieldDiffs = this._compareAmounts(gm, gdt);
+        if (row.fieldDiffs.length) row.status = 'MISMATCH';
+      }
+    } else {
+      row.status = gm ? 'MISSING_GDT' : 'MISSING_GMAIL';
+    }
+    return row;
+  }
+
+  /** Mở email gốc (cùng dạng link với tab Links HĐ gốc) */
+  openLiveGmail(row: LiveReconcileRow): void {
+    if (!row.gmailThreadId) return;
+    const url = `https://mail.google.com/mail/u/1/#all/${row.gmailThreadId}`;
+    console.log(`${LOG} Mở email gốc: ${url}`);
+    window.open(url, '_blank');
   }
 
   private _normalizeInvoiceNo(no: string): string {
@@ -883,6 +912,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       'MISSING_GMAIL': 'Thiếu Gmail',
       'MISSING_GDT': 'Thiếu XML',
       'NO_AMOUNT': 'Chưa có số liệu',
+      'NO_INVOICE_NO': 'Gmail không đọc được số HĐ',
     };
     return labels[status] || status;
   }
@@ -894,6 +924,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       'MISSING_GMAIL': 'live-missing',
       'MISSING_GDT': 'live-missing',
       'NO_AMOUNT': 'live-no-amount',
+      'NO_INVOICE_NO': 'live-no-number',
     };
     return classes[status] || '';
   }

@@ -1,237 +1,150 @@
 <div class="dashboard-container">
+  <!-- TỔNG QUAN — dữ liệu thật theo kỳ ở thanh chọn kỳ (23/10/2026). Không có nguồn → ghi "chưa có", không hiện số giả. -->
 
-  <!-- ═══════════════════════════════════════════════════════════════════════════
-       HEADER: Chọn kỳ kế toán + Trạng thái khóa sổ
-  ═══════════════════════════════════════════════════════════════════════════ -->
-  <header class="period-header">
-    <div class="period-selector">
-      <div class="period-type-tabs">
-        <button
-          class="period-tab"
-          [class.active]="selectedPeriodType === 'month'"
-          (click)="selectedPeriodType = 'month'; onPeriodChange()">
-          Tháng
-        </button>
-        <button
-          class="period-tab"
-          [class.active]="selectedPeriodType === 'quarter'"
-          (click)="selectedPeriodType = 'quarter'; onPeriodChange()">
-          Quý
-        </button>
-        <button
-          class="period-tab"
-          [class.active]="selectedPeriodType === 'year'"
-          (click)="selectedPeriodType = 'year'; onPeriodChange()">
-          Năm
-        </button>
-      </div>
-
-      <div class="period-dropdowns">
-        <!-- Month selector -->
-        <select
-          *ngIf="selectedPeriodType === 'month'"
-          [(ngModel)]="selectedMonth"
-          (change)="onPeriodChange()"
-          class="period-select">
-          <option *ngFor="let m of months" [value]="m.value">{{ m.label }}</option>
-        </select>
-
-        <!-- Quarter selector -->
-        <select
-          *ngIf="selectedPeriodType === 'quarter'"
-          [(ngModel)]="selectedQuarter"
-          (change)="onPeriodChange()"
-          class="period-select">
-          <option *ngFor="let q of quarters" [value]="q.value">{{ q.label }}</option>
-        </select>
-
-        <!-- Year selector -->
-        <select
-          [(ngModel)]="selectedYear"
-          (change)="onPeriodChange()"
-          class="period-select">
-          <option *ngFor="let y of years" [value]="y">{{ y }}</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="period-status">
-      <span class="status-badge" [class.locked]="isPeriodLocked" [class.open]="!isPeriodLocked">
-        <i class="fa-solid" [class.fa-lock]="isPeriodLocked" [class.fa-lock-open]="!isPeriodLocked"></i>
-        {{ isPeriodLocked ? 'Đã khóa sổ' : 'Đang mở' }}
-      </span>
-
-      <button
-        *ngIf="!isPeriodLocked"
-        class="btn-lock"
-        (click)="lockPeriod()">
-        <i class="fa-solid fa-lock"></i>
-        Khóa sổ kỳ
-      </button>
-
-      <button
-        *ngIf="isPeriodLocked"
-        class="btn-unlock"
-        (click)="unlockPeriod()">
-        <i class="fa-solid fa-lock-open"></i>
-        Mở khóa
-      </button>
-    </div>
-  </header>
-
-  <!-- ═══════════════════════════════════════════════════════════════════════════
-       DASHBOARD SUMMARY: Các chỉ số tài chính nhanh
-  ═══════════════════════════════════════════════════════════════════════════ -->
+  <!-- ═══ THUẾ GTGT (Đối soát hóa đơn XML của đúng kỳ) ═══ -->
   <section class="summary-section">
     <h2 class="section-title">
       <i class="fa-solid fa-chart-line"></i>
-      Tổng quan kỳ {{ periodLabel }}
+      Thuế GTGT kỳ {{ periodLabel() }}
     </h2>
 
-    <div class="summary-grid">
-      <!-- Doanh thu -->
-      <div class="summary-card revenue">
-        <div class="card-icon">
-          <i class="fa-solid fa-arrow-trend-up"></i>
-        </div>
-        <div class="card-content">
-          <span class="card-label">Doanh thu</span>
-          <span class="card-value">{{ formatCurrency(summary.doanhThu) }} đ</span>
+    @if (taxLoading) {
+      <div class="section-note"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải số liệu...</div>
+    } @else if (taxError) {
+      <div class="section-note error"><i class="fa-solid fa-triangle-exclamation"></i> {{ taxError }}</div>
+    } @else if (taxCards.length) {
+      <div class="summary-grid">
+        @for (c of taxCards; track c.code) {
+          <a class="summary-card" [ngClass]="c.tone" routerLink="/tax-figures-page" [queryParams]="{ run: taxRun?.id }" [title]="'Chỉ tiêu [' + c.code + '] tờ khai 01/GTGT'">
+            <div class="card-icon"><i class="fa-solid" [ngClass]="c.icon"></i></div>
+            <div class="card-content">
+              <span class="card-label">{{ c.label }} <small>[{{ c.code }}]</small></span>
+              <span class="card-value">{{ formatCurrency(c.value) }} đ</span>
+            </div>
+          </a>
+        }
+      </div>
+      <div class="section-note">{{ taxPeriodNote }}</div>
+    } @else {
+      <div class="empty-state">
+        <i class="fa-solid fa-file-circle-question"></i>
+        <div>
+          Chưa có lần <b>Đối soát hóa đơn XML</b> nào của kỳ {{ periodLabel() }} — chọn thư mục XML của kỳ này để có số liệu thuế.
+          <div class="empty-actions">
+            <a routerLink="/invoice-reconciliation-page" class="btn-link"><i class="fa-solid fa-file-code"></i> Đối soát hóa đơn XML</a>
+            @if (latestRun) {
+              <a routerLink="/tax-figures-page" [queryParams]="{ run: latestRun.id }" class="btn-link muted">
+                Xem lần gần nhất: kỳ {{ latestRun.summary?.period }}</a>
+            }
+          </div>
         </div>
       </div>
-
-      <!-- Chi phí -->
-      <div class="summary-card expense">
-        <div class="card-icon">
-          <i class="fa-solid fa-arrow-trend-down"></i>
-        </div>
-        <div class="card-content">
-          <span class="card-label">Chi phí</span>
-          <span class="card-value">{{ formatCurrency(summary.chiPhi) }} đ</span>
-        </div>
-      </div>
-
-      <!-- Lợi nhuận -->
-      <div class="summary-card profit" [class.negative]="summary.loiNhuan < 0">
-        <div class="card-icon">
-          <i class="fa-solid fa-coins"></i>
-        </div>
-        <div class="card-content">
-          <span class="card-label">Lợi nhuận tạm tính</span>
-          <span class="card-value">{{ formatCurrency(summary.loiNhuan) }} đ</span>
-        </div>
-      </div>
-
-      <!-- VAT phải nộp -->
-      <div class="summary-card vat-pay">
-        <div class="card-icon">
-          <i class="fa-solid fa-file-invoice-dollar"></i>
-        </div>
-        <div class="card-content">
-          <span class="card-label">VAT phải nộp</span>
-          <span class="card-value">{{ formatCurrency(summary.vatPhaiNop) }} đ</span>
-        </div>
-      </div>
-
-      <!-- VAT được khấu trừ -->
-      <div class="summary-card vat-credit">
-        <div class="card-icon">
-          <i class="fa-solid fa-receipt"></i>
-        </div>
-        <div class="card-content">
-          <span class="card-label">VAT được khấu trừ</span>
-          <span class="card-value">{{ formatCurrency(summary.vatDuocKhauTru) }} đ</span>
-        </div>
-      </div>
-
-      <!-- Tiền mặt (111) -->
-      <div class="summary-card cash">
-        <div class="card-icon">
-          <i class="fa-solid fa-wallet"></i>
-        </div>
-        <div class="card-content">
-          <span class="card-label">Tiền mặt (111)</span>
-          <span class="card-value">{{ formatCurrency(summary.soDuTienMat) }} đ</span>
-        </div>
-      </div>
-
-      <!-- Tiền ngân hàng (112) -->
-      <div class="summary-card bank">
-        <div class="card-icon">
-          <i class="fa-solid fa-building-columns"></i>
-        </div>
-        <div class="card-content">
-          <span class="card-label">Ngân hàng (112)</span>
-          <span class="card-value">{{ formatCurrency(summary.soDuNganHang) }} đ</span>
-        </div>
-      </div>
-    </div>
+    }
   </section>
 
-  <!-- ═══════════════════════════════════════════════════════════════════════════
-       QUICK ACTIONS: Điều hướng nhanh theo luồng kế toán
-  ═══════════════════════════════════════════════════════════════════════════ -->
+  <!-- ═══ CHỨNG TỪ TRONG KỲ (phiếu thu / chi, phiếu kho) + KIỂM TRA HĐ ═══ -->
+  <section class="summary-section">
+    <h2 class="section-title">
+      <i class="fa-solid fa-file-invoice"></i>
+      Chứng từ &amp; kiểm tra
+    </h2>
+    <div class="summary-grid">
+      <a class="summary-card revenue" routerLink="/cash-voucher-page/receipt">
+        <div class="card-icon"><i class="fa-solid fa-arrow-down"></i></div>
+        <div class="card-content">
+          <span class="card-label">Phiếu thu trong kỳ</span>
+          @if (cashStats) {
+            <span class="card-value">{{ formatCurrency(cashStats.total_receipt_amount) }} đ</span>
+            <span class="card-sub">{{ cashStats.receipt_count }} phiếu</span>
+          } @else { <span class="card-sub">{{ cashError || 'Đang tải...' }}</span> }
+        </div>
+      </a>
+      <a class="summary-card expense" routerLink="/cash-voucher-page/payment">
+        <div class="card-icon"><i class="fa-solid fa-arrow-up"></i></div>
+        <div class="card-content">
+          <span class="card-label">Phiếu chi trong kỳ</span>
+          @if (cashStats) {
+            <span class="card-value">{{ formatCurrency(cashStats.total_payment_amount) }} đ</span>
+            <span class="card-sub">{{ cashStats.payment_count }} phiếu · nháp {{ cashStats.by_status.draft }}</span>
+          } @else { <span class="card-sub">{{ cashError || 'Đang tải...' }}</span> }
+        </div>
+      </a>
+      <a class="summary-card bank" routerLink="/warehouse-page/receipt">
+        <div class="card-icon"><i class="fa-solid fa-box"></i></div>
+        <div class="card-content">
+          <span class="card-label">Nhập / xuất kho trong kỳ</span>
+          @if (whStats) {
+            <span class="card-value">{{ formatCurrency(whStats.total_receipt_amount) }} / {{ formatCurrency(whStats.total_issue_amount) }} đ</span>
+            <span class="card-sub">{{ whStats.receipt_count }} phiếu nhập · {{ whStats.issue_count }} phiếu xuất</span>
+          } @else { <span class="card-sub">{{ whError || 'Đang tải...' }}</span> }
+        </div>
+      </a>
+      <a class="summary-card" routerLink="/invoice-check-page" [ngClass]="checkRun?.counts?.bills_error ? 'expense' : 'vat-credit'">
+        <div class="card-icon"><i class="fa-solid fa-rotate"></i></div>
+        <div class="card-content">
+          <span class="card-label">Kiểm tra HĐ nháp gần nhất</span>
+          @if (checkRun) {
+            <span class="card-value">{{ checkRun.counts.bills_error || 0 }} lỗi · {{ checkRun.counts.bills_warn || 0 }} cảnh báo</span>
+            <span class="card-sub">{{ checkRun.counts.bills || 0 }} HĐ · {{ checkRun.started_at | date:'dd/MM HH:mm' }}
+              · tự kiểm {{ checkScheduler ? 'BẬT' : 'TẮT' }}</span>
+          } @else { <span class="card-sub">{{ checkError || 'Chưa có lần kiểm nào' }}</span> }
+        </div>
+      </a>
+    </div>
+    <div class="section-note">Thu / chi là tổng phiếu trong kỳ (không tính phiếu hủy), chưa phải số dư TK 111 / 112 (chưa có số dư đầu kỳ).</div>
+  </section>
+
+  <!-- ═══ THAO TÁC NHANH ═══ -->
   <section class="quick-actions-section">
     <h2 class="section-title">
       <i class="fa-solid fa-bolt"></i>
       Thao tác nhanh
     </h2>
-
     <div class="quick-actions-grid">
-      <a
-        *ngFor="let action of quickActions"
-        [routerLink]="action.route"
-        class="quick-action-card"
-        [style.--accent-color]="action.color">
-        <div class="action-icon">
-          <i class="fa-solid" [ngClass]="action.icon"></i>
-        </div>
-        <div class="action-content">
-          <span class="action-label">{{ action.label }}</span>
-          <span class="action-desc">{{ action.description }}</span>
-        </div>
-        <i class="fa-solid fa-chevron-right action-arrow"></i>
-      </a>
+      @for (action of quickActions; track action.route) {
+        <a [routerLink]="action.route" class="quick-action-card" [style.--accent-color]="action.color">
+          <div class="action-icon"><i class="fa-solid" [ngClass]="action.icon"></i></div>
+          <div class="action-content">
+            <span class="action-label">{{ action.label }}</span>
+            <span class="action-desc">{{ action.description }}</span>
+          </div>
+          <i class="fa-solid fa-chevron-right action-arrow"></i>
+        </a>
+      }
     </div>
   </section>
 
-  <!-- ═══════════════════════════════════════════════════════════════════════════
-       RECENT ACTIVITIES: Hoạt động gần đây
-  ═══════════════════════════════════════════════════════════════════════════ -->
+  <!-- ═══ HOẠT ĐỘNG GẦN ĐÂY (trong kỳ) ═══ -->
   <section class="recent-section">
     <h2 class="section-title">
       <i class="fa-solid fa-clock-rotate-left"></i>
-      Hoạt động gần đây
+      Hoạt động trong kỳ
     </h2>
-
     <div class="recent-list">
-      <div
-        *ngFor="let activity of recentActivities"
-        class="recent-item">
-        <div class="activity-icon" [style.background-color]="getActivityColor(activity.type)">
-          <i class="fa-solid" [ngClass]="getActivityIcon(activity.type)"></i>
+      @for (activity of activities; track $index) {
+        <a class="recent-item" [routerLink]="activity.route">
+          <div class="activity-icon" [style.background-color]="getActivityColor(activity.type)">
+            <i class="fa-solid" [ngClass]="getActivityIcon(activity.type)"></i>
+          </div>
+          <div class="activity-content">
+            <span class="activity-desc">{{ activity.description }}</span>
+            <span class="activity-date">{{ activity.date | date:'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+        </a>
+      }
+      @if (!activities.length) {
+        <div class="no-activity">
+          <i class="fa-solid" [ngClass]="activitiesLoading ? 'fa-spinner fa-spin' : 'fa-inbox'"></i>
+          <span>{{ activitiesLoading ? 'Đang tải...' : 'Chưa có phiếu thu / chi, phiếu kho hay lần đối soát nào trong kỳ này' }}</span>
         </div>
-        <div class="activity-content">
-          <span class="activity-desc">{{ activity.description }}</span>
-          <span class="activity-date">{{ activity.date }}</span>
-        </div>
-      </div>
-
-      <div *ngIf="recentActivities.length === 0" class="no-activity">
-        <i class="fa-solid fa-inbox"></i>
-        <span>Chưa có hoạt động nào trong kỳ này</span>
-      </div>
+      }
     </div>
   </section>
 
-  <!-- ═══════════════════════════════════════════════════════════════════════════
-       FOOTER INFO
-  ═══════════════════════════════════════════════════════════════════════════ -->
   <footer class="dashboard-footer">
     <p>
       <i class="fa-solid fa-scale-balanced"></i>
       Tuân thủ Thông tư 133/2016/TT-BTC | Định hướng Thông tư 99/2025/TT-BTC
     </p>
-    <p>Dành cho Công ty TNHH 1 thành viên - Doanh nghiệp nhỏ & vừa</p>
   </footer>
 </div>
