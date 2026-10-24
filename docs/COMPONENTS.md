@@ -428,3 +428,11 @@ Giống "Chuyển khoản HĐ đầu ra" nhưng HĐ là HĐ **mua vào** và ti�
   phần tử cha phải `position: relative`.
 - Dùng ở: `server-table` (mọi bảng Đối soát hóa đơn XML / Số liệu khai thuế), Kiểm tra HĐ tự động (mở lần kiểm, bảng thuế suất), Số liệu
   khai thuế, Ánh xạ hàng hóa, Chuyển khoản HĐ đầu ra / đầu vào, Kiểm tra số lượng HĐ đầu vào / đầu ra (cả bảng Links HĐ gốc), Tổng quan.
+
+- (24/10/2026) **Chuyển khoản HĐ đầu vào chọn được sao kê PDF** (`utils/tpbank-pdf.util.ts`, `pdfjs-dist` 4.10.38 tải khi cần; worker nạp như module
+  qua `globalThis.pdfjsWorker`, không cần file asset): file PDF TPBank in xoay ngang — mỗi GD 1 cột dọc, mỗi thông tin 1 dải y; đo trên T03.pdf (22 trang):
+  đủ 384 GD ghi có + 45 GD ghi nợ, khớp file xlsx cùng tháng từng GD (PDF có thể CẮT tên chủ TK quá dài — so tên vẫn ghép được).
+  Chọn lẫn .xlsx + .pdf: gộp, bỏ GD trùng theo mã GD (`mergeDebitStatements`).
+- (24/10/2026) **Chuyển khoản HĐ đầu ra**: lấy xong mà KiotViet không có HĐ CK nào trong khoảng ngày → cảnh báo rõ. Đo 24/10/2026: KiotViet chỉ
+  ghi phương thức "chuyển khoản" từ khoảng đầu 04/2026 (tháng 3: 25–40 HĐ / ngày, 0 HĐ CK) → tháng 3 trở về trước không đối soát được.
+- (24/10/2026) Kiểm tra HĐ tự động: lịch 4 giờ / ngày → chỉ hiện "Lần tới" gần nhất (trước bị lỗi NG0955 trùng khóa `einvoice_check`).

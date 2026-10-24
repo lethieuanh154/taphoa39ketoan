@@ -12,10 +12,8 @@
       @if (list) {
         @if (list.scheduler.enabled) {
           <span class="badge ok"><i class="fa-solid fa-clock"></i> Tự kiểm lúc {{ list.check_time }} hằng ngày (giờ VN)</span>
-          @for (j of list.scheduler.jobs; track j.name) {
-            @if (j.name === 'einvoice_check') {
-              <span class="hint">Lần tới {{ viTime(j.next_at) }}@if (j.last_result) { · lần trước: {{ j.last_result }} }</span>
-            }
+          @if (nextCheckJob; as j) {
+            <span class="hint">Lần tới {{ viTime(j.next_at) }}@if (lastCheckResult) { · lần trước: {{ lastCheckResult }} }</span>
           }
         } @else {
           <span class="badge off"><i class="fa-solid fa-clock"></i> Lịch tự kiểm đang TẮT trên máy chủ này</span>

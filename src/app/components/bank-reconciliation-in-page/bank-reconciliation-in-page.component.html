@@ -56,8 +56,8 @@
       <span class="step">2</span><b>Sao kê TPBank</b>
       <label class="btn pick" [class.disabled]="parsing" title="Chọn được nhiều file (vd 3 tháng của 1 quý)">
         <i class="fa-solid" [ngClass]="parsing ? 'fa-spinner fa-spin' : 'fa-file-excel'"></i>
-        {{ parsing ? 'Đang đọc...' : (bank ? 'Chọn lại file sao kê' : 'Chọn file Bảng kê TPBank (.xlsx)') }}
-        <input type="file" accept=".xlsx" multiple (change)="onBankSelected($event)" [disabled]="parsing" hidden>
+        {{ parsing ? 'Đang đọc...' : (bank ? 'Chọn lại file sao kê' : 'Chọn sao kê TPBank (.xlsx hoặc .pdf)') }}
+        <input type="file" accept=".xlsx,.pdf" multiple (change)="onBankSelected($event)" [disabled]="parsing" hidden>
       </label>
       @if (bank) {
         <span><b>{{ bank.transactions.length | number }}</b> giao dịch tiền ra · {{ vnd(bank.total) }} đ · GD {{ viDate(bank.fromDate) }} → {{ viDate(bank.toDate) }}

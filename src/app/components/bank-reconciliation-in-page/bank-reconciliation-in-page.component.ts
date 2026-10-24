@@ -15,7 +15,7 @@ import { TienIchCacheService } from '../../services/tien-ich-cache.service';
 import { BgJob } from '../../services/background-job.service';
 import { CachedXml, PurchaseInvoiceSourceService } from '../../services/purchase-invoice-source.service';
 import { PortalLink } from '../accountant-pages/invoice.service.v2';
-import { DebitStatement, parseTpBankDebitFiles } from '../../utils/tpbank-debit.util';
+import { DebitStatement, mergeDebitStatements, parseTpBankDebitFiles } from '../../utils/tpbank-debit.util';
 import {
   PURCHASE_KIND_LABEL, PurchaseInv, PurchaseMatchKind, PurchaseMatchRow, PurchaseReconResult, buildPurchaseReconCsv,
   reconcilePurchaseTransfers, MAX_DAYS_AFTER, MAX_DAYS_BEFORE
@@ -242,7 +242,27 @@ export class BankReconciliationInPageComponent implements OnInit {
     this.parsing = true;
     this.error = '';
     try {
-      const st = await parseTpBankDebitFiles(files);
+      // .xlsx (Bảng kê) và .pdf (Sao kê giao dịch) — chọn lẫn được; PDF đọc bằng pdfjs-dist (chỉ tải thư viện khi có file PDF)
+      const pdfs = files.filter(f => /\.pdf$/i.test(f.name));
+      const xlsx = files.filter(f => !/\.pdf$/i.test(f.name));
+      const parts = xlsx.length ? [await parseTpBankDebitFiles(xlsx)] : [];
+      if (pdfs.length) {
+        // Worker của pdf.js nạp như module JS (bundle, tải khi cần) và chạy ngay trên luồng chính qua globalThis.pdfjsWorker —
+        // KHÔNG dùng file asset riêng (24/10/2026: thiếu file / dev server chưa khởi động lại → "Setting up fake worker failed").
+        // Sao kê 22 trang đọc ~0,1 giây nên không cần luồng riêng.
+        const [pdfjs, worker, { parseTpBankPdf, pdfToDebitStatement }] = await Promise.all([
+          import('pdfjs-dist'), import('pdfjs-dist/build/pdf.worker.min.mjs'), import('../../utils/tpbank-pdf.util')]);
+        (globalThis as any).pdfjsWorker = worker;
+        for (const f of pdfs) {
+          const t0 = performance.now();
+          const ps = await parseTpBankPdf(new Uint8Array(await f.arrayBuffer()), pdfjs);
+          if (!ps.rows.length) throw new Error(`${f.name}: không thấy giao dịch nào — có đúng file Sao kê TPBank (PDF) không?`);
+          const d = pdfToDebitStatement(ps, f.name);
+          console.log(`${LOG} PDF ${f.name}: ${ps.pages} trang, ${ps.rows.length} GD (${d.transactions.length} tiền ra) — ${(performance.now() - t0).toFixed(0)} ms`);
+          parts.push(d);
+        }
+      }
+      const st = mergeDebitStatements(parts);
       this.bank = st;
       this.bankSavedAt = Date.now();
       await this.cache.set<DebitStatement>(BANK_KEY, st);

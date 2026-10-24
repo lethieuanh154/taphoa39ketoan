@@ -93,7 +93,11 @@ export async function parseTpBankDebits(file: File): Promise<DebitStatement> {
 
 /** Nhiều file (vd sao kê từng tuần) → gộp, bỏ GD trùng (cùng mã GD, hoặc cùng giờ + số tiền + người nhận khi không có mã) */
 export async function parseTpBankDebitFiles(files: File[]): Promise<DebitStatement> {
-  const list = await Promise.all(files.map(parseTpBankDebits));
+  return mergeDebitStatements(await Promise.all(files.map(parseTpBankDebits)));
+}
+
+/** Gộp sao kê đã đọc (xlsx và / hoặc PDF — tpbank-pdf.util.ts), bỏ GD trùng */
+export function mergeDebitStatements(list: DebitStatement[]): DebitStatement {
   const seen = new Set<string>();
   const transactions: DebitTxn[] = [];
   for (const st of list) {

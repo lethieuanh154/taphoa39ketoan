@@ -112,6 +112,18 @@ export class InvoiceCheckPageComponent implements OnInit {
     }
   }
 
+  /** Lịch tự kiểm có nhiều giờ (00:00, 12:00, 17:00, 21:00) → lần chạy sắp tới gần nhất */
+  get nextCheckJob() {
+    return (this.list?.scheduler.jobs || []).filter(j => j.name === 'einvoice_check')
+      .sort((a, b) => a.next_at.localeCompare(b.next_at))[0];
+  }
+
+  /** Kết quả lần tự kiểm gần nhất (giờ chạy muộn nhất có kết quả) */
+  get lastCheckResult(): string {
+    return (this.list?.scheduler.jobs || []).filter(j => j.name === 'einvoice_check' && j.last_result)
+      .sort((a, b) => b.next_at.localeCompare(a.next_at))[0]?.last_result || '';
+  }
+
   private stopPoll(): void {
     if (this.pollTimer) clearTimeout(this.pollTimer);
     this.pollTimer = null;

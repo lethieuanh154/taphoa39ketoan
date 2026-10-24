@@ -49,6 +49,12 @@
       · {{ range.auto_sync.enabled ? ('máy chủ tự lấy lại 7 ngày gần nhất lúc ' + range.auto_sync.time + ' hằng ngày') : 'lịch tự lấy trên máy chủ đang tắt' }}
     </div>
   }
+  @if (kvLoaded && !invoiceCount && !loadingKv) {
+    <div class="info-msg warn-msg"><i class="fa-solid fa-triangle-exclamation"></i>
+      KiotViet <b>không có hóa đơn thanh toán chuyển khoản nào</b> từ {{ viDate(loadedFrom) }} đến {{ viDate(loadedTo) }}
+      (đã hỏi đủ mọi ngày). Hóa đơn trong khoảng này có thể được ghi là tiền mặt trên KiotViet — đo 24/10/2026: KiotViet chỉ bắt đầu ghi
+      phương thức chuyển khoản từ khoảng đầu tháng 4/2026, tháng 3 trở về trước không đối soát được.</div>
+  }
   @if (rangeChanged) {
     <div class="info-msg warn-msg"><i class="fa-solid fa-triangle-exclamation"></i>
       Khoảng ngày đã đổi ({{ viDate(fromDate) }} → {{ viDate(toDate) }}) — bấm <b>Lấy hóa đơn KiotViet</b> để đối soát lại.</div>
