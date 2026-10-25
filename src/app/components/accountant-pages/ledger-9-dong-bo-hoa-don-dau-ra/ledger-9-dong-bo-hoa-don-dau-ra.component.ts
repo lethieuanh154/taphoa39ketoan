@@ -209,6 +209,11 @@ export class Ledger9DongBoHoaDonDauRaComponent {
     this.error = this.xmlInvoices.length ? '' : 'Không tìm thấy HĐ đầu ra nào của MST công ty trong thư mục đã chọn (cần file XML hóa đơn điện tử hoặc ZIP chứa XML).';
   }
 
+  // Đang chạy = cờ của trang HOẶC việc nền còn chạy (25/10/2026): quay lại trang thấy loading NGAY, không đợi đọc xong bản XML đã lưu
+  get xmlBusy(): boolean { return this.xmlReading || !!this.jobs.get(CACHE_XML); }
+  get kvBusy(): boolean { return this.loadingKv || !!this.jobs.find('einvoice-bills:'); }
+  get xmlProgressText(): string { return (this.xmlJob || this.jobs.get<CachedXml>(CACHE_XML))?.progress || ''; }
+
   get rangeError(): string {
     if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) return 'Chọn kỳ trên thanh chọn kỳ';
     const days = (Date.parse(this.toDate) - Date.parse(this.fromDate)) / 86400000 + 1;

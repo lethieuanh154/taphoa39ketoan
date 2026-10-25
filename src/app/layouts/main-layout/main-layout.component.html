@@ -147,6 +147,16 @@
     <router-outlet></router-outlet>
   </main>
 
+  <!-- Việc đang chạy nền (BackgroundJobService) — chuyển trang vẫn chạy tiếp; quay lại trang đó để xem kết quả -->
+  @if (bgJobs().length) {
+    <div class="bg-jobs" role="status" aria-live="polite">
+      <div class="bg-jobs-title"><span class="bg-ring"></span> Đang chạy nền ({{ bgJobs().length }})</div>
+      @for (j of bgJobs(); track j.key) {
+        <div class="bg-job">{{ j.label }}@if (j.progress) { · {{ j.progress }} } <small>từ {{ j.startedAt | date:'HH:mm:ss' }}</small></div>
+      }
+    </div>
+  }
+
   <!-- MST công ty (CompanyService): tự hiện khi chưa nhập; bấm "MST: …" ở góc dưới sidebar để đổi -->
   @if (showMstDialog) {
     <div class="mst-backdrop">

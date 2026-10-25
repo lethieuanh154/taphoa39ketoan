@@ -6,6 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { CompanyService } from '../../services/company.service';
+import { BackgroundJobService } from '../../services/background-job.service';
 import { PeriodSelectorComponent } from '../../components/shared/period-selector/period-selector.component';
 import { MENU_SECTIONS, matchesRoute } from './menu.config';
 
@@ -30,6 +31,8 @@ export class MainLayoutComponent implements OnInit {
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
   private companyService = inject(CompanyService);
+  /** Việc đang chạy nền (đọc XML, lấy HĐĐT / Gmail, đếm email…) — khung góc dưới phải, thấy ở mọi trang */
+  readonly bgJobs = inject(BackgroundJobService).active;
 
   readonly sections = MENU_SECTIONS;
 

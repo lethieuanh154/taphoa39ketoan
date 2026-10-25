@@ -466,6 +466,8 @@ Dùng ở Kiểm tra số lượng HĐ: đọc thư mục XML (`xml-in` / `xml-o
 (`einvoice-bills:<from>:<to>`), lấy Gmail + scrape (`gmail-links:...`, `log` = khung log). Việc tự ghi kết quả vào IndexedDB
 (TienIchCacheService) → quay lại trang: còn chạy thì hiện tiến độ / log và chờ tiếp, xong rồi thì đọc bản lưu. Tải lại cả trang (F5)
 thì việc đang chạy mất (bản đã lưu vẫn còn).
+`active = signal<BgJob[]>` (25/10/2026) — danh sách việc đang chạy; MainLayout hiện khung **"Đang chạy nền (N)"** góc phải dưới,
+thấy ở mọi trang (tên việc · tiến độ · giờ bắt đầu), hết việc thì ẩn.
 
 ## PurchaseInvoiceSourceService — nguồn HĐ đầu vào dùng chung (23/10/2026)
 

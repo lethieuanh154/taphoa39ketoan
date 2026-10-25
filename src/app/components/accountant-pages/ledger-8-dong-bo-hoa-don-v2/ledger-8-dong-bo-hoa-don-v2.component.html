@@ -29,15 +29,16 @@
   <div class="filter-section">
     <h3 class="section-title">Danh sách HĐ trên máy (XML)</h3>
     <div class="xml-picker">
-      <label class="btn btn-primary" [class.disabled]="xmlReading">
-        <i class="fa-solid" [ngClass]="xmlReading ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
-        {{ xmlReading ? ('Đang đọc ' + (xmlJob?.progress || '...')) : 'Chọn thư mục XML HĐ đầu vào' }}
-        <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
+      <label class="btn btn-primary" [class.disabled]="xmlBusy">
+        <i class="fa-solid" [ngClass]="xmlBusy ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
+        {{ xmlBusy ? ('Đang đọc ' + (xmlProgressText || '...')) : 'Chọn thư mục XML HĐ đầu vào' }}
+        <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlBusy" hidden>
       </label>
-      <span class="xml-hint" *ngIf="!xmlInfo && !xmlReading">Thư mục app FDI tải về (vd <code>...\T9\&lt;MST&gt;\purchase\xml</code>) — đọc ngay trên máy, không tải lên máy chủ. Có ZIP cũng được.</span>
+      <span class="xml-hint" *ngIf="!xmlInfo && !xmlBusy">Thư mục app FDI tải về (vd <code>...\T9\&lt;MST&gt;\purchase\xml</code>) — đọc ngay trên máy, không tải lên máy chủ. Có ZIP cũng được.</span>
       <span class="xml-info" *ngIf="xmlInfo"><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
         <span class="xml-hint" *ngIf="xmlSavedAt">· đọc lúc {{ viTime(xmlSavedAt) }} (đã lưu trên máy — FDI tải thêm thì chọn lại thư mục)</span></span>
     </div>
+    <app-table-loading *ngIf="xmlBusy" [text]="'Đang đọc thư mục XML... ' + xmlProgressText"></app-table-loading>
     <div class="xml-error" *ngIf="mstWarning"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstWarning }}</div>
     <div class="xml-error" *ngIf="xmlError"><i class="fa-solid fa-triangle-exclamation"></i> {{ xmlError }}</div>
 
@@ -76,15 +77,15 @@
         <div class="filter-group">
           <label>&nbsp;</label>
           <div class="button-group">
-            <button type="button" class="btn btn-primary" (click)="runLiveReconciliation()" [disabled]="liveReconciling">
-              <i class="fa-solid fa-search" *ngIf="!liveReconciling"></i>
-              <i class="fa-solid fa-spinner fa-spin" *ngIf="liveReconciling"></i>
+            <button type="button" class="btn btn-primary" (click)="runLiveReconciliation()" [disabled]="liveBusy">
+              <i class="fa-solid fa-search" *ngIf="!liveBusy"></i>
+              <i class="fa-solid fa-spinner fa-spin" *ngIf="liveBusy"></i>
               Tìm kiếm
             </button>
             <button type="button" class="btn btn-outline-secondary" (click)="resetFilter()">
               <i class="fa-solid fa-rotate-left"></i> Đặt lại
             </button>
-            <button type="button" class="btn btn-outline-primary" (click)="forceReloadReconcile()" [disabled]="liveReconciling" title="Tải lại từ server (bỏ qua cache)">
+            <button type="button" class="btn btn-outline-primary" (click)="forceReloadReconcile()" [disabled]="liveBusy" title="Tải lại từ server (bỏ qua cache)">
               <i class="fa-solid fa-sync"></i> Tải lại
             </button>
           </div>
@@ -98,16 +99,16 @@
   <!-- ============================================ -->
   <div class="action-section">
     <div class="action-center">
-      <button class="btn btn-primary btn-large" (click)="runQuickCount(!!countResult)" [disabled]="counting"
+      <button class="btn btn-primary btn-large" (click)="runQuickCount(!!countResult)" [disabled]="countBusy"
               title="Chỉ đếm email nhận trong kỳ (người gửi / tiêu đề / giờ) rồi so với số HĐ XML theo ngày — nhanh, không đọc nội dung / đính kèm">
-        <i class="fa-solid" [ngClass]="counting ? 'fa-spinner fa-spin' : 'fa-list-ol'"></i>
-        {{ counting ? 'Đang đếm email...' : (countResult ? 'Đếm lại email' : 'Đếm nhanh (số email ⇄ số HĐ)') }}
+        <i class="fa-solid" [ngClass]="countBusy ? 'fa-spinner fa-spin' : 'fa-list-ol'"></i>
+        {{ countBusy ? 'Đang đếm email...' : (countResult ? 'Đếm lại email' : 'Đếm nhanh (số email ⇄ số HĐ)') }}
       </button>
-      <button class="btn btn-warning btn-large" (click)="runLiveReconciliation()" [disabled]="liveReconciling">
-        <span *ngIf="!liveReconciling">
+      <button class="btn btn-warning btn-large" (click)="runLiveReconciliation()" [disabled]="liveBusy">
+        <span *ngIf="!liveBusy">
           <i class="fa-solid fa-bolt"></i> Đối chiếu Gmail vs XML
         </span>
-        <span *ngIf="liveReconciling">
+        <span *ngIf="liveBusy">
           <i class="fa-solid fa-spinner fa-spin"></i> Đang đối chiếu...
         </span>
       </button>
@@ -117,9 +118,9 @@
   <!-- ============================================ -->
   <!-- ĐẾM NHANH: số email ⇄ số HĐ XML (25/10/2026) -->
   <!-- ============================================ -->
-  <div class="count-section" *ngIf="countResult || counting || countError">
+  <div class="count-section" *ngIf="countResult || countBusy || countError">
     <div class="xml-error" *ngIf="countError"><i class="fa-solid fa-triangle-exclamation"></i> {{ countError }}</div>
-    <app-table-loading *ngIf="counting && !countResult" text="Đang đếm email Gmail..."></app-table-loading>
+    <app-table-loading *ngIf="countBusy && !countResult" text="Đang đếm email Gmail..."></app-table-loading>
     <ng-container *ngIf="countResult as r">
       <div class="count-head" [class.ok]="r.ok">
         <span class="count-big"><i class="fa-solid" [ngClass]="r.ok ? 'fa-circle-check' : 'fa-triangle-exclamation'"></i>
@@ -169,10 +170,10 @@
   <!-- ============================================ -->
   <!-- KẾT QUẢ ĐỐI CHIẾU (Gmail vs XML) -->
   <!-- ============================================ -->
-  <div class="live-reconciliation-section" *ngIf="liveResults.length > 0 || liveReconciling">
+  <div class="live-reconciliation-section" *ngIf="liveResults.length > 0 || liveBusy">
     <div class="section-header">
       <h3><i class="fa-solid fa-bolt"></i> Đối chiếu: Gmail vs thư mục XML</h3>
-      <span class="xml-hint" *ngIf="gmailFetchedAt && !liveReconciling">Gmail lấy lúc {{ viTime(gmailFetchedAt) }} (đã lưu trên máy) —
+      <span class="xml-hint" *ngIf="gmailFetchedAt && !liveBusy">Gmail lấy lúc {{ viTime(gmailFetchedAt) }} (đã lưu trên máy) —
         bấm <b>Tải lại</b> để lấy email mới</span>
       <div class="live-actions" *ngIf="liveResults.length > 0">
         <button class="btn btn-sm btn-primary" (click)="saveLiveResults()" [disabled]="liveSaving || liveSaved">
@@ -231,11 +232,11 @@
     <!-- Status log -->
     <div *ngIf="liveStatusLog.length > 0" class="status-log-section" style="background:#1e1e1e;color:#d4d4d4;font-family:monospace;font-size:12px;padding:10px 14px;border-radius:6px;margin-bottom:12px;max-height:160px;overflow-y:auto;">
       <div *ngFor="let line of liveStatusLog" style="line-height:1.6;">{{ line }}</div>
-      <div *ngIf="liveReconciling" style="line-height:1.6;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:4px;"></i> Đang xử lý...</div>
+      <div *ngIf="liveBusy" style="line-height:1.6;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:4px;"></i> Đang xử lý...</div>
     </div>
 
     <!-- Results table -->
-    <app-table-loading *ngIf="liveReconciling && liveResults.length === 0" text="Đang đối chiếu Gmail với thư mục XML..."></app-table-loading>
+    <app-table-loading *ngIf="liveBusy && liveResults.length === 0" text="Đang đối chiếu Gmail với thư mục XML..."></app-table-loading>
     <div class="live-results-table-wrapper" *ngIf="liveResults.length > 0">
       <table class="live-results-table">
         <thead>

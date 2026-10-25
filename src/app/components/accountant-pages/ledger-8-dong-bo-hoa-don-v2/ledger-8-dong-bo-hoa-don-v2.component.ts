@@ -852,6 +852,8 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       }
       if (cacheOnly) return;
       job = this.source.startGmailCount(p);
+    } else if (cacheOnly) {
+      console.log(`${LOG} Quay lại trang: đang đếm email ${p.from} → ${p.to} (chạy nền) → chờ tiếp`);
     }
     this.counting = true;
     this.countError = '';
@@ -880,6 +882,12 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     console.log(`${LOG} Đếm nhanh ${v.fromDate} → ${v.toDate}: ${r.email} email ⇄ ${r.xml} HĐ XML → ${r.ok ? 'khớp' : 'lệch ' + r.diff}, `
       + `${r.days.filter(x => x.diff).length} ngày chênh`);
   }
+
+  // Đang chạy = cờ của trang HOẶC việc nền còn chạy (25/10/2026): quay lại trang thấy loading NGAY, không đợi đọc xong bản XML đã lưu
+  get xmlBusy(): boolean { return this.xmlReading || !!this.source.runningXml(); }
+  get liveBusy(): boolean { return this.liveReconciling || !!this.source.runningGmail(); }
+  get countBusy(): boolean { return this.counting || !!this.source.runningGmailCount(); }
+  get xmlProgressText(): string { return (this.xmlJob || this.source.runningXml())?.progress || ''; }
 
   get countDays() {
     const days = this.countResult?.days || [];

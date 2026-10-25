@@ -343,6 +343,9 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - (23/10/2026 chiều) Cả 2 trang: bỏ ô Từ / Đến ngày (cả tab Links HĐ gốc) — khoảng ngày = KỲ ở thanh chọn kỳ (đổi kỳ → hiện kết quả
   đã lưu của kỳ mới); đọc XML, lấy HĐĐT, lấy Gmail chạy NỀN (`BackgroundJobService`) → chuyển trang không dừng, quay lại thấy tiến độ.
   Đầu ra bỏ nút "Theo ngày trong XML"; kỳ > 92 ngày → nhắc chọn Tháng / Quý.
+- (25/10/2026) Quay lại trang khi việc còn chạy → loading hiện NGAY (getter `xmlBusy` / `liveBusy` / `countBusy` (đầu vào),
+  `xmlBusy` / `kvBusy` (đầu ra) = cờ trang HOẶC `BackgroundJobService` còn việc), không đợi đọc bản XML đã lưu; đang đọc XML có
+  vòng xoay lớn kèm tiến độ. Ở trang khác: khung "Đang chạy nền" của MainLayout.
 
 ## InvoiceCheckPageComponent — Tiện ích "Kiểm tra HĐ tự động" (23/10/2026)
 

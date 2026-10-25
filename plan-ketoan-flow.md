@@ -148,7 +148,7 @@ bảng lưu phía server, sửa được ở Danh mục.
 | NH1 · NH2 · NH3 | Nhập mua hàng · NVL · CCDC | | 1331 / 331 | 1561 · 152 · 153 / 331 |
 | (5) | HĐ nhập - xuất không qua kho | 154 / 331 | 1331 / 331 | |
 | (6) | HĐ cung ứng dịch vụ | 131 / **5113** (file ghi 5112 — sai, xác nhận 24/10) | 131 / 33311 | |
-| (7) | HĐ / chứng từ dịch vụ mua vào | **641 hoặc 642** / 331 (24/10) | 1331 / 331 | |
+| (7) | HĐ / chứng từ dịch vụ mua vào | **6421 hoặc 6422** / 331 (TT 133, chốt 25/10) | 1331 / 331 | |
 | (13) · (14) | Phiếu thu tiền gửi · tiền mặt | 1121 / 131 · 1111 / 131 | | |
 | (8) · (9) | Phiếu chi tiền gửi · tiền mặt | 331 / 1121 · 331 / 1111 | | |
 | NT1 · NT2 · NT3 | Hàng bán bị trả lại (hàng · NVL · CCDC) | 5111 / 131 | 33311 / 131 | 156 · 152 · 153 / 632 |
@@ -171,9 +171,15 @@ Kế toán đã xác nhận (user 24/10/2026):
   `of(...)`, không lưu máy chủ) → TK tự tạo **mất khi tải lại trang**: bước 3 phải nối hệ thống TK với KeToanBackEnd (lưu Firestore)
   trước khi kế toán tạo 6321; bút toán tự sinh tham chiếu TK theo mã, không cứng trong code.
 - XK2 / CK3 (xuất dùng nội bộ, chuyển kho thành phẩm): **bỏ qua**, không làm.
-- **HĐ / chứng từ dịch vụ mua vào**: Nợ **641** (chi phí bán hàng) hoặc **642** (chi phí quản lý doanh nghiệp) / Có 331, VAT 1331 / 331.
-  Đề xuất (chờ kế toán duyệt khi làm bước 3): mặc định 642; kế toán đổi sang 641 ở từng HĐ (dịch vụ phục vụ bán hàng: vận chuyển hàng
-  bán, quảng cáo, thuê mặt bằng bán hàng…); máy **nhớ lựa chọn theo NCC** → HĐ sau của NCC đó tự gợi ý TK đã chọn.
+- **HĐ / chứng từ dịch vụ mua vào**: Nợ **6421** (chi phí bán hàng) hoặc **6422** (chi phí quản lý doanh nghiệp) / Có 331, VAT 1331 / 331.
+  CHỐT 25/10/2026: công ty theo **TT 133** (không có TK 641) → kế toán nói "641" = **6421**, "642" = **6422**.
+  Kế toán phân loại (25/10): 641 = bao bì, quảng cáo, CCDC phục vụ bán hàng, tiếp khách, lương bộ phận bán hàng…; 642 = văn phòng
+  phẩm, máy tính, bàn ghế, phần mềm, mặt bằng, lương bộ phận văn phòng…
+  CHỐT 25/10 (làm ở bước 3): **mặc định 6421** (tạp hóa → phần lớn dịch vụ mua vào phục vụ bán hàng); tên dòng hàng
+  khớp từ khóa nhóm 642 (văn phòng phẩm, máy tính, bàn ghế, phần mềm, thuê mặt bằng…) → gợi ý 6422; kế toán đổi được ở từng HĐ; máy
+  **nhớ lựa chọn theo NCC** → HĐ sau của NCC đó tự gợi ý TK đã chọn.
+  Việc kèm theo: danh mục TK demo đang ghi sai tên 6421 "CP nhân viên" / 6422 "CP vật liệu, dụng cụ" (`models/chart-of-accounts.models.ts`,
+  `models/cash-voucher.models.ts`) → đổi thành 6421 Chi phí bán hàng / 6422 Chi phí quản lý doanh nghiệp khi làm hệ thống TK lưu thật.
 - Dùng lại: `services/invoice-voucher-converter.service.ts` (HĐ mua → phiếu chi + nhập kho; HĐ bán → phiếu thu + xuất
   kho), `shared/create-voucher-from-invoice-modal`, service phiếu thu/chi, kho, nhật ký, sổ cái.
 - Kho theo ĐVT master; giá vốn **bình quân gia quyền tính lại sau mỗi lần nhập** (bình quân di động — user 22/10/2026: hết
@@ -345,7 +351,7 @@ nên là), link mở đúng HĐ trên einvoiceapp để sửa; lịch sử các 
    toán chưa phân biệt được người làm → schema người dùng / vai trò làm sẵn để thêm email + phân quyền sau.
 8. ~~**Quy tắc định khoản**~~ — đã có 22/10/2026: `DINH KHOAN.xlsx` (bảng ở mục 2 bước 3); 4 điểm còn hỏi đã được kế toán xác nhận
    24/10/2026 (ngay dưới bảng): không làm quy tắc chiết khấu / khuyến mại (KiotViet đã làm), dịch vụ = 5113, giá vốn 6321 (kế toán tự
-   tạo — cần hệ thống TK lưu thật), bỏ XK2 / CK3, dịch vụ mua vào 641 / 642.
+   tạo — cần hệ thống TK lưu thật), bỏ XK2 / CK3, dịch vụ mua vào 6421 / 6422 (TT 133, chốt 25/10).
 9. Câu hỏi riêng bước 1: `plan-doi-soat-web.md` mục 9 — 22/10/2026: kiến trúc **B** (chạy ở KeToanBackEnd, dùng lại
    `doi_soat.py`), trình duyệt + script đã giải quyết theo B; câu i: bảng quy đổi ĐVT KeToanBackEnd tự lấy từ KiotViet.
 10. ~~**Token KiotViet cho job**~~ — đã trả lời 22/10/2026: **(b)** job chạy ở KeToanBackEnd với credential KiotViet riêng

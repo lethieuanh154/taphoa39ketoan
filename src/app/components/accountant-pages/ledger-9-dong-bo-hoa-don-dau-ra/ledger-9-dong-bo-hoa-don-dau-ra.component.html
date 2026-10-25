@@ -9,24 +9,24 @@
 
   <section class="card">
     <div class="row">
-      <label class="btn btn-primary pick" [class.disabled]="xmlReading">
-        <i class="fa-solid" [ngClass]="xmlReading ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
-        {{ xmlReading ? ('Đang đọc ' + (xmlJob?.progress || '...')) : 'Chọn thư mục XML HĐ đầu ra' }}
-        <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
+      <label class="btn btn-primary pick" [class.disabled]="xmlBusy">
+        <i class="fa-solid" [ngClass]="xmlBusy ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
+        {{ xmlBusy ? ('Đang đọc ' + (xmlProgressText || '...')) : 'Chọn thư mục XML HĐ đầu ra' }}
+        <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlBusy" hidden>
       </label>
       @if (xmlInfo) {
         <span><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
           @if (xmlSavedAt) { <span class="hint">· đọc lúc {{ viTime(xmlSavedAt) }} (đã lưu trên máy — FDI tải thêm thì chọn lại thư mục)</span> }</span>
-      } @else if (!xmlReading) {
+      } @else if (!xmlBusy) {
         <span class="hint">Vd <code>D:\D\TAI HOA DON HANG LOAT\&lt;MST&gt;\T9\&lt;MST&gt;\sold\xml</code> — có ZIP cũng được.</span>
       }
     </div>
     <div class="row">
       <span class="hint"><i class="fa-solid fa-calendar-day"></i> Kỳ: <b>{{ periodLabel() }}</b> (đổi ở thanh chọn kỳ trên cùng, tối đa 92 ngày)
         @if (rangeError) { — <b class="warn-text">{{ rangeError }}</b> }</span>
-      <button type="button" class="btn btn-primary" (click)="compare()" [disabled]="loadingKv || xmlReading || !xmlInvoices.length">
-        <i class="fa-solid" [ngClass]="loadingKv ? 'fa-spinner fa-spin' : 'fa-scale-balanced'"></i>
-        {{ loadingKv ? 'Đang lấy HĐĐT KiotViet...' : 'So với HĐĐT KiotViet' }}
+      <button type="button" class="btn btn-primary" (click)="compare()" [disabled]="kvBusy || xmlBusy || !xmlInvoices.length">
+        <i class="fa-solid" [ngClass]="kvBusy ? 'fa-spinner fa-spin' : 'fa-scale-balanced'"></i>
+        {{ kvBusy ? 'Đang lấy HĐĐT KiotViet...' : 'So với HĐĐT KiotViet' }}
       </button>
     </div>
     @if (mstWarning) { <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstWarning }}</div> }
@@ -35,10 +35,10 @@
 
   @if (compared) {
     <section class="card rel">
-      @if (loadingKv) { <app-table-loading [overlay]="true" text="Đang lấy HĐĐT KiotViet..."></app-table-loading> }
+      @if (kvBusy) { <app-table-loading [overlay]="true" text="Đang lấy HĐĐT KiotViet..."></app-table-loading> }
       <h2>Kết quả {{ comparedRange }}</h2>
       <p class="hint"><i class="fa-solid fa-clock-rotate-left"></i> HĐĐT KiotViet lấy lúc {{ viTime(kvFetchedAt) }} (đã lưu trên máy)
-        <button type="button" class="btn small" (click)="compare(true)" [disabled]="loadingKv">
+        <button type="button" class="btn small" (click)="compare(true)" [disabled]="kvBusy">
           <i class="fa-solid fa-rotate"></i> Lấy lại từ KiotViet</button></p>
       <div class="stats">
         <div class="stat"><b>{{ counts.xml | number }}</b><small>HĐ trong XML</small></div>
@@ -108,9 +108,9 @@
         </div>
       }
     </section>
-  } @else if (loadingKv || xmlReading) {
+  } @else if (kvBusy || xmlBusy) {
     <section class="card">
-      <app-table-loading [text]="xmlReading ? 'Đang đọc thư mục XML... ' + (xmlJob?.progress || '') : 'Đang lấy HĐĐT KiotViet...'"></app-table-loading>
+      <app-table-loading [text]="xmlBusy ? 'Đang đọc thư mục XML... ' + xmlProgressText : 'Đang lấy HĐĐT KiotViet...'"></app-table-loading>
     </section>
   }
 </div>

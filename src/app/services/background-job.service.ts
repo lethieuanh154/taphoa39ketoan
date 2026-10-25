@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 /**
  * VIỆC CHẠY NỀN CỦA CÁC TRANG TIỆN ÍCH (23/10/2026) — chuyển sang trang khác KHÔNG làm dừng việc đang chạy (đọc thư mục XML, lấy
@@ -24,6 +24,8 @@ export interface BgJob<T = unknown> {
 @Injectable({ providedIn: 'root' })
 export class BackgroundJobService {
   private jobs = new Map<string, BgJob<any>>();
+  /** Việc đang chạy (cho khung "Đang chạy nền" ở MainLayout — thấy được ở mọi trang, 25/10/2026) */
+  readonly active = signal<BgJob<any>[]>([]);
 
   run<T>(key: string, label: string, meta: Record<string, any>, fn: (job: BgJob<T>) => Promise<T>): BgJob<T> {
     const running = this.jobs.get(key) as BgJob<T> | undefined;
@@ -42,8 +44,12 @@ export class BackgroundJobService {
         console.warn(`${LOG} Lỗi: ${label} — ${e?.message || e?.status || e}`);
         throw e;
       }
-    ).finally(() => this.jobs.delete(key));
+    ).finally(() => {
+      this.jobs.delete(key);
+      this.active.set([...this.jobs.values()]);
+    });
     this.jobs.set(key, job);
+    this.active.set([...this.jobs.values()]);
     return job;
   }
 
