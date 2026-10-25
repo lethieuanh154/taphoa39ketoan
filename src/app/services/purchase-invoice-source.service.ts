@@ -1,10 +1,13 @@
 import { inject, Injectable } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { InvoiceServiceV2, PortalLink } from '../components/accountant-pages/invoice.service.v2';
 import { BackgroundJobService, BgJob } from './background-job.service';
 import { TienIchCacheService, CacheEntry } from './tien-ich-cache.service';
 import { LocalXmlInvoice, XmlReadResult, detectCompanyMst, readInvoiceFiles } from '../utils/invoice-xml.util';
 import { PurchaseInv } from '../utils/purchase-transfer-reconcile.util';
+import { CountEmail } from '../utils/invoice-count.util';
 
 /**
  * NGUỒN HĐ ĐẦU VÀO DÙNG CHUNG (23/10/2026) — Kiểm tra số lượng HĐ đầu vào (ledger-8) + Đối soát CK → Chuyển khoản HĐ đầu vào.
@@ -15,6 +18,9 @@ import { PurchaseInv } from '../utils/purchase-transfer-reconcile.util';
 const LOG = '[PurchaseSource]';
 export const XML_IN_KEY = 'xml-in';
 
+/** Đếm nhanh: email nhận trong kỳ (chỉ người gửi / tiêu đề / giờ) — /api/gmail/message-count */
+export interface GmailCount { count: number; listed: number; truncated: boolean; emails: CountEmail[]; }
+
 export interface CachedXml { folder: string; result: XmlReadResult; }
 
 export interface GmailParams { label: string; labelId?: string; from: string; to: string; }
@@ -24,6 +30,7 @@ export class PurchaseInvoiceSourceService {
   private invoiceService = inject(InvoiceServiceV2);
   private jobs = inject(BackgroundJobService);
   private cache = inject(TienIchCacheService);
+  private http = inject(HttpClient);
 
   // ===== XML =====
   /** Đọc thư mục XML (chạy nền; đang đọc thì dùng lại việc đang chạy) */
@@ -125,5 +132,34 @@ export class PurchaseInvoiceSourceService {
         total: Math.round(pl.totalAmount), source: 'gmail', gmailThreadId: pl.gmailThreadId || pl.gmailId });
     }
     return { invoices, noAmount, noNumber };
+  }
+
+  // ===== Đếm nhanh (25/10/2026) =====
+  gmailCountKey(label: string, from: string, to: string): string {
+    return `gmail-count:${label || '*'}:${from}:${to}`;
+  }
+
+  cachedGmailCount(p: GmailParams): Promise<CacheEntry<GmailCount> | null> {
+    return this.cache.get<GmailCount>(this.gmailCountKey(p.label, p.from, p.to));
+  }
+
+  runningGmailCount(): BgJob<GmailCount> | undefined {
+    return this.jobs.find<GmailCount>('gmail-count:');
+  }
+
+  /** Đếm email nhận trong [from, to] (giờ VN) — chỉ header, không nội dung / đính kèm; chạy nền, lưu IndexedDB */
+  startGmailCount(p: GmailParams): BgJob<GmailCount> {
+    const key = this.gmailCountKey(p.label, p.from, p.to);
+    return this.jobs.run<GmailCount>(key, `Đếm email Gmail ${p.from} → ${p.to}`, { from: p.from, to: p.to, label: p.label }, async () => {
+      let params = new HttpParams().set('from', p.from).set('to', p.to);
+      if (p.labelId) params = params.set('label_id', p.labelId);
+      const t0 = performance.now();
+      const r = await firstValueFrom(this.http.get<GmailCount>(`${environment.ketoanBackendUrl}/api/gmail/message-count`, { params }));
+      const data: GmailCount = { count: r.count, listed: r.listed, truncated: r.truncated, emails: r.emails || [] };
+      await this.cache.set<GmailCount>(key, data);
+      console.log(`${LOG} Đếm email ${p.from} → ${p.to}: ${data.count} email (${((performance.now() - t0) / 1000).toFixed(1)} giây)`
+        + (data.truncated ? ' — CHẠM GIỚI HẠN, chia kỳ nhỏ hơn' : ''));
+      return data;
+    });
   }
 }

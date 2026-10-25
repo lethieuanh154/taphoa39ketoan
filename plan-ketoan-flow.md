@@ -147,8 +147,8 @@ bảng lưu phía server, sửa được ở Danh mục.
 | XH1 · XH2 | Xuất bán hàng · bán NVL | 131 / 5111 | 131 / 33311 | 6321 / 1561 · 632 / 152 |
 | NH1 · NH2 · NH3 | Nhập mua hàng · NVL · CCDC | | 1331 / 331 | 1561 · 152 · 153 / 331 |
 | (5) | HĐ nhập - xuất không qua kho | 154 / 331 | 1331 / 331 | |
-| (6) | HĐ cung ứng dịch vụ | 131 / 5112 | 131 / 33311 | |
-| (7) | HĐ dịch vụ mua vào | 642 / 331 | 1331 / 331 | |
+| (6) | HĐ cung ứng dịch vụ | 131 / **5113** (file ghi 5112 — sai, xác nhận 24/10) | 131 / 33311 | |
+| (7) | HĐ / chứng từ dịch vụ mua vào | **641 hoặc 642** / 331 (24/10) | 1331 / 331 | |
 | (13) · (14) | Phiếu thu tiền gửi · tiền mặt | 1121 / 131 · 1111 / 131 | | |
 | (8) · (9) | Phiếu chi tiền gửi · tiền mặt | 331 / 1121 · 331 / 1111 | | |
 | NT1 · NT2 · NT3 | Hàng bán bị trả lại (hàng · NVL · CCDC) | 5111 / 131 | 33311 / 131 | 156 · 152 · 153 / 632 |
@@ -162,14 +162,18 @@ Hệ quả cho flow: **HĐ bán luôn ghi Nợ 131** (kể cả khách trả ti�
 sao kê ở bước 2 sinh **phiếu thu tiền gửi** Nợ 1121 / Có 131, còn lại (tiền mặt) sinh **phiếu thu tiền mặt** Nợ 1111 / Có 131.
 HĐ mua: Nợ 1561, 1331 / Có 331 → trả NCC: phiếu chi Nợ 331 / Có 1121 hoặc 1111.
 
-Cần kế toán xác nhận (bảng chưa có hoặc chưa khớp):
-- Cột **chiết khấu** và **chi phí** trống ở mọi dòng → chưa có quy tắc cho chiết khấu thương mại trên HĐ, hàng khuyến mại /
-  tặng kèm (giá 0), phí ngân hàng, HĐ điều chỉnh / thay thế.
-- Dòng (6) dịch vụ ghi Có **5112**, nhưng theo TT 133 (và hệ thống TK của KeToan) 5112 = doanh thu thành phẩm, dịch vụ = **5113**.
-- Bán hàng ghi giá vốn Nợ **6321**, hàng trả lại ghi Có **632**; hệ thống TK của KeToan **chưa có 6321** → thêm TK chi tiết
-  hoặc thống nhất dùng 1 TK.
-- XK2 "xuất dùng nội bộ" ghi Nợ **154** (chi phí SXKD dở dang) — DN thương mại thường ghi 642; CK3 "chuyển kho thành phẩm"
-  ghi 153 / 153 (thành phẩm là 155) — có thể gõ nhầm.
+Kế toán đã xác nhận (user 24/10/2026):
+- Chiết khấu thương mại, hàng khuyến mại / tặng kèm, phí ngân hàng, HĐ điều chỉnh / thay thế: **KHÔNG làm quy tắc riêng** — KiotViet đã
+  xử lý trên HĐ (số tiền trên HĐ đã đúng), KeToan hạch toán theo số trên HĐ.
+- HĐ cung ứng dịch vụ: Có **5113** (doanh thu dịch vụ, TT 133) — dòng 5112 trong `DINH KHOAN.xlsx` là nhầm.
+- Giá vốn hàng bán: Nợ **6321** (TK chi tiết của 632, kế toán **tự tạo** trong Hệ thống tài khoản để dễ quản lý 632); hàng bán trả lại
+  ghi Có 632 như bảng. ⚠ Trang Hệ thống tài khoản hiện là DEMO (dữ liệu trong bộ nhớ, `chart-of-accounts.service.ts` `addAccount` trả
+  `of(...)`, không lưu máy chủ) → TK tự tạo **mất khi tải lại trang**: bước 3 phải nối hệ thống TK với KeToanBackEnd (lưu Firestore)
+  trước khi kế toán tạo 6321; bút toán tự sinh tham chiếu TK theo mã, không cứng trong code.
+- XK2 / CK3 (xuất dùng nội bộ, chuyển kho thành phẩm): **bỏ qua**, không làm.
+- **HĐ / chứng từ dịch vụ mua vào**: Nợ **641** (chi phí bán hàng) hoặc **642** (chi phí quản lý doanh nghiệp) / Có 331, VAT 1331 / 331.
+  Đề xuất (chờ kế toán duyệt khi làm bước 3): mặc định 642; kế toán đổi sang 641 ở từng HĐ (dịch vụ phục vụ bán hàng: vận chuyển hàng
+  bán, quảng cáo, thuê mặt bằng bán hàng…); máy **nhớ lựa chọn theo NCC** → HĐ sau của NCC đó tự gợi ý TK đã chọn.
 - Dùng lại: `services/invoice-voucher-converter.service.ts` (HĐ mua → phiếu chi + nhập kho; HĐ bán → phiếu thu + xuất
   kho), `shared/create-voucher-from-invoice-modal`, service phiếu thu/chi, kho, nhật ký, sổ cái.
 - Kho theo ĐVT master; giá vốn **bình quân gia quyền tính lại sau mỗi lần nhập** (bình quân di động — user 22/10/2026: hết
@@ -339,8 +343,9 @@ nên là), link mở đúng HĐ trên einvoiceapp để sửa; lịch sử các 
 7. ~~**Người dùng**~~ — đã trả lời 22/10/2026: **nhiều kế toán dùng chung**, hiện whitelist chỉ 1 email
    `songminhcr.dn@gmail.com`; **sau này có phân quyền** (`user-roles-page`). Hệ quả: khi dùng chung 1 tài khoản, Dấu vết kiểm
    toán chưa phân biệt được người làm → schema người dùng / vai trò làm sẵn để thêm email + phân quyền sau.
-8. ~~**Quy tắc định khoản**~~ — đã có 22/10/2026: `DINH KHOAN.xlsx` (bảng ở mục 2 bước 3). Còn 4 điểm kế toán xác nhận
-   (cuối bảng đó: chiết khấu / khuyến mại / phí NH / HĐ điều chỉnh; 5112 hay 5113; 6321; XK2, CK3) — hỏi khi làm bước 3.
+8. ~~**Quy tắc định khoản**~~ — đã có 22/10/2026: `DINH KHOAN.xlsx` (bảng ở mục 2 bước 3); 4 điểm còn hỏi đã được kế toán xác nhận
+   24/10/2026 (ngay dưới bảng): không làm quy tắc chiết khấu / khuyến mại (KiotViet đã làm), dịch vụ = 5113, giá vốn 6321 (kế toán tự
+   tạo — cần hệ thống TK lưu thật), bỏ XK2 / CK3, dịch vụ mua vào 641 / 642.
 9. Câu hỏi riêng bước 1: `plan-doi-soat-web.md` mục 9 — 22/10/2026: kiến trúc **B** (chạy ở KeToanBackEnd, dùng lại
    `doi_soat.py`), trình duyệt + script đã giải quyết theo B; câu i: bảng quy đổi ĐVT KeToanBackEnd tự lấy từ KiotViet.
 10. ~~**Token KiotViet cho job**~~ — đã trả lời 22/10/2026: **(b)** job chạy ở KeToanBackEnd với credential KiotViet riêng

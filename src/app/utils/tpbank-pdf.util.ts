@@ -91,7 +91,7 @@ export async function parseTpBankPdf(data: Uint8Array, pdfjs: any): Promise<PdfS
 /** PDF → sao kê tiền RA (giống parseTpBankDebits của file .xlsx) */
 export function pdfToDebitStatement(st: PdfStatement, fileName: string): DebitStatement {
   const transactions: DebitTxn[] = st.rows.filter(r => r.debit > 0).map(r => ({
-    date: r.date, iso: r.iso, desc: r.desc, amount: r.debit, counterparty: r.counterparty, account: r.account, code: r.code,
+    date: r.date, iso: r.iso, desc: r.desc, amount: r.debit, counterparty: r.counterparty, account: r.account, code: r.code, file: fileName,
   }));
   const stamps = st.rows.map(r => r.iso).sort();
   return {

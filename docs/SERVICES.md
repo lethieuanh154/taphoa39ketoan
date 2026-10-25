@@ -476,3 +476,5 @@ xmlPurchases(result, companyMst) → { mst, detected, invoices }   // bên mua =
 startGmail({label, labelId?, from, to}) / runningGmail() / cachedGmail(p)   // portal-links + scrape, khóa `gmail-links:<nhãn>:<từ>:<đến>`
 static fromXml(LocalXmlInvoice) / fromGmail(links, from, to) → PurchaseInv[]  // Gmail: chỉ email có số HĐ + số tiền, bỏ trùng
 ```
+- (25/10/2026) `PurchaseInvoiceSourceService`: `startGmailCount(p)` / `runningGmailCount()` / `cachedGmailCount(p)` — Đếm nhanh
+  (`GET /api/gmail/message-count`, chạy nền, IndexedDB `gmail-count:*`) → `GmailCount {count, listed, truncated, emails[]}`.

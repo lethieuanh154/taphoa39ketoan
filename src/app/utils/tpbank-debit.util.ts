@@ -14,6 +14,7 @@ export interface DebitTxn {
   counterparty: string;  // chủ TK nhận
   account: string;       // TK nhận
   code: string;          // mã GD
+  file?: string;         // file sao kê chứa GD (25/10/2026 — danh sách từng file, bỏ 1 file)
 }
 
 export interface DebitStatement {
@@ -76,7 +77,7 @@ export async function parseTpBankDebits(file: File): Promise<DebitStatement> {
       transactions.push({
         date: String(cells['A']).trim(), iso, amount: Math.round(amount),
         desc: String(cells['C'] ?? '').trim(), account: String(cells['G'] ?? '').trim(),
-        counterparty: String(cells['H'] ?? '').trim(), code: String(cells['I'] ?? '').trim(),
+        counterparty: String(cells['H'] ?? '').trim(), code: String(cells['I'] ?? '').trim(), file: file.name,
       });
     }
   }
@@ -91,7 +92,7 @@ export async function parseTpBankDebits(file: File): Promise<DebitStatement> {
   };
 }
 
-/** Nhiều file (vd sao kê từng tuần) → gộp, bỏ GD trùng (cùng mã GD, hoặc cùng giờ + số tiền + người nhận khi không có mã) */
+/** Nhiều file (vd sao kê từng tuần) → gộp, bỏ GD trùng (cùng mã GD + giờ + số tiền; không có mã thì thêm người nhận) */
 export async function parseTpBankDebitFiles(files: File[]): Promise<DebitStatement> {
   return mergeDebitStatements(await Promise.all(files.map(parseTpBankDebits)));
 }
@@ -102,7 +103,8 @@ export function mergeDebitStatements(list: DebitStatement[]): DebitStatement {
   const transactions: DebitTxn[] = [];
   for (const st of list) {
     for (const t of st.transactions) {
-      const k = t.code || `${t.iso}|${t.amount}|${t.counterparty}`;
+      // mã GD + giờ + số tiền: TPBank ghi PHÍ chuyển khoản trùng mã GD với khoản chuyển chính (25/10/2026: T02 có 1 cặp)
+      const k = `${t.code}|${t.iso}|${t.amount}|${t.code ? "" : t.counterparty}`;
       if (seen.has(k)) continue;
       seen.add(k);
       transactions.push(t);
@@ -114,6 +116,6 @@ export function mergeDebitStatements(list: DebitStatement[]): DebitStatement {
     transactions, total: transactions.reduce((s, t) => s + t.amount, 0),
     fromDate: pick(list.map(l => l.fromDate), 1), toDate: pick(list.map(l => l.toDate), -1),
     periodFrom: pick(list.map(l => l.periodFrom), 1), periodTo: pick(list.map(l => l.periodTo), -1),
-    files: list.flatMap(l => l.files),
+    files: [...new Set(list.flatMap(l => l.files))],
   };
 }

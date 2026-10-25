@@ -234,7 +234,8 @@ export class BankReconciliationInPageComponent implements OnInit {
   }
 
   // ===== sao kê =====
-  async onBankSelected(event: Event): Promise<void> {
+  /** `append` = THÊM vào sao kê đang có (vd thêm tháng mới); mặc định thay sao kê. Chọn được nhiều file 1 lần (giữ Ctrl / Shift). */
+  async onBankSelected(event: Event, append = false): Promise<void> {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files || []);
     input.value = '';
@@ -262,7 +263,7 @@ export class BankReconciliationInPageComponent implements OnInit {
           parts.push(d);
         }
       }
-      const st = mergeDebitStatements(parts);
+      const st = mergeDebitStatements(append && this.bank ? [this.bank, ...parts] : parts);
       this.bank = st;
       this.bankSavedAt = Date.now();
       await this.cache.set<DebitStatement>(BANK_KEY, st);
@@ -275,6 +276,37 @@ export class BankReconciliationInPageComponent implements OnInit {
     } finally {
       this.parsing = false;
     }
+  }
+
+  /** Từng file trong sao kê đang dùng + số GD tiền ra của file đó */
+  get bankFiles(): { name: string; count: number; total: number }[] {
+    const by = new Map<string, { name: string; count: number; total: number }>();
+    for (const f of this.bank?.files || []) by.set(f, { name: f, count: 0, total: 0 });
+    for (const t of this.bank?.transactions || []) {
+      const k = t.file || this.bank!.files[0] || '';
+      const x = by.get(k) || { name: k, count: 0, total: 0 };
+      x.count++;
+      x.total += t.amount;
+      by.set(k, x);
+    }
+    return [...by.values()];
+  }
+
+  /** Bỏ 1 file khỏi sao kê đang dùng */
+  removeBankFile(name: string): void {
+    if (!this.bank) return;
+    const files = this.bank.files.filter(f => f !== name);
+    if (!files.length) {
+      this.clearBank();
+      return;
+    }
+    const transactions = this.bank.transactions.filter(t => (t.file || this.bank!.files[0]) !== name);
+    const isos = transactions.map(t => t.iso).sort();
+    this.bank = { ...this.bank, files, transactions, total: transactions.reduce((s, t) => s + t.amount, 0),
+      fromDate: (isos[0] || this.bank.fromDate).slice(0, 10), toDate: (isos[isos.length - 1] || this.bank.toDate).slice(0, 10) };
+    void this.cache.set<DebitStatement>(BANK_KEY, this.bank);
+    console.log(`${LOG} Bỏ file ${name}: còn ${files.length} file, ${transactions.length} GD tiền ra`);
+    this.recompute();
   }
 
   clearBank(): void {

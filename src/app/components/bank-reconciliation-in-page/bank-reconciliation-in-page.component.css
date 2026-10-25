@@ -75,3 +75,10 @@ tr.k-invoice_only td, tr.k-bank_only td { background: #fffbeb; }
 
 /* vòng xoay đang tải (app-table-loading overlay) */
 .card.rel { position: relative; }
+
+/* Nhiều file sao kê (25/10/2026) */
+.files { display: flex; flex-wrap: wrap; gap: 6px; }
+.file-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 4px 3px 9px; border: 1px solid #dbeafe; background: #eff6ff;
+  color: #1e3a8a; border-radius: 999px; font-size: 0.74rem; }
+.file-chip button { border: none; background: none; color: #64748b; cursor: pointer; padding: 0 4px; }
+.file-chip button:hover { color: #b91c1c; }

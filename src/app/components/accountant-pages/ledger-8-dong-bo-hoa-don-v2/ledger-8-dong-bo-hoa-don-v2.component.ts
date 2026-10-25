@@ -27,7 +27,8 @@ import { PeriodService } from '../../../services/period.service';
 import { CompanyService } from '../../../services/company.service';
 import { BgJob } from '../../../services/background-job.service';
 import { LocalXmlInvoice, XmlReadResult, detectCompanyMst } from '../../../utils/invoice-xml.util';
-import { CachedXml, PurchaseInvoiceSourceService } from '../../../services/purchase-invoice-source.service';
+import { CachedXml, GmailCount, PurchaseInvoiceSourceService } from '../../../services/purchase-invoice-source.service';
+import { CountEmail, CountResult, compareCounts } from '../../../utils/invoice-count.util';
 import { environment } from '../../../../environments/environment';
 import { TableLoadingComponent } from '../../shared/table-loading/table-loading.component';
 
@@ -99,6 +100,15 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   /** thời điểm lấy link Gmail của kết quả đang xem */
   gmailFetchedAt: number | null = null;
 
+  // Đếm nhanh (25/10/2026): số email nhận trong kỳ ⇄ số HĐ XML, lệch thì so theo ngày
+  counting = false;
+  countResult: CountResult | null = null;
+  countFetchedAt: number | null = null;
+  countTruncated = false;
+  countError = '';
+  countAllDays = false;
+  countOpenDay = '';
+
   private companyService = inject(CompanyService);
   /** XML + Gmail dùng chung với Đối soát CK → Chuyển khoản HĐ đầu vào */
   private source = inject(PurchaseInvoiceSourceService);
@@ -136,6 +146,8 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
         this.liveResults = [];
         this.liveStatusLog = [];
         void this.runLiveReconciliation(false, true);
+        this.countResult = null;
+        void this.runQuickCount(false, true);
       }
     });
     effect(() => {
@@ -177,6 +189,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       this.liveReconciling = false;
     }
     await this.runLiveReconciliation(false, true);
+    await this.runQuickCount(false, true);
   }
 
   /** Chờ việc đọc thư mục chạy nền xong → dùng kết quả (cũng dùng khi quay lại trang giữa chừng) */
@@ -816,6 +829,65 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       row.status = gm ? 'MISSING_GDT' : 'MISSING_GMAIL';
     }
     return row;
+  }
+
+  // ===== ĐẾM NHANH =====
+  /** `force` = đếm lại từ Gmail; `cacheOnly` (mở lại trang / đổi kỳ) = chỉ dùng bản đã lưu hoặc việc đang chạy */
+  async runQuickCount(force = false, cacheOnly = false): Promise<void> {
+    if (!this.xmlInvoices.length) {
+      if (!cacheOnly) this.xmlError = 'Chọn thư mục XML hóa đơn đầu vào (app FDI tải về) trước khi đếm.';
+      return;
+    }
+    const v = this.filterForm.value;
+    const labelId = v.gmailLabel ? this.gmailLabels.find(l => l.name === v.gmailLabel)?.id : undefined;
+    const p = { label: v.gmailLabel, labelId, from: v.fromDate, to: v.toDate };
+    let job = this.source.runningGmailCount();
+    if (job && (job.meta['from'] !== p.from || job.meta['to'] !== p.to || job.meta['label'] !== p.label)) job = undefined;
+    if (!job) {
+      const c = force ? null : await this.source.cachedGmailCount(p);
+      if (c) {
+        this.countFetchedAt = c.savedAt;
+        this.buildCount(c.data);
+        return;
+      }
+      if (cacheOnly) return;
+      job = this.source.startGmailCount(p);
+    }
+    this.counting = true;
+    this.countError = '';
+    try {
+      const data = await job.promise;
+      this.countFetchedAt = Date.now();
+      this.buildCount(data);
+    } catch (e: any) {
+      console.error(`${LOG} Đếm email lỗi:`, e?.status, e?.error?.detail || e?.error?.error || e?.message || e);
+      this.countError = `Không đếm được email Gmail: ${e?.error?.detail || e?.error?.error || e?.message || e}`;
+    } finally {
+      this.counting = false;
+    }
+  }
+
+  private buildCount(d: GmailCount): void {
+    const v = this.filterForm.value;
+    const mst = this.labelMappings.find(m => m.labelName === v.gmailLabel)?.supplierTaxCode || '';
+    const invoices = this.xmlInvoices
+      .filter(i => !mst || this._normalizeTaxCode(i.nbmst) === this._normalizeTaxCode(mst))
+      .map(i => ({ date: i.tdlap, no: String(i.shdon), symbol: `${i.khmshdon}${i.khhdon}`, seller: i.nbten, sellerMst: i.nbmst }));
+    this.countResult = compareCounts(invoices, d.emails, v.fromDate, v.toDate);
+    this.countTruncated = d.truncated;
+    this.countOpenDay = '';
+    const r = this.countResult;
+    console.log(`${LOG} Đếm nhanh ${v.fromDate} → ${v.toDate}: ${r.email} email ⇄ ${r.xml} HĐ XML → ${r.ok ? 'khớp' : 'lệch ' + r.diff}, `
+      + `${r.days.filter(x => x.diff).length} ngày chênh`);
+  }
+
+  get countDays() {
+    const days = this.countResult?.days || [];
+    return this.countAllDays ? days : days.filter(d => d.diff);
+  }
+
+  openCountEmail(e: CountEmail): void {
+    window.open(`https://mail.google.com/mail/u/1/#all/${e.thread_id || e.id}`, '_blank');
   }
 
   /** Mở email gốc (cùng dạng link với tab Links HĐ gốc) */

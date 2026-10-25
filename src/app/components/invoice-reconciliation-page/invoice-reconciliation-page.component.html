@@ -2,7 +2,8 @@
   <header class="page-head">
     <div>
       <h1><i class="fa-solid fa-file-code"></i> Đối soát hóa đơn XML</h1>
-      <p class="sub">Chọn thư mục hóa đơn XML đầu vào / đầu ra (tải từ app FDI) → bấm <b>Đối soát</b> → xem các bảng như file Excel của
+      <p class="sub">Chọn thư mục hóa đơn XML đầu vào / đầu ra (tải từ app FDI) → bấm <b>Đối soát</b> → xem các bảng như
+        file Excel của
         script đối soát. File XML gốc không bị sửa; máy chủ xóa XML ngay sau khi phân tích.</p>
     </div>
   </header>
@@ -11,25 +12,6 @@
   <section class="card">
     <h2>Lần đối soát mới</h2>
 
-    <div class="row catalog">
-      <span class="label">Bảng quy đổi ĐVT KiotViet</span>
-      @if (catalog && catalog.exists) {
-        <span>{{ catalog.count | number }} dòng ĐVT · lấy lúc {{ formatDate(catalog.exportedAt || '') }} (giờ UTC)</span>
-      } @else if (catalog) {
-        <span class="warn">Chưa có — máy chủ sẽ tự lấy khi đối soát</span>
-      }
-      <button type="button" class="btn" (click)="refreshCatalog()" [disabled]="catalogBusy">
-        <i class="fa-solid fa-rotate" [class.fa-spin]="catalogBusy"></i>
-        {{ catalogBusy ? 'Đang lấy từ KiotViet (30–60 giây)...' : 'Cập nhật bảng quy đổi' }}
-      </button>
-      <button type="button" class="btn" (click)="downloadCatalog()" [disabled]="!catalog?.exists || downloading === 'catalog'"
-              title="File JSON dùng được cho script chạy trên máy">
-        <i class="fa-solid fa-download"></i> Tải JSON
-      </button>
-    </div>
-    @if (catalogError) {
-      <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ catalogError }}</div>
-    }
 
     <div class="row">
       <label class="btn btn-primary pick" [class.disabled]="running">
@@ -37,31 +19,53 @@
         <input type="file" webkitdirectory multiple (change)="onFolderSelected($event)" [disabled]="running" hidden>
       </label>
       @if (scan) {
-        <span class="folder"><i class="fa-regular fa-folder"></i> {{ scan.folderName || '(thư mục)' }}</span>
+      <span class="folder"><i class="fa-regular fa-folder"></i> {{ scan.folderName || '(thư mục)' }}</span>
       } @else {
-        <span class="hint">Chọn thư mục gốc / thư mục MST / thư mục tháng — máy đọc mọi XML, ZIP bên trong.</span>
+      <span class="hint">Chọn thư mục gốc / thư mục MST / thư mục tháng — máy đọc mọi XML, ZIP bên trong.</span>
       }
     </div>
+    <div class="row catalog">
+      <span class="label">Bảng quy đổi ĐVT KiotViet</span>
+      @if (catalog && catalog.exists) {
+      <span>{{ catalog.count | number }} dòng ĐVT · lấy lúc {{ formatDate(catalog.exportedAt || '') }} (giờ UTC)</span>
+      } @else if (catalog) {
+      <span class="warn">Chưa có — máy chủ sẽ tự lấy khi đối soát</span>
+      }
+      <button type="button" class="btn" (click)="refreshCatalog()" [disabled]="catalogBusy">
+        <i class="fa-solid fa-rotate" [class.fa-spin]="catalogBusy"></i>
+        {{ catalogBusy ? 'Đang lấy từ KiotViet (30–60 giây)...' : 'Cập nhật bảng quy đổi' }}
+      </button>
+      <button type="button" class="btn" (click)="downloadCatalog()"
+        [disabled]="!catalog?.exists || downloading === 'catalog'" title="File JSON dùng được cho script chạy trên máy">
+        <i class="fa-solid fa-download"></i> Tải JSON
+      </button>
+    </div>
+    @if (catalogError) {
+    <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ catalogError }}</div>
+    }
 
     @if (scan) {
-      <div class="scan">
-        <div><b>{{ scan.nXml | number }}</b> file XML · <b>{{ scan.nZip | number }}</b> ZIP · {{ formatMb(scan.totalBytes) }}
-          @if (scan.nSkipped) { <span class="hint">· bỏ qua {{ scan.nSkipped | number }} file khác</span> }
-        </div>
-        <div>Bảng lương: {{ scan.payroll.join(', ') || 'không có (bỏ qua tờ khai TNCN)' }}</div>
-        <div>Danh mục Vietda: {{ scan.vietda.join(', ') || 'không có (bản sao XML dùng mã master)' }}</div>
-        @if (scan.mapping.length) { <div>Ánh xạ đã sửa: {{ scan.mapping.join(', ') }}</div> }
-        @if (scan.catalogs.length) { <div>Bảng quy đổi dự phòng: {{ scan.catalogs.join(', ') }}</div> }
-        @if (!(scan.nXml + scan.nZip)) {
-          <div class="warn"><i class="fa-solid fa-triangle-exclamation"></i> Thư mục không có file XML / ZIP hóa đơn nào.</div>
-        }
-        @if (scan.suspicious.length) {
-          <div class="msg error">
-            <i class="fa-solid fa-virus"></i> Thấy {{ scan.suspicious.length }} file .xlsm / ~$cache1 (vd {{ scan.suspicious[0] }}) —
-            máy có thể nhiễm virus macro Excel. Đừng bật macro, báo người hỗ trợ. Các file này không được gửi đi.
-          </div>
-        }
+    <div class="scan">
+      <div><b>{{ scan.nXml | number }}</b> file XML · <b>{{ scan.nZip | number }}</b> ZIP · {{ formatMb(scan.totalBytes)
+        }}
+        @if (scan.nSkipped) { <span class="hint">· bỏ qua {{ scan.nSkipped | number }} file khác</span> }
       </div>
+      <div>Bảng lương: {{ scan.payroll.join(', ') || 'không có (bỏ qua tờ khai TNCN)' }}</div>
+      <div>Danh mục Vietda: {{ scan.vietda.join(', ') || 'không có (bản sao XML dùng mã master)' }}</div>
+      @if (scan.mapping.length) { <div>Ánh xạ đã sửa: {{ scan.mapping.join(', ') }}</div> }
+      @if (scan.catalogs.length) { <div>Bảng quy đổi dự phòng: {{ scan.catalogs.join(', ') }}</div> }
+      @if (!(scan.nXml + scan.nZip)) {
+      <div class="warn"><i class="fa-solid fa-triangle-exclamation"></i> Thư mục không có file XML / ZIP hóa đơn nào.
+      </div>
+      }
+      @if (scan.suspicious.length) {
+      <div class="msg error">
+        <i class="fa-solid fa-virus"></i> Thấy {{ scan.suspicious.length }} file .xlsm / ~$cache1 (vd {{
+        scan.suspicious[0] }}) —
+        máy có thể nhiễm virus macro Excel. Đừng bật macro, báo người hỗ trợ. Các file này không được gửi đi.
+      </div>
+      }
+    </div>
     }
 
     <div class="row options">
@@ -76,12 +80,13 @@
       </label>
     </div>
     @if (periodMode === 'period') {
-      <div class="hint indent">Hóa đơn ngoài kỳ không tính (vẫn hiện ở tab HĐ đầu vào / đầu ra, ghi "ngoài kỳ").</div>
+    <div class="hint indent">Hóa đơn ngoài kỳ không tính (vẫn hiện ở tab HĐ đầu vào / đầu ra, ghi "ngoài kỳ").</div>
     }
 
     <div class="row options">
       <span class="label">MST công ty</span>
-      <input type="text" class="input" [(ngModel)]="mst" placeholder="Để trống = tự nhận từ XML" [disabled]="running" maxlength="14">
+      <input type="text" class="input" [(ngModel)]="mst" placeholder="Để trống = tự nhận từ XML" [disabled]="running"
+        maxlength="14">
     </div>
 
     <div class="row">
@@ -89,113 +94,119 @@
         <i class="fa-solid fa-scale-balanced"></i> Đối soát
       </button>
       @if (serverBusy && !running) {
-        <span class="warn">Máy chủ đang chạy một lần đối soát khác — đợi xong rồi bấm lại.</span>
+      <span class="warn">Máy chủ đang chạy một lần đối soát khác — đợi xong rồi bấm lại.</span>
       }
     </div>
 
     @if (running) {
-      <div class="progress">
-        <div class="bar"><div class="fill" [style.width.%]="progressPercent"></div></div>
-        <span>{{ progressPercent }}% — {{ progressLabel }}</span>
+    <div class="progress">
+      <div class="bar">
+        <div class="fill" [style.width.%]="progressPercent"></div>
       </div>
+      <span>{{ progressPercent }}% — {{ progressLabel }}</span>
+    </div>
     }
     @if (startError) {
-      <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ startError }}</div>
+    <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ startError }}</div>
     }
   </section>
 
   <!-- ═══════════════ KẾT QUẢ ═══════════════ -->
   @if (runError) {
-    <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ runError }}</div>
+  <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ runError }}</div>
   }
   @if (run && run.status === 'error') {
-    <section class="card">
-      <div class="msg error">
-        <i class="fa-solid fa-circle-exclamation"></i>
-        Lần đối soát {{ formatDate(run.created_at) }} ({{ run.folder_name }}) bị lỗi: {{ run.error }}
-      </div>
-    </section>
+  <section class="card">
+    <div class="msg error">
+      <i class="fa-solid fa-circle-exclamation"></i>
+      Lần đối soát {{ formatDate(run.created_at) }} ({{ run.folder_name }}) bị lỗi: {{ run.error }}
+    </div>
+  </section>
   }
   @if (run && run.status === 'done' && run.summary) {
-    <section class="card result">
-      <div class="result-head">
-        <div>
-          <h2>Kết quả — {{ run.folder_name || run.id }}</h2>
-          <div class="hint">
-            @if (run.source_run) { <b>Chạy lại</b> (ánh xạ đã sửa: {{ run.summary.n_saved_mappings ?? 0 | number }} dòng) · }
-            Chạy lúc {{ formatDate(run.created_at) }} bởi {{ run.created_by }} · {{ run.duration_s }} giây ·
-            MST {{ run.summary.company }} · {{ run.summary.period }} · Bảng quy đổi: {{ run.summary.catalog }}
-          </div>
-        </div>
-        <div class="result-actions">
-          <button type="button" class="btn" (click)="downloadReport()" [disabled]="downloading === 'report'">
-            <i class="fa-solid fa-file-excel"></i> Tải Excel đầy đủ
-          </button>
-          <a class="btn btn-primary" [routerLink]="['/item-mapping-page']" [queryParams]="{ run: run.id }"
-             title="Sửa Mã master / Hệ số rồi chạy lại đối soát">
-            <i class="fa-solid fa-link"></i> Sửa ánh xạ hàng hóa
-            @if (run.summary.n_review) { <span class="pill">{{ run.summary.n_review | number }} cần xem</span> }
-          </a>
-          @if (run.has_clone_zip !== false) {
-            <button type="button" class="btn" (click)="downloadCloneZip()" [disabled]="downloading === 'clone'"
-                    title="Bản sao XML đã quy đổi ĐVT về ĐVT master (để nhập Vietda — tạm thời)">
-              <i class="fa-solid fa-file-zipper"></i> Tải XML quy đổi
-            </button>
-          }
+  <section class="card result">
+    <div class="result-head">
+      <div>
+        <h2>Kết quả — {{ run.folder_name || run.id }}</h2>
+        <div class="hint">
+          @if (run.source_run) { <b>Chạy lại</b> (ánh xạ đã sửa: {{ run.summary.n_saved_mappings ?? 0 | number }} dòng)
+          · }
+          Chạy lúc {{ formatDate(run.created_at) }} bởi {{ run.created_by }} · {{ run.duration_s }} giây ·
+          MST {{ run.summary.company }} · {{ run.summary.period }} · Bảng quy đổi: {{ run.summary.catalog }}
         </div>
       </div>
-
-      <div class="stats">
-        <div class="stat"><span>HĐ đầu vào</span><b>{{ run.summary.n_invoices_in | number }}</b></div>
-        <div class="stat"><span>HĐ đầu ra</span><b>{{ run.summary.n_invoices_out | number }}</b></div>
-        <div class="stat"><span>Mặt hàng</span><b>{{ run.summary.n_items | number }}</b>
-          @if (run.summary.n_review) { <small class="warn">{{ run.summary.n_review | number }} cần xem</small> }
-        </div>
-        <div class="stat high"><span>Ngoại lệ cao</span><b>{{ run.summary.exceptions['Cao'] | number }}</b></div>
-        <div class="stat mid"><span>Trung bình</span><b>{{ run.summary.exceptions['Trung bình'] | number }}</b></div>
-        <div class="stat low"><span>Thấp</span><b>{{ run.summary.exceptions['Thấp'] | number }}</b></div>
-      </div>
-
-      @if (run.warnings && run.warnings.length) {
-        <div class="warnings">
-          <button type="button" class="link" (click)="showWarnings = !showWarnings">
-            <i class="fa-solid fa-triangle-exclamation"></i> {{ run.warnings.length }} lưu ý khi đối soát
-            <i class="fa-solid" [class.fa-chevron-down]="!showWarnings" [class.fa-chevron-up]="showWarnings"></i>
-          </button>
-          @if (showWarnings) {
-            <ul>
-              @for (w of run.warnings; track $index) { <li>{{ w }}</li> }
-            </ul>
-          }
-        </div>
-      }
-
-      <nav class="tabs">
-        @for (tab of visibleTabs; track tab.key) {
-          <button type="button" class="tab" [class.active]="tab.key === activeTab" (click)="selectTab(tab.key)">
-            {{ tabLabel(tab) }} <span class="count" [class.zero]="!tab.count">{{ tab.count | number }}</span>
-          </button>
+      <div class="result-actions">
+        <button type="button" class="btn" (click)="downloadReport()" [disabled]="downloading === 'report'">
+          <i class="fa-solid fa-file-excel"></i> Tải Excel đầy đủ
+        </button>
+        <a class="btn btn-primary" [routerLink]="['/item-mapping-page']" [queryParams]="{ run: run.id }"
+          title="Sửa Mã master / Hệ số rồi chạy lại đối soát">
+          <i class="fa-solid fa-link"></i> Sửa ánh xạ hàng hóa
+          @if (run.summary.n_review) { <span class="pill">{{ run.summary.n_review | number }} cần xem</span> }
+        </a>
+        @if (run.has_clone_zip !== false) {
+        <button type="button" class="btn" (click)="downloadCloneZip()" [disabled]="downloading === 'clone'"
+          title="Bản sao XML đã quy đổi ĐVT về ĐVT master (để nhập Vietda — tạm thời)">
+          <i class="fa-solid fa-file-zipper"></i> Tải XML quy đổi
+        </button>
         }
-      </nav>
+      </div>
+    </div>
 
-      @if (activeGuide; as g) {
-        <div class="guide">
-          <button type="button" class="link" (click)="showGuide = !showGuide">
-            <i class="fa-regular fa-circle-question"></i> Hướng dẫn đọc tab này
-            <i class="fa-solid" [class.fa-chevron-down]="!showGuide" [class.fa-chevron-up]="showGuide"></i>
-          </button>
-          @if (showGuide) {
-            <dl>
-              <dt>Mục đích</dt><dd>{{ g.purpose }}</dd>
-              <dt>Cách đọc</dt><dd>{{ g.howToRead }}</dd>
-              <dt>Khi nào cần làm gì</dt><dd>{{ g.action }}</dd>
-            </dl>
-          }
-        </div>
+    <div class="stats">
+      <div class="stat"><span>HĐ đầu vào</span><b>{{ run.summary.n_invoices_in | number }}</b></div>
+      <div class="stat"><span>HĐ đầu ra</span><b>{{ run.summary.n_invoices_out | number }}</b></div>
+      <div class="stat"><span>Mặt hàng</span><b>{{ run.summary.n_items | number }}</b>
+        @if (run.summary.n_review) { <small class="warn">{{ run.summary.n_review | number }} cần xem</small> }
+      </div>
+      <div class="stat high"><span>Ngoại lệ cao</span><b>{{ run.summary.exceptions['Cao'] | number }}</b></div>
+      <div class="stat mid"><span>Trung bình</span><b>{{ run.summary.exceptions['Trung bình'] | number }}</b></div>
+      <div class="stat low"><span>Thấp</span><b>{{ run.summary.exceptions['Thấp'] | number }}</b></div>
+    </div>
+
+    @if (run.warnings && run.warnings.length) {
+    <div class="warnings">
+      <button type="button" class="link" (click)="showWarnings = !showWarnings">
+        <i class="fa-solid fa-triangle-exclamation"></i> {{ run.warnings.length }} lưu ý khi đối soát
+        <i class="fa-solid" [class.fa-chevron-down]="!showWarnings" [class.fa-chevron-up]="showWarnings"></i>
+      </button>
+      @if (showWarnings) {
+      <ul>
+        @for (w of run.warnings; track $index) { <li>{{ w }}</li> }
+      </ul>
       }
+    </div>
+    }
 
-      <app-server-table [source]="tableSource"></app-server-table>
-    </section>
+    <nav class="tabs">
+      @for (tab of visibleTabs; track tab.key) {
+      <button type="button" class="tab" [class.active]="tab.key === activeTab" (click)="selectTab(tab.key)">
+        {{ tabLabel(tab) }} <span class="count" [class.zero]="!tab.count">{{ tab.count | number }}</span>
+      </button>
+      }
+    </nav>
+
+    @if (activeGuide; as g) {
+    <div class="guide">
+      <button type="button" class="link" (click)="showGuide = !showGuide">
+        <i class="fa-regular fa-circle-question"></i> Hướng dẫn đọc tab này
+        <i class="fa-solid" [class.fa-chevron-down]="!showGuide" [class.fa-chevron-up]="showGuide"></i>
+      </button>
+      @if (showGuide) {
+      <dl>
+        <dt>Mục đích</dt>
+        <dd>{{ g.purpose }}</dd>
+        <dt>Cách đọc</dt>
+        <dd>{{ g.howToRead }}</dd>
+        <dt>Khi nào cần làm gì</dt>
+        <dd>{{ g.action }}</dd>
+      </dl>
+      }
+    </div>
+    }
+
+    <app-server-table [source]="tableSource"></app-server-table>
+  </section>
   }
 
   <!-- ═══════════════ CÁC LẦN GẦN ĐÂY ═══════════════ -->
@@ -206,39 +217,51 @@
     </div>
     <p class="hint">Kết quả lưu tạm trên máy chủ 7 ngày.</p>
     @if (runsError) {
-      <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ runsError }}</div>
+    <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ runsError }}</div>
     }
     <div class="runs-wrap">
       <table class="runs">
         <thead>
-          <tr><th>Lúc chạy</th><th>Thư mục</th><th>Kỳ</th><th>Trạng thái</th><th class="num">HĐ vào</th><th class="num">HĐ ra</th>
-            <th class="num">Ngoại lệ cao</th><th>Người chạy</th><th></th></tr>
+          <tr>
+            <th>Lúc chạy</th>
+            <th>Thư mục</th>
+            <th>Kỳ</th>
+            <th>Trạng thái</th>
+            <th class="num">HĐ vào</th>
+            <th class="num">HĐ ra</th>
+            <th class="num">Ngoại lệ cao</th>
+            <th>Người chạy</th>
+            <th></th>
+          </tr>
         </thead>
         <tbody>
           @for (r of runs; track r.id) {
-            <tr [class.current]="r.id === run?.id">
-              <td>{{ formatDate(r.created_at) }}</td>
-              <td>{{ r.folder_name }}</td>
-              <td>{{ r.summary?.period }}</td>
-              <td>
-                @switch (r.status) {
-                  @case ('done') { <span class="badge ok">Xong</span> }
-                  @case ('error') { <span class="badge err" [title]="r.error">Lỗi</span> }
-                  @default { <span class="badge run">Đang chạy {{ r.progress.percent }}%</span> }
-                }
-              </td>
-              <td class="num">{{ r.summary?.n_invoices_in | number }}</td>
-              <td class="num">{{ r.summary?.n_invoices_out | number }}</td>
-              <td class="num">{{ r.summary?.exceptions?.['Cao'] | number }}</td>
-              <td>{{ r.created_by }}</td>
-              <td class="actions">
-                <button type="button" class="btn small" (click)="view(r)">Xem</button>
-                <button type="button" class="btn small danger" (click)="deleteRun(r)" [disabled]="r.status === 'running' || r.status === 'queued'"
-                        title="Xóa kết quả khỏi máy chủ"><i class="fa-solid fa-trash"></i></button>
-              </td>
-            </tr>
+          <tr [class.current]="r.id === run?.id">
+            <td>{{ formatDate(r.created_at) }}</td>
+            <td>{{ r.folder_name }}</td>
+            <td>{{ r.summary?.period }}</td>
+            <td>
+              @switch (r.status) {
+              @case ('done') { <span class="badge ok">Xong</span> }
+              @case ('error') { <span class="badge err" [title]="r.error">Lỗi</span> }
+              @default { <span class="badge run">Đang chạy {{ r.progress.percent }}%</span> }
+              }
+            </td>
+            <td class="num">{{ r.summary?.n_invoices_in | number }}</td>
+            <td class="num">{{ r.summary?.n_invoices_out | number }}</td>
+            <td class="num">{{ r.summary?.exceptions?.['Cao'] | number }}</td>
+            <td>{{ r.created_by }}</td>
+            <td class="actions">
+              <button type="button" class="btn small" (click)="view(r)">Xem</button>
+              <button type="button" class="btn small danger" (click)="deleteRun(r)"
+                [disabled]="r.status === 'running' || r.status === 'queued'" title="Xóa kết quả khỏi máy chủ"><i
+                  class="fa-solid fa-trash"></i></button>
+            </td>
+          </tr>
           } @empty {
-            <tr><td colspan="9" class="empty">Chưa có lần đối soát nào.</td></tr>
+          <tr>
+            <td colspan="9" class="empty">Chưa có lần đối soát nào.</td>
+          </tr>
           }
         </tbody>
       </table>

@@ -436,3 +436,11 @@ Giống "Chuyển khoản HĐ đầu ra" nhưng HĐ là HĐ **mua vào** và ti�
 - (24/10/2026) **Chuyển khoản HĐ đầu ra**: lấy xong mà KiotViet không có HĐ CK nào trong khoảng ngày → cảnh báo rõ. Đo 24/10/2026: KiotViet chỉ
   ghi phương thức "chuyển khoản" từ khoảng đầu 04/2026 (tháng 3: 25–40 HĐ / ngày, 0 HĐ CK) → tháng 3 trở về trước không đối soát được.
 - (24/10/2026) Kiểm tra HĐ tự động: lịch 4 giờ / ngày → chỉ hiện "Lần tới" gần nhất (trước bị lỗi NG0955 trùng khóa `einvoice_check`).
+- (25/10/2026) **Chuyển khoản HĐ đầu vào — nhiều sao kê**: chọn nhiều file 1 lần (Ctrl / Shift, vd T01.pdf + T02.pdf + T03.pdf, trộn .xlsx / .pdf)
+  hoặc **Thêm file** vào sao kê đang dùng; chip từng file (số GD tiền ra, tổng) có nút bỏ file. Bỏ GD trùng theo mã GD + giờ + số tiền
+  (TPBank ghi PHÍ chuyển khoản trùng mã GD với khoản chuyển — bỏ trùng chỉ theo mã từng xóa nhầm phí). Đo: T01 8 · T02 24 · T03 45 GD ra.
+- (25/10/2026) **Kiểm tra số lượng HĐ đầu vào — Đếm nhanh** (`utils/invoice-count.util.ts` `compareCounts`,
+  `PurchaseInvoiceSourceService.startGmailCount` → BE `/api/gmail/message-count`): chỉ ĐẾM email nhận trong kỳ (người gửi / tiêu đề /
+  giờ, không nội dung / đính kèm / scrape) ⇄ số HĐ XML trong kỳ (kể cả HĐ thay thế / điều chỉnh). Tổng bằng nhau = **Khớp số lượng**;
+  lệch → bảng theo NGÀY (ngày lập HĐ ⇄ ngày Gmail nhận), chỉ hiện ngày chênh (tùy chọn hiện mọi ngày), bấm 1 ngày xem email + HĐ XML
+  của ngày đó, gợi ý "gửi trễ / sớm 1 ngày". Chạy nền + lưu IndexedDB `gmail-count:<nhãn>:<từ>:<đến>`; nhãn NCC đang chọn thì lọc theo nhãn.

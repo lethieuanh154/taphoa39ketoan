@@ -54,17 +54,31 @@
   <section class="card">
     <div class="row">
       <span class="step">2</span><b>Sao kê TPBank</b>
-      <label class="btn pick" [class.disabled]="parsing" title="Chọn được nhiều file (vd 3 tháng của 1 quý)">
+      <label class="btn pick" [class.disabled]="parsing" title="Chọn được NHIỀU file cùng lúc (giữ Ctrl / Shift) — vd T01, T02, T03 của 1 quý">
         <i class="fa-solid" [ngClass]="parsing ? 'fa-spinner fa-spin' : 'fa-file-excel'"></i>
-        {{ parsing ? 'Đang đọc...' : (bank ? 'Chọn lại file sao kê' : 'Chọn sao kê TPBank (.xlsx hoặc .pdf)') }}
+        {{ parsing ? 'Đang đọc...' : (bank ? 'Chọn lại sao kê' : 'Chọn sao kê TPBank (.xlsx / .pdf, nhiều file)') }}
         <input type="file" accept=".xlsx,.pdf" multiple (change)="onBankSelected($event)" [disabled]="parsing" hidden>
       </label>
       @if (bank) {
+        <label class="btn pick" [class.disabled]="parsing" title="Thêm file vào sao kê đang dùng (vd thêm tháng mới) — giao dịch trùng tự bỏ">
+          <i class="fa-solid fa-plus"></i> Thêm file
+          <input type="file" accept=".xlsx,.pdf" multiple (change)="onBankSelected($event, true)" [disabled]="parsing" hidden>
+        </label>
         <span><b>{{ bank.transactions.length | number }}</b> giao dịch tiền ra · {{ vnd(bank.total) }} đ · GD {{ viDate(bank.fromDate) }} → {{ viDate(bank.toDate) }}
-          <span class="hint">· {{ bank.files.join(', ') }}@if (bankSavedAt) { · đọc lúc {{ viTime(bankSavedAt) }} }</span></span>
+          @if (bankSavedAt) { <span class="hint">· đọc lúc {{ viTime(bankSavedAt) }}</span> }</span>
         <button type="button" class="btn-link" (click)="clearBank()"><i class="fa-solid fa-xmark"></i> Bỏ sao kê</button>
+      } @else if (!parsing) {
+        <span class="hint">Chọn nhiều file 1 lần bằng Ctrl / Shift (vd T01.pdf, T02.pdf, T03.pdf); .xlsx và .pdf trộn được.</span>
       }
     </div>
+    @if (bank && bank.files.length) {
+      <div class="files">
+        @for (f of bankFiles; track f.name) {
+          <span class="file-chip" [title]="f.name"><i class="fa-regular fa-file"></i> {{ f.name }} · {{ f.count }} GD · {{ vnd(f.total) }} đ
+            <button type="button" (click)="removeBankFile(f.name)" title="Bỏ file này"><i class="fa-solid fa-xmark"></i></button></span>
+        }
+      </div>
+    }
     @if (bank && (bank.toDate < from || bank.fromDate > to)) {
       <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> Sao kê ({{ viDate(bank.fromDate) }} → {{ viDate(bank.toDate) }})
         không trùng kỳ đang chọn ({{ periodLabel() }}) — kiểm tra lại kỳ hoặc file.</div>

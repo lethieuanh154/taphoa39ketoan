@@ -98,6 +98,11 @@
   <!-- ============================================ -->
   <div class="action-section">
     <div class="action-center">
+      <button class="btn btn-primary btn-large" (click)="runQuickCount(!!countResult)" [disabled]="counting"
+              title="Chỉ đếm email nhận trong kỳ (người gửi / tiêu đề / giờ) rồi so với số HĐ XML theo ngày — nhanh, không đọc nội dung / đính kèm">
+        <i class="fa-solid" [ngClass]="counting ? 'fa-spinner fa-spin' : 'fa-list-ol'"></i>
+        {{ counting ? 'Đang đếm email...' : (countResult ? 'Đếm lại email' : 'Đếm nhanh (số email ⇄ số HĐ)') }}
+      </button>
       <button class="btn btn-warning btn-large" (click)="runLiveReconciliation()" [disabled]="liveReconciling">
         <span *ngIf="!liveReconciling">
           <i class="fa-solid fa-bolt"></i> Đối chiếu Gmail vs XML
@@ -107,6 +112,58 @@
         </span>
       </button>
     </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- ĐẾM NHANH: số email ⇄ số HĐ XML (25/10/2026) -->
+  <!-- ============================================ -->
+  <div class="count-section" *ngIf="countResult || counting || countError">
+    <div class="xml-error" *ngIf="countError"><i class="fa-solid fa-triangle-exclamation"></i> {{ countError }}</div>
+    <app-table-loading *ngIf="counting && !countResult" text="Đang đếm email Gmail..."></app-table-loading>
+    <ng-container *ngIf="countResult as r">
+      <div class="count-head" [class.ok]="r.ok">
+        <span class="count-big"><i class="fa-solid" [ngClass]="r.ok ? 'fa-circle-check' : 'fa-triangle-exclamation'"></i>
+          {{ r.email | number }} email ⇄ {{ r.xml | number }} HĐ XML</span>
+        <span>{{ r.ok ? 'Khớp số lượng' : (r.diff > 0 ? 'Thừa ' + r.diff + ' email' : 'Thiếu ' + (-r.diff) + ' email') }}</span>
+        <span class="xml-hint">· Gmail đếm lúc {{ viTime(countFetchedAt) }} (đã lưu trên máy) · HĐ XML tính cả HĐ thay thế / điều chỉnh</span>
+        <label class="count-toggle"><input type="checkbox" [(ngModel)]="countAllDays"> Hiện mọi ngày</label>
+      </div>
+      <div class="xml-error" *ngIf="countTruncated"><i class="fa-solid fa-triangle-exclamation"></i> Hộp thư có hơn 3.000 email trong kỳ — chỉ đếm 3.000, chọn kỳ ngắn hơn.</div>
+      <p class="xml-hint" *ngIf="!r.ok || countDays.length">So theo ngày: ngày lập HĐ (XML) ⇄ ngày Gmail nhận email. Bấm 1 ngày để xem email và HĐ của ngày đó.
+        NCC gửi trễ / sớm 1 ngày thì ngày này thiếu, ngày kế thừa (có ghi gợi ý).</p>
+      <table class="count-table" *ngIf="countDays.length">
+        <thead><tr><th>Ngày</th><th class="num">HĐ XML</th><th class="num">Email</th><th class="num">Chênh</th><th>Gợi ý</th></tr></thead>
+        <tbody>
+          <ng-container *ngFor="let d of countDays">
+            <tr class="count-row" [class.bad]="d.diff" (click)="countOpenDay = countOpenDay === d.date ? '' : d.date">
+              <td><i class="fa-solid" [ngClass]="countOpenDay === d.date ? 'fa-caret-down' : 'fa-caret-right'"></i> {{ formatGdtDate(d.date) }}</td>
+              <td class="num">{{ d.xml }}</td><td class="num">{{ d.email }}</td>
+              <td class="num">{{ d.diff > 0 ? '+' + d.diff : d.diff }}</td>
+              <td class="xml-hint">{{ d.hint }}</td>
+            </tr>
+            <tr *ngIf="countOpenDay === d.date" class="count-detail">
+              <td colspan="5">
+                <div class="count-cols">
+                  <div>
+                    <b>Email ({{ d.emails.length }})</b>
+                    <div *ngFor="let e of d.emails" class="count-item">
+                      <button type="button" class="btn-mail" (click)="openCountEmail(e)" title="Mở email gốc"><i class="fa-solid fa-envelope"></i></button>
+                      {{ e.at.slice(11, 16) }} · {{ e.from_name || e.from_email }} <small>{{ e.subject }}</small>
+                    </div>
+                    <div *ngIf="!d.emails.length" class="xml-hint">—</div>
+                  </div>
+                  <div>
+                    <b>HĐ XML ({{ d.invoices.length }})</b>
+                    <div *ngFor="let i of d.invoices" class="count-item">{{ i.symbol }}-{{ i.no }} · {{ i.seller }}</div>
+                    <div *ngIf="!d.invoices.length" class="xml-hint">—</div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+        </tbody>
+      </table>
+    </ng-container>
   </div>
 
   <!-- ============================================ -->
