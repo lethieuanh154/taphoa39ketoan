@@ -15,7 +15,7 @@ import {
 const LOG = '[ItemMapping]';
 const KEY = 'Khóa (không sửa)';
 
-type ColKind = 'text' | 'num' | 'check' | 'master' | 'factor' | 'vietda' | 'qty';
+type ColKind = 'text' | 'num' | 'check' | 'master' | 'factor' | 'vietda' | 'vdfactor' | 'qty';
 interface Col { header: string; label: string; kind: ColKind; width: number; filter?: boolean; vaoOnly?: boolean; }
 
 /** Cột hiện trên trang (bảng BE có đủ cột MAP_HEADERS của script) */
@@ -34,6 +34,8 @@ const COLUMNS: Col[] = [
   { header: 'Tổng SL quy đổi', label: 'SL quy đổi', kind: 'qty', width: 80 },
   { header: 'Mã Vietda', label: 'Mã Vietda', kind: 'vietda', width: 110, filter: true },
   { header: 'Tên Vietda', label: 'Tên Vietda', kind: 'text', width: 200 },
+  { header: 'ĐVT Vietda', label: 'ĐVT Vietda', kind: 'text', width: 70 },
+  { header: 'Hệ số Vietda', label: 'Hệ số Vietda', kind: 'vdfactor', width: 90 },
   { header: 'Cách ghép', label: 'Cách ghép', kind: 'text', width: 130, filter: true },
   { header: 'Độ tin cậy', label: 'Tin cậy', kind: 'num', width: 60 },
   { header: 'Cần xem', label: 'Cần xem', kind: 'text', width: 300, filter: true },
@@ -47,8 +49,21 @@ const QUICK = [
   { label: 'Thiếu hệ số', value: 'thieu he so' },
   { label: 'Tin cậy thấp', value: 'tin cay thap' },
   { label: 'Lệch ĐVT', value: 'dvt' },
+  { label: 'Thiếu hệ số Vietda', value: 'thieu he so vietda' },
 ];
 const QTY_FMT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 });
+
+/** "1.234,5" (kiểu Việt) hoặc "0.5" / "24" → số; trống → null; sai → NaN */
+function parseFactor(text: string): number | null {
+  const t = text.includes(',') ? text.trim().replace(/\./g, '').replace(',', '.') : text.trim();
+  return t === '' ? null : (/^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN);
+}
+
+function sameFactor(a: number | null, b: number | null, tol: number): boolean {
+  return a === b || (a !== null && b !== null && Math.abs(a - b) < tol);
+}
+
+const isBadFactor = (f: number | null) => f !== null && !(f > 0);
 
 /**
  * TIỆN ÍCH — ÁNH XẠ HÀNG HÓA (plan-doi-soat-web.md bước 4)
@@ -82,6 +97,7 @@ export class ItemMappingPageComponent implements OnInit {
   /** khóa dòng → giá trị đang sửa (chưa lưu) */
   edits = new Map<string, MappingEdit>();
   factorText = new Map<string, string>();
+  vdFactorText = new Map<string, string>();
 
   loading = false;
   saving = false;
@@ -145,7 +161,7 @@ export class ItemMappingPageComponent implements OnInit {
   }
 
   get invalidCount(): number {
-    return [...this.edits.values()].filter(e => e.he_so !== null && !(e.he_so > 0)).length;
+    return [...this.edits.values()].filter(e => isBadFactor(e.he_so) || isBadFactor(e.he_so_vietda)).length;
   }
 
   tabCount(key: string): number {
@@ -160,6 +176,7 @@ export class ItemMappingPageComponent implements OnInit {
     if (id === this.run?.id || !this.canLeave()) return;
     this.edits.clear();
     this.factorText.clear();
+    this.vdFactorText.clear();
     this.router.navigate([], { relativeTo: this.route, queryParams: { run: id } });
   }
 
@@ -295,12 +312,13 @@ export class ItemMappingPageComponent implements OnInit {
 
   /** Giá trị đang lưu của dòng (chưa tính phần đang sửa) */
   private fromRow(row: any[]): MappingEdit {
-    const f = this.raw(row, 'Hệ số quy đổi');
+    const num = (v: any) => typeof v === 'number' ? v : (v ? Number(v) : null);
     return {
       key: this.key(row),
       ma_master: this.raw(row, 'Mã master') || '',
-      he_so: typeof f === 'number' ? f : (f ? Number(f) : null),
+      he_so: num(this.raw(row, 'Hệ số quy đổi')),
       ma_vietda: this.raw(row, 'Mã Vietda') || '',
+      he_so_vietda: num(this.raw(row, 'Hệ số Vietda')),
       da_kiem: String(this.raw(row, 'Đã kiểm (x)') || '').trim().toLowerCase() === 'x',
     };
   }
@@ -318,7 +336,25 @@ export class ItemMappingPageComponent implements OnInit {
 
   isFactorInvalid(row: any[]): boolean {
     const e = this.edits.get(this.key(row));
-    return !!e && e.he_so !== null && !(e.he_so > 0);
+    return !!e && isBadFactor(e.he_so);
+  }
+
+  /** Hệ số Vietda máy gợi ý có thể là 1/48 → hiện tối đa 6 số lẻ */
+  vdFactorValue(row: any[]): string {
+    const k = this.key(row);
+    if (this.vdFactorText.has(k)) return this.vdFactorText.get(k)!;
+    const f = this.current(row).he_so_vietda;
+    return f === null || f === undefined ? '' : String(Number(f.toFixed(6))).replace('.', ',');
+  }
+
+  isVdFactorInvalid(row: any[]): boolean {
+    const e = this.edits.get(this.key(row));
+    return !!e && isBadFactor(e.he_so_vietda);
+  }
+
+  setVdFactor(row: any[], text: string): void {
+    this.vdFactorText.set(this.key(row), text);
+    this.update(row, { he_so_vietda: parseFactor(text) });
   }
 
   setMaster(row: any[], value: string): void {
@@ -334,23 +370,21 @@ export class ItemMappingPageComponent implements OnInit {
   }
 
   setFactor(row: any[], text: string): void {
-    const k = this.key(row);
-    this.factorText.set(k, text);
-    // "1.234,5" (kiểu Việt) hoặc "0.5" / "24"
-    const t = text.includes(',') ? text.trim().replace(/\./g, '').replace(',', '.') : text.trim();
-    const he_so = t === '' ? null : (/^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN);
-    this.update(row, { he_so });
+    this.factorText.set(this.key(row), text);
+    this.update(row, { he_so: parseFactor(text) });
   }
 
   private update(row: any[], patch: Partial<MappingEdit>): void {
     const k = this.key(row);
     const next: MappingEdit = { ...this.current(row), ...patch };
     const orig = this.fromRow(row);
+    // Hệ số Vietda hiện 6 số lẻ (1/48 = 0,020833) → sai số hiển thị không tính là sửa
     const same = next.ma_master === orig.ma_master && next.ma_vietda === orig.ma_vietda && next.da_kiem === orig.da_kiem
-      && (next.he_so === orig.he_so || (next.he_so !== null && orig.he_so !== null && Math.abs(next.he_so - orig.he_so) < 1e-9));
+      && sameFactor(next.he_so, orig.he_so, 1e-9) && sameFactor(next.he_so_vietda, orig.he_so_vietda, 1e-6);
     if (same) {
       this.edits.delete(k);
       this.factorText.delete(k);
+      this.vdFactorText.delete(k);
     } else {
       this.edits.set(k, next);
     }
@@ -362,6 +396,7 @@ export class ItemMappingPageComponent implements OnInit {
     const k = this.key(row);
     this.edits.delete(k);
     this.factorText.delete(k);
+    this.vdFactorText.delete(k);
   }
 
   discard(): void {
@@ -369,13 +404,14 @@ export class ItemMappingPageComponent implements OnInit {
     console.info(`${LOG} Bỏ ${this.edits.size} thay đổi chưa lưu`);
     this.edits.clear();
     this.factorText.clear();
+    this.vdFactorText.clear();
   }
 
   save(): void {
     const run = this.run;
     if (!run || !this.edits.size || this.saving) return;
     if (this.invalidCount) {
-      this.error = `Có ${this.invalidCount} dòng Hệ số không hợp lệ (phải là số > 0, để trống = chưa ánh xạ).`;
+      this.error = `Có ${this.invalidCount} dòng Hệ số / Hệ số Vietda không hợp lệ (phải là số > 0, để trống = chưa ánh xạ).`;
       console.warn(`${LOG} Không lưu: ${this.invalidCount} hệ số không hợp lệ`);
       return;
     }
@@ -387,6 +423,7 @@ export class ItemMappingPageComponent implements OnInit {
         this.saving = false;
         this.edits.clear();
         this.factorText.clear();
+        this.vdFactorText.clear();
         this.message = `Đã lưu ${edits.length} dòng (${r.saved} dòng giữ lại cho lần sau${r.removed ? `, ${r.removed} dòng trở về gợi ý của máy` : ''}). `
           + 'Bấm "Chạy lại đối soát" để cập nhật kết quả.';
         this.load();

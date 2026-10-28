@@ -3,9 +3,12 @@
  * 23/10/2026: bỏ nguồn GDT (cổng thuế chặn tự động hóa) → đọc XML trong trình duyệt (utils/invoice-xml.util.ts), không upload.
  * 23/10/2026 chiều: khoảng ngày = KỲ ở thanh chọn kỳ. Đọc XML chạy NỀN (BackgroundJobService) → chuyển trang không dừng.
  * 28/10/2026 (user): bỏ đối chiếu Gmail ⇄ XML (portal-links + scrape cổng NCC) → trang gồm:
- * - Đếm nhanh: số email Gmail nhận trong kỳ ⇄ số HĐ XML (giữ — Gmail chỉ còn dùng ở đây).
+ * - Đếm nhanh: số email Gmail ⇄ số HĐ XML (giữ — Gmail chỉ còn dùng ở đây). 28/10/2026: bỏ bảng theo ngày + nút "Gmail ngày này" →
+ *   tổng email ⇄ tổng HĐ + 2 cột lệch (HĐ chưa thấy email | email chưa ghép HĐ); email trễ ≤ LAG_DAYS ngày vẫn ghép đúng HĐ.
  * - Danh sách HĐ đầu vào + cột HĐ gốc: mã / link tra cứu lấy từ XML (utils/invoice-lookup.util.ts), lưu Firestore qua
  *   InvoiceLookupService (tự lưu sau mỗi lần chọn thư mục) → máy khác mở trang thấy ngay danh sách + link của kỳ, không cần thư mục.
+ *   28/10/2026: HĐ chưa có link NCC (NCC HĐĐT chưa biết / người bán có trang tra cứu riêng) → kế toán dán link từ email NCC 1 lần
+ *   (nút "Gán link") cho cả NCC HĐĐT / người bán / riêng 1 HĐ; link có mã tra cứu của HĐ → tự thành link mẫu mở thẳng mọi HĐ.
  */
 
 import { Component, OnInit, OnDestroy, effect, inject } from '@angular/core';
@@ -22,11 +25,12 @@ import { CompanyService } from '../../../services/company.service';
 import { BgJob } from '../../../services/background-job.service';
 import { LocalXmlInvoice, XmlReadResult, detectCompanyMst } from '../../../utils/invoice-xml.util';
 import { CachedXml, GmailCount, PurchaseInvoiceSourceService } from '../../../services/purchase-invoice-source.service';
-import { CountEmail, CountResult, compareCounts } from '../../../utils/invoice-count.util';
+import { CountEmail, CountResult, LAG_DAYS, compareCounts, countFetchTo } from '../../../utils/invoice-count.util';
 import { AuthService, httpErrorText } from '../../../services/auth.service';
 import {
   GDT_LOOKUP_URL, InvoiceLookupService, SavedLookup, fromXml, gdtLookupText, lookupKey
 } from '../../../services/invoice-lookup.service';
+import { LookupPortal, applyPortal, isHttpUrl, linkTemplate, looksInvoiceSpecific } from '../../../utils/invoice-lookup.util';
 import { environment } from '../../../../environments/environment';
 import { TableLoadingComponent } from '../../shared/table-loading/table-loading.component';
 
@@ -34,6 +38,7 @@ const LOG = '[InvoiceCountIn]';
 const MAX_SAVED_DAYS = 92;
 
 type LinkKind = 'direct' | 'portal' | 'gdt';
+type AssignScope = 'tcgp' | 'seller' | 'invoice';
 
 /** 1 dòng danh sách HĐ đầu vào: XML trên máy và / hoặc bản lưu máy chủ */
 export interface InRow {
@@ -43,7 +48,16 @@ export interface InRow {
   beforeVat: number; vat: number; total: number;
   tcgp: string; provider: string; code: string; codeField: string; url: string; kind: LinkKind;
   inXml: boolean; saved: boolean;
+  /** link riêng HĐ này kế toán dán tay (máy chủ `manual_url`) */
+  manualUrl: string;
+  /** link đang dùng là link gán tay theo phạm vi nào ('' = lấy từ XML / bảng NCC có sẵn) */
+  assigned: '' | AssignScope;
+  /** link gốc từ XML / bản lưu (trước khi áp link gán tay) */
+  baseUrl: string; baseDirect: boolean;
 }
+
+/** Nhóm HĐ chưa có link NCC — gán 1 lần cho cả nhóm */
+export interface NeedLinkGroup { id: string; label: string; n: number; withCode: boolean; sample: InRow; }
 
 @Component({
   selector: 'app-ledger-8-dong-bo-hoa-don-v2',
@@ -81,9 +95,12 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   countResult: CountResult | null = null;
   countFetchedAt: number | null = null;
   countTruncated = false;
+  /** email có trong hộp thư mà máy chủ đọc lỗi (không có trong kết quả → có thể báo lệch sai) */
+  countUnread = 0;
   countError = '';
-  countAllDays = false;
-  countOpenDay = '';
+  /** bảng phụ dưới phần lệch: các cặp đã khớp / email gửi trùng */
+  countView: '' | 'pairs' | 'dups' = '';
+  readonly lagDays = LAG_DAYS;
   /** hộp thư hóa đơn (GMAIL_INVOICE_ACCOUNT) → link Gmail mở đúng tài khoản; chưa biết thì dùng /u/1/ như trước */
   gmailAccount = '';
 
@@ -101,6 +118,21 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   copiedMsg = '';
   private copiedTimer: any = null;
   readonly gdtUrl = GDT_LOOKUP_URL;
+
+  // Link tra cứu gán tay (Firestore invoice_lookup_portals)
+  portals: LookupPortal[] = [];
+  private portalMap = new Map<string, LookupPortal>();
+  portalsError = '';
+  showPortals = false;
+  needLink: NeedLinkGroup[] = [];
+  /** HĐ (khóa lookupKey) → email NCC đã ghép ở Đếm nhanh — mở email lấy link tra cứu */
+  private pairEmail = new Map<string, CountEmail>();
+  editRow: InRow | null = null;
+  editScope: AssignScope = 'tcgp';
+  editUrl = '';
+  editName = '';
+  editBusy = false;
+  editError = '';
 
   private companyService = inject(CompanyService);
   private authService = inject(AuthService);
@@ -131,6 +163,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
         console.log(`${LOG} Kỳ đổi → ${p.from} → ${p.to}: tải lại link HĐ gốc + Đếm nhanh đã lưu của kỳ này`);
         void this.loadSaved();
         this.countResult = null;
+        this.pairEmail.clear();
         if (this.rawXml) void this.runQuickCount(false, true);
       }
     });
@@ -150,6 +183,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
       error: err => console.warn(`${LOG} Không lấy được hộp thư Gmail (${httpErrorText(err)}) → link Gmail dùng /u/1/`)
     });
     void this.loadSaved();
+    void this.loadPortals();
     void this.restore();
   }
 
@@ -203,6 +237,11 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
 
   viTime(ms: number | null): string {
     return ms ? new Date(ms).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  }
+
+  viIsoTime(iso?: string): string {
+    const ms = iso ? Date.parse(iso) : NaN;
+    return Number.isFinite(ms) ? this.viTime(ms) : '';
   }
 
   /** Load Gmail labels from KeToanBackEnd — lọc Đếm nhanh theo NCC */
@@ -346,7 +385,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   }
 
   /** Gộp XML trong kỳ + bản lưu máy chủ theo khóa MST bán | mẫu số + ký hiệu | số. XML ưu tiên (mới đọc), thiếu mã thì lấy mã đã lưu. */
-  private buildRows(): void {
+  private buildRows(keepPage = false): void {
     const v = this.filterForm.value;
     const map = new Map<string, InRow>();
     for (const s of this.saved) {
@@ -355,7 +394,7 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
         date: s.date, template: s.template || '', series: s.series || '', no: Number(s.number), sellerMst: s.seller_mst,
         sellerName: s.seller_name || '', beforeVat: s.total_before_vat || 0, vat: s.vat || 0, total: s.total || 0,
         tcgp: s.tcgp || '', provider: s.provider || '', code: s.code || '', codeField: s.code_field || '', url: s.url || '',
-        direct: !!s.direct, inXml: false, saved: true,
+        direct: !!s.direct, inXml: false, saved: true, manualUrl: s.manual_url || '',
       }));
     }
     for (const i of this.xmlInvoices) {
@@ -368,18 +407,184 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
         date: i.tdlap, template: i.khmshdon, series: i.khhdon, no: i.shdon, sellerMst: i.nbmst, sellerName: i.nbten,
         beforeVat: i.tgtcthue, vat: i.tgtthue, total: i.tgtttbso,
         tcgp: i.lookup?.tcgp || old?.tcgp || '', provider: i.lookup?.provider || old?.provider || '',
-        code: l ? l.code : old?.code || '', codeField: l ? l.codeField : old?.codeField || '', url: l ? l.url : old?.url || '',
-        direct: l ? l.direct : old?.kind === 'direct', inXml: true, saved: !!old,
+        code: l ? l.code : old?.code || '', codeField: l ? l.codeField : old?.codeField || '', url: l ? l.url : old?.baseUrl || '',
+        direct: l ? l.direct : !!old?.baseDirect, inXml: true, saved: !!old, manualUrl: old?.manualUrl || '',
       }));
     }
     this.rows = [...map.values()].sort((a, b) => b.date.localeCompare(a.date) || a.sellerName.localeCompare(b.sellerName) || b.no - a.no);
-    this.page = 1;
+    this.needLink = this.groupNeedLink();
+    if (!keepPage || this.page > this.pageCount) this.page = 1;
   }
 
-  private row(key: string, x: Omit<InRow, 'key' | 'kind'> & { direct: boolean }): InRow {
+  /**
+   * Chọn link cho 1 HĐ: link riêng HĐ (dán tay) > link gán tay theo người bán > theo NCC HĐĐT > link XML / bảng NCC có sẵn.
+   * Link gán tay không đè link MỞ THẲNG có sẵn (MISA).
+   */
+  private row(key: string, x: Omit<InRow, 'key' | 'kind' | 'assigned' | 'baseUrl' | 'baseDirect'> & { direct: boolean }): InRow {
     const { direct, ...rest } = x;
-    const kind: LinkKind = direct && x.url ? 'direct' : x.url ? 'portal' : 'gdt';
-    return { key, ...rest, kind };
+    let url = x.url, isDirect = direct && !!x.url, provider = x.provider, assigned: InRow['assigned'] = '';
+    const byTcgp = x.tcgp ? this.portalMap.get(`tcgp-${x.tcgp}`) : undefined;
+    const p = this.portalMap.get(`seller-${x.sellerMst}`) || byTcgp;
+    if (x.manualUrl) {
+      url = x.manualUrl;
+      isDirect = true;
+      assigned = 'invoice';
+    } else if (p && !isDirect) {
+      ({ url, direct: isDirect } = applyPortal(p, x.code));
+      assigned = p.scope;
+    }
+    if (!provider && byTcgp?.name) provider = byTcgp.name;
+    const kind: LinkKind = isDirect && url ? 'direct' : url ? 'portal' : 'gdt';
+    return { key, ...rest, provider, url, kind, assigned, baseUrl: x.url, baseDirect: direct };
+  }
+
+  /** HĐ chỉ tra được ở CQT, gom nhóm: có mã → theo NCC HĐĐT (1 link mẫu cho mọi người bán dùng NCC đó); không mã → theo người bán */
+  private groupNeedLink(): NeedLinkGroup[] {
+    const g = new Map<string, NeedLinkGroup>();
+    for (const r of this.rows) {
+      if (r.kind !== 'gdt') continue;
+      const byTcgp = !!(r.code && r.tcgp);
+      const id = byTcgp ? `tcgp-${r.tcgp}` : `seller-${r.sellerMst}`;
+      const cur = g.get(id);
+      if (cur) cur.n++;
+      else g.set(id, { id, n: 1, withCode: byTcgp, sample: r,
+        label: byTcgp ? (r.provider || `NCC HĐĐT ${r.tcgp}`) : (r.sellerName || r.sellerMst) });
+    }
+    return [...g.values()].sort((a, b) => Number(b.withCode) - Number(a.withCode) || b.n - a.n || a.label.localeCompare(b.label));
+  }
+
+  // ===== LINK TRA CỨU GÁN TAY =====
+  async loadPortals(): Promise<void> {
+    this.portalsError = '';
+    try {
+      this.portals = (await this.lookups.listPortals()).sort((a, b) => (a.name || a.mst).localeCompare(b.name || b.mst));
+    } catch (e: any) {
+      console.error(`${LOG} Đọc link tra cứu gán tay lỗi: ${httpErrorText(e)}`);
+      this.portalsError = `Không đọc được link tra cứu đã gán: ${e?.error?.detail || httpErrorText(e)}`;
+      this.portals = [];
+    }
+    this.portalMap = new Map(this.portals.map(p => [p.id, p]));
+    this.buildRows(true);
+  }
+
+  /** email NCC đã ghép với HĐ này ở Đếm nhanh (chưa đếm → null) */
+  emailOf(r: InRow): CountEmail | null {
+    return this.pairEmail.get(r.key) || null;
+  }
+
+  openEdit(r: InRow): void {
+    this.editRow = r;
+    this.editError = '';
+    const p = r.assigned === 'tcgp' ? this.portalMap.get(`tcgp-${r.tcgp}`) : r.assigned === 'seller' ? this.portalMap.get(`seller-${r.sellerMst}`) : undefined;
+    this.editScope = r.assigned || (r.code && r.tcgp ? 'tcgp' : 'seller');
+    this.editUrl = r.assigned === 'invoice' ? r.manualUrl : p?.url || '';
+    this.editName = p?.name || '';
+    console.info(`${LOG} Mở gán link ${r.template}${r.series}-${r.no} (${r.sellerMst}, NCC HĐĐT ${r.tcgp || '?'}, ${r.code ? 'có mã' : 'không mã'})`);
+  }
+
+  closeEdit(): void {
+    if (!this.editBusy) this.editRow = null;
+  }
+
+  /** Số HĐ trong kỳ chịu ảnh hưởng nếu gán theo phạm vi */
+  scopeCount(scope: AssignScope): number {
+    const r = this.editRow;
+    if (!r) return 0;
+    if (scope === 'invoice') return 1;
+    return this.rows.filter(x => scope === 'tcgp' ? x.tcgp === r.tcgp : x.sellerMst === r.sellerMst).length;
+  }
+
+  /** Xem trước kết quả gán: link sẽ lưu + giải thích; `error` chặn lưu, `warn` chỉ nhắc */
+  get editPlan(): { url: string; direct: boolean; note: string; warn: string; error: string } {
+    const r = this.editRow, u = this.editUrl.trim();
+    const out = { url: u, direct: false, note: '', warn: '', error: '' };
+    if (!r) return out;
+    if (!u) return { ...out, error: 'Dán link tra cứu (từ email NCC hoặc trang tra cứu của NCC).' };
+    if (!isHttpUrl(u)) return { ...out, error: 'Link phải bắt đầu bằng http:// hoặc https://, không có khoảng trắng.' };
+    if (this.editScope === 'invoice') {
+      return { ...out, direct: true, note: 'Chỉ HĐ này: nút "Mở HĐ gốc" mở thẳng link này.',
+        error: r.saved ? '' : 'HĐ này chưa lưu lên máy chủ — bấm "Lưu lên máy chủ" trước.' };
+    }
+    const who = this.editScope === 'tcgp' ? `dùng NCC HĐĐT ${r.provider || r.tcgp}` : `của ${r.sellerName || r.sellerMst}`;
+    const tpl = linkTemplate(u, r.code);
+    if (tpl) {
+      return { ...out, url: tpl, direct: true,
+        note: `Thấy mã tra cứu ${r.code} trong link → mọi HĐ ${who} có mã sẽ MỞ THẲNG HĐ gốc (link mẫu: ${tpl}).` };
+    }
+    const warn = looksInvoiceSpecific(u)
+      ? 'Link có vẻ là link riêng của 1 HĐ (có mã trong link nhưng không phải mã tra cứu trong XML) — dùng chung sẽ mở sai HĐ. '
+        + 'Chọn "Chỉ HĐ này", hoặc dán link trang tra cứu chung của NCC.'
+      : '';
+    return { ...out, warn,
+      note: `Mọi HĐ ${who} sẽ có nút "Tra cứu NCC"${r.code ? ' (bấm là chép sẵn mã tra cứu để dán)' : ' — XML không có mã, lấy mã trong email NCC'}.` };
+  }
+
+  async saveEdit(): Promise<void> {
+    const r = this.editRow, plan = this.editPlan, scope = this.editScope;
+    if (!r || plan.error || this.editBusy) return;
+    this.editBusy = true;
+    this.editError = '';
+    try {
+      if (scope === 'invoice') {
+        await this.lookups.setManualUrl('in', { seller_mst: r.sellerMst, template: r.template, series: r.series, number: r.no }, plan.url);
+        this.setSavedManual(r, plan.url);
+        this.buildRows(true);
+      } else {
+        await this.lookups.savePortal(scope, scope === 'tcgp' ? r.tcgp : r.sellerMst, this.editName.trim(), plan.url);
+        await this.loadPortals();
+      }
+      this.flash(`Đã gán link tra cứu ${this.scopeLabel(scope)} — ${this.scopeCount(scope)} HĐ trong kỳ được cập nhật`);
+      this.editRow = null;
+    } catch (e: any) {
+      console.error(`${LOG} Gán link tra cứu ${scope} lỗi: ${httpErrorText(e)}`);
+      this.editError = `Không lưu được: ${e?.error?.detail || httpErrorText(e)}`;
+    } finally {
+      this.editBusy = false;
+    }
+  }
+
+  /** Bỏ link gán tay đang áp cho HĐ (theo phạm vi của nó) */
+  async removeAssigned(r: InRow): Promise<void> {
+    const scope = r.assigned;
+    if (!scope || this.editBusy || !confirm(`Bỏ link tra cứu đã gán ${this.scopeLabel(scope)}?`)) return;
+    this.editBusy = true;
+    this.editError = '';
+    try {
+      if (scope === 'invoice') {
+        await this.lookups.setManualUrl('in', { seller_mst: r.sellerMst, template: r.template, series: r.series, number: r.no }, '');
+        this.setSavedManual(r, '');
+        this.buildRows(true);
+      } else {
+        await this.lookups.deletePortal(scope, scope === 'tcgp' ? r.tcgp : r.sellerMst);
+        await this.loadPortals();
+      }
+      this.editRow = null;
+    } catch (e: any) {
+      console.error(`${LOG} Bỏ link gán ${scope} lỗi: ${httpErrorText(e)}`);
+      this.editError = `Không bỏ được: ${e?.error?.detail || httpErrorText(e)}`;
+    } finally {
+      this.editBusy = false;
+    }
+  }
+
+  async deletePortal(p: LookupPortal): Promise<void> {
+    if (!confirm(`Xóa link tra cứu gán cho ${p.name || p.mst}?`)) return;
+    try {
+      await this.lookups.deletePortal(p.scope, p.mst);
+      await this.loadPortals();
+    } catch (e: any) {
+      console.error(`${LOG} Xóa link tra cứu ${p.id} lỗi: ${httpErrorText(e)}`);
+      this.portalsError = `Không xóa được: ${e?.error?.detail || httpErrorText(e)}`;
+    }
+  }
+
+  scopeLabel(s: AssignScope): string {
+    return s === 'tcgp' ? 'theo NCC HĐĐT' : s === 'seller' ? 'theo người bán' : 'riêng HĐ này';
+  }
+
+  private setSavedManual(r: InRow, url: string): void {
+    const s = this.saved.find(x => lookupKey(x.seller_mst, x.template || '', x.series || '', x.number) === r.key);
+    if (s) s.manual_url = url;
   }
 
   get counts() {
@@ -422,8 +627,9 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   /** Bấm nút HĐ gốc (thẻ <a> tự mở tab): link không mở thẳng → chép mã (hoặc thông tin tra cứu CQT) để dán vào trang tra cứu */
   onOpenLink(r: InRow): void {
     const what = r.kind === 'direct' ? 'mở thẳng' : r.kind === 'portal' ? `trang tra cứu ${r.provider || r.url}` : 'cổng CQT';
-    console.info(`${LOG} Mở HĐ gốc ${r.template}${r.series}-${r.no} (${r.sellerMst}): ${what}`);
+    console.info(`${LOG} Mở HĐ gốc ${r.template}${r.series}-${r.no} (${r.sellerMst}): ${what}${r.assigned ? ' · link gán tay ' + r.assigned : ''}`);
     if (r.kind === 'portal' && r.code) void this.copy(r.code, `Đã chép mã tra cứu ${r.code} — dán vào trang tra cứu (MST bán ${r.sellerMst})`);
+    if (r.kind === 'portal' && !r.code) this.flash('XML không có mã tra cứu — lấy mã trong email NCC gửi HĐ này');
     if (r.kind === 'gdt') void this.copy(gdtLookupText({ seller_mst: r.sellerMst, template: r.template, series: r.series, number: r.no, vat: r.vat, total: r.total }),
       'Đã chép MST bán / ký hiệu / số / tiền — dán vào trang tra cứu HĐ của cổng CQT');
   }
@@ -440,12 +646,19 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     this.copiedTimer = setTimeout(() => this.copiedMsg = '', 6000);
   }
 
+  private flash(msg: string): void {
+    this.copiedMsg = msg;
+    clearTimeout(this.copiedTimer);
+    this.copiedTimer = setTimeout(() => this.copiedMsg = '', 6000);
+  }
+
   kindLabel(r: InRow): string {
     return r.kind === 'direct' ? 'Mở HĐ gốc' : r.kind === 'portal' ? 'Tra cứu NCC' : 'Tra cứu CQT';
   }
 
   kindTitle(r: InRow): string {
-    if (r.kind === 'direct') return `Mở thẳng HĐ trên ${r.provider}`;
+    if (r.assigned === 'invoice') return 'Mở link riêng HĐ này (kế toán đã dán)';
+    if (r.kind === 'direct') return `Mở thẳng HĐ trên ${r.provider || r.url}${r.assigned ? ' (link gán tay ' + this.scopeLabel(r.assigned) + ')' : ''}`;
     if (r.kind === 'portal') return `Mở trang tra cứu${r.provider ? ' ' + r.provider : ''} và chép mã ${r.code} (dán vào ô mã tra cứu)`;
     return `${r.provider ? r.provider + ' không ghi' : 'XML không có'} mã tra cứu → mở cổng CQT, chép sẵn MST bán / ký hiệu / số / tiền`;
   }
@@ -480,7 +693,8 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     }
     const v = this.filterForm.value;
     const labelId = v.gmailLabel ? this.gmailLabels.find(l => l.name === v.gmailLabel)?.id : undefined;
-    const p = { label: v.gmailLabel, labelId, from: v.fromDate, to: v.toDate };
+    // lấy email tới hết ngày cuối kỳ + LAG_DAYS: NCC gửi trễ (HĐ 31/10, email 01/11) vẫn ghép được
+    const p = { label: v.gmailLabel, labelId, from: v.fromDate, to: countFetchTo(v.toDate) };
     let job = this.source.runningGmailCount();
     if (job && (job.meta['from'] !== p.from || job.meta['to'] !== p.to || job.meta['label'] !== p.label)) job = undefined;
     if (!job) {
@@ -514,24 +728,33 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     const mst = this.labelMappings.find(m => m.labelName === v.gmailLabel)?.supplierTaxCode || '';
     const invoices = this.xmlInvoices
       .filter(i => !mst || this._normalizeTaxCode(i.nbmst) === this._normalizeTaxCode(mst))
-      .map(i => ({ date: i.tdlap, no: String(i.shdon), symbol: `${i.khmshdon}${i.khhdon}`, seller: i.nbten, sellerMst: i.nbmst }));
+      .map(i => ({ date: i.tdlap, no: String(i.shdon), symbol: `${i.khmshdon}${i.khhdon}`, seller: i.nbten, sellerMst: i.nbmst, total: i.tgtttbso }));
     this.countResult = compareCounts(invoices, d.emails, v.fromDate, v.toDate);
     this.countTruncated = d.truncated;
-    this.countOpenDay = '';
+    this.countUnread = Math.max(0, (d.listed || 0) - d.emails.length);
+    if (this.countUnread) console.warn(`${LOG} ${this.countUnread} email máy chủ đọc lỗi — kết quả có thể thiếu, bấm "Đếm lại email"`);
     const r = this.countResult;
-    console.log(`${LOG} Đếm nhanh ${v.fromDate} → ${v.toDate}: ${r.email} email ⇄ ${r.xml} HĐ XML → ${r.ok ? 'khớp' : 'lệch ' + r.diff}, `
-      + `${r.days.filter(x => x.diff).length} ngày chênh`);
+    this.pairEmail = new Map(r.pairs.map(p => [lookupKey(p.invoice.sellerMst, '', p.invoice.symbol, p.invoice.no), p.email]));
+    console.log(`${LOG} Đếm nhanh ${v.fromDate} → ${v.toDate}: ${r.email} email ⇄ ${r.xml} HĐ XML → ${r.ok ? 'khớp' : 'lệch'}; `
+      + `${r.byKey}/${r.pairs.length} cặp theo khóa HĐ, ${r.xmlOnly.length} HĐ chưa thấy email, ${r.emailOnly.length} email không khớp, `
+      + `${r.duplicates.length} gửi trùng, ${r.late} gửi trễ, ${r.afterPeriod} nhận sau kỳ, ${r.prevPeriod} của HĐ kỳ trước, ${r.noKey} email không có khóa HĐ`);
+  }
+
+  /** HĐ chưa có email gom theo NCC (nhiều nhất trước) — nhìn nhanh NCC nào chưa gửi */
+  get missBySeller(): { seller: string; n: number }[] {
+    const m = new Map<string, number>();
+    for (const i of this.countResult?.xmlOnly || []) m.set(i.seller, (m.get(i.seller) || 0) + 1);
+    return [...m.entries()].map(([seller, n]) => ({ seller, n })).sort((a, b) => b.n - a.n || a.seller.localeCompare(b.seller));
+  }
+
+  setCountView(v: '' | 'pairs' | 'dups'): void {
+    this.countView = this.countView === v ? '' : v;
   }
 
   // Đang chạy = cờ của trang HOẶC việc nền còn chạy (25/10/2026): quay lại trang thấy loading NGAY, không đợi đọc xong bản XML đã lưu
   get xmlBusy(): boolean { return this.xmlReading || !!this.source.runningXml(); }
   get countBusy(): boolean { return this.counting || !!this.source.runningGmailCount(); }
   get xmlProgressText(): string { return (this.xmlJob || this.source.runningXml())?.progress || ''; }
-
-  get countDays() {
-    const days = this.countResult?.days || [];
-    return this.countAllDays ? days : days.filter(d => d.diff);
-  }
 
   /** `/mail/u/<email>/` (email trong path) → Gmail "Temporary Error (404)" (28/10/2026) → chọn hộp thư bằng `?authuser=<email>` */
   private gmailBase(): string {
@@ -545,13 +768,6 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
     return `${this.gmailBase()}#all/${e.thread_id || e.id}`;
   }
 
-  /** Link tìm đúng các email đã đếm của 1 ngày (giờ VN, cùng điều kiện với BE /api/gmail/message-count) */
-  countDayUrl(date: string): string {
-    const start = Date.parse(`${date}T00:00:00+07:00`) / 1000;
-    const q = `after:${start} before:${start + 86400} -in:sent -in:drafts -in:chats`;
-    return `${this.gmailBase()}#search/${encodeURIComponent(q)}`;
-  }
-
   logOpenGmail(what: string): void {
     console.info(`${LOG} Mở Gmail: ${what}`);
   }
@@ -559,6 +775,11 @@ export class Ledger8DongBoHoaDonV2Component implements OnInit, OnDestroy {
   private _normalizeTaxCode(taxCode: string): string {
     if (!taxCode) return '';
     return taxCode.replace(/-\d+$/, '').trim();
+  }
+
+  /** "28/10 09:15" — giờ Gmail nhận (`at` ISO giờ VN) */
+  viMailTime(at: string): string {
+    return `${at.slice(8, 10)}/${at.slice(5, 7)} ${at.slice(11, 16)}`;
   }
 
   viDate(iso: string): string {

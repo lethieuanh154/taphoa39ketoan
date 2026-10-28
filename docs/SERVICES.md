@@ -447,7 +447,7 @@ Lỗi IndexedDB chỉ log cảnh báo (trang chạy như không có cache). Mụ
 |---|---|---|---|
 | `xml-in` / `xml-out` | XML đã đọc từ thư mục (ledger-8 / ledger-9) | mở lại trang hiện ngay, không phải chọn lại thư mục | chọn lại thư mục |
 | `einvoice-bills:<from>:<to>` | HĐĐT KiotViet theo khoảng ngày | ledger-9 | nút "Lấy lại từ KiotViet" |
-| `gmail-count:<nhãn>:<from>:<to>` | Đếm nhanh email Gmail (28/10/2026 bỏ `gmail-links` — link HĐ gốc nay ở máy chủ) | ledger-8 | "Đếm lại email" |
+| `gmail-count2:<nhãn>:<from>:<to>` | Đếm nhanh email Gmail + khóa HĐ từng email (28/10/2026 bỏ `gmail-links` — link HĐ gốc nay ở máy chủ) | ledger-8 | "Đếm lại email" |
 | `ck-range:<from>:<to>` | HĐ CK của khoảng ngày kết thúc trước hôm nay > 8 ngày, đủ mọi ngày | BankReconciliationService.load | "Lấy lại từ KiotViet" (force) |
 | `check-run:<id>` | lần Kiểm tra HĐ đã xong / lỗi | EinvoiceCheckService.getRun | không đổi nữa |
 | `figures:<id>` | số liệu khai thuế của 1 lần đối soát | ReconciliationService.getFigures | không đổi nữa (xóa lần chạy → xóa) |
@@ -494,4 +494,14 @@ lookupKey(mstBán, mẫuSố, kýHiệu, số) / gdtLookupText(...)           //
 Mã tra cứu lấy từ XML: `utils/invoice-lookup.util.ts` `detectLookup(MSTTCGP, [TTruong, DLieu][])` (thuần hàm, có spec) — bảng `PROVIDERS`
 theo MST nhà cung cấp HĐĐT, `CODE_FIELDS` / `URL_FIELDS` theo tên trường đã bỏ dấu. Dùng ở ledger-8 (chiều `in`) và ledger-9 (`out`,
 mã = `verify_code` HĐĐT KiotViet).
+
+**Link tra cứu gán tay (28/10/2026)** — NCC HĐĐT chưa có trong `PROVIDERS` / người bán có trang tra cứu riêng (VNPT, BKAV):
+```typescript
+listPortals(): Promise<LookupPortal[]>                             // GET  /portals — Firestore invoice_lookup_portals
+savePortal(scope: 'tcgp' | 'seller', mst, name, url)               // PUT  /portals — url có `{code}` = mở thẳng bằng mã trong XML
+deletePortal(scope, mst)                                           // DELETE /portals/{scope}/{mst}
+setManualUrl('in', {seller_mst, template, series, number}, url)    // PUT  /manual-url — link riêng 1 HĐ ('' = xóa), chỉ HĐ đã lưu
+```
+Hàm thuần ở `invoice-lookup.util.ts` (có spec): `applyPortal(portal, code)` → `{url, direct}`; `linkTemplate(linkDán, mã)` → thay mã
+bằng `{code}` ('' nếu link không chứa mã); `looksInvoiceSpecific(url)` → cảnh báo link riêng 1 HĐ; `isHttpUrl`.
 

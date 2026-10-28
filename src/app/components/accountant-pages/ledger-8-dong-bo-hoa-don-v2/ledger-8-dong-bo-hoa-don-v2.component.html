@@ -56,66 +56,112 @@
   <!-- ============================================ -->
   <div class="count-section" *ngIf="countResult || countBusy || countError">
     <div class="xml-error" *ngIf="countError"><i class="fa-solid fa-triangle-exclamation"></i> {{ countError }}</div>
-    <app-table-loading *ngIf="countBusy && !countResult" text="Đang đếm email Gmail..."></app-table-loading>
+    <app-table-loading *ngIf="countBusy && !countResult" text="Đang đếm email Gmail + nhận diện HĐ từng email..."></app-table-loading>
     <ng-container *ngIf="countResult as r">
-      <div class="count-head" [class.ok]="r.ok">
-        <span class="count-big"><i class="fa-solid" [ngClass]="r.ok ? 'fa-circle-check' : 'fa-triangle-exclamation'"></i>
-          {{ r.email | number }} email ⇄ {{ r.xml | number }} HĐ XML</span>
-        <span>{{ r.ok ? 'Khớp số lượng' : (r.diff > 0 ? 'Thừa ' + r.diff + ' email' : 'Thiếu ' + (-r.diff) + ' email') }}</span>
-        <span class="xml-hint">· Gmail đếm lúc {{ viTime(countFetchedAt) }} (đã lưu trên máy) · HĐ XML tính cả HĐ thay thế / điều chỉnh</span>
-        <label class="count-toggle"><input type="checkbox" [(ngModel)]="countAllDays"> Hiện mọi ngày</label>
+      <!-- Trạng thái -->
+      <div class="count-banner" [class.ok]="r.ok">
+        <i class="fa-solid count-banner-icon" [ngClass]="r.ok ? 'fa-circle-check' : 'fa-circle-exclamation'"></i>
+        <div class="count-banner-text">
+          <div class="count-banner-title">{{ r.ok ? 'KHỚP' : 'LỆCH' }}
+            <span class="count-banner-sum">{{ r.email | number }} email HĐ ⇄ {{ r.xml | number }} HĐ XML</span></div>
+          <div *ngIf="r.ok">Mọi HĐ đầu vào trong kỳ {{ periodLabel() }} đều có email nhà cung cấp gửi về Gmail.</div>
+          <div *ngIf="!r.ok">
+            <b *ngIf="r.xmlOnly.length">{{ r.xmlOnly.length }} HĐ trên cổng thuế chưa có email</b>
+            <span *ngIf="r.xmlOnly.length && r.emailOnly.length"> · </span>
+            <b *ngIf="r.emailOnly.length">{{ r.emailOnly.length }} email không khớp HĐ XML nào</b>
+          </div>
+        </div>
+        <span class="count-banner-meta">kỳ {{ periodLabel() }}<br>đếm lúc {{ viTime(countFetchedAt) }}</span>
       </div>
+
+      <!-- Số liệu -->
+      <div class="count-stats">
+        <div class="count-stat"><small>HĐ XML (cổng thuế)</small><b>{{ r.xml | number }}</b></div>
+        <div class="count-stat"><small>Email HĐ</small><b>{{ r.email | number }}</b></div>
+        <div class="count-stat good"><small>Đã khớp</small><b>{{ r.pairs.length | number }}</b>
+          <em>{{ r.byKey | number }} theo khóa HĐ · {{ r.pairs.length - r.byKey | number }} theo ngày</em></div>
+        <div class="count-stat" [class.bad]="r.xmlOnly.length"><small>HĐ chưa có email</small><b>{{ r.xmlOnly.length | number }}</b></div>
+        <div class="count-stat" [class.warn]="r.emailOnly.length"><small>Email không khớp</small><b>{{ r.emailOnly.length | number }}</b></div>
+        <div class="count-stat muted"><small>Gửi trùng (không tính)</small><b>{{ r.duplicates.length | number }}</b></div>
+      </div>
+      <p class="xml-hint count-note">
+        Ghép theo <b>khóa HĐ</b> (MST bán + ký hiệu + số — đọc từ XML đính kèm / tên file / tiêu đề email), email không có khóa thì ghép theo
+        ngày (lập HĐ → nhận email trong {{ lagDays }} ngày).
+        <ng-container *ngIf="r.late"> · {{ r.late }} email gửi trễ</ng-container>
+        <ng-container *ngIf="r.afterPeriod"> ({{ r.afterPeriod }} nhận sau kỳ, đã tính cho HĐ cuối kỳ)</ng-container>
+        <ng-container *ngIf="r.prevPeriod"> · {{ r.prevPeriod }} email của HĐ kỳ trước (không tính)</ng-container>
+        <ng-container *ngIf="r.noKey"> · {{ r.noKey }} email không nhận diện được HĐ</ng-container>
+      </p>
+      <div class="xml-error" *ngIf="countUnread"><i class="fa-solid fa-triangle-exclamation"></i> {{ countUnread }} email trong hộp thư máy chủ đọc lỗi (không có trong kết quả — có thể làm báo lệch sai) → bấm "Đếm lại email".</div>
       <div class="xml-error" *ngIf="countTruncated"><i class="fa-solid fa-triangle-exclamation"></i> Hộp thư có hơn 3.000 email trong kỳ — chỉ đếm 3.000, chọn kỳ ngắn hơn.</div>
-      <p class="xml-hint" *ngIf="!r.ok || countDays.length">So theo ngày: ngày lập HĐ (XML) ⇄ ngày Gmail nhận email. Bấm 1 ngày để xem email và HĐ của ngày đó.
-        NCC gửi trễ / sớm 1 ngày thì ngày này thiếu, ngày kế thừa (có ghi gợi ý).</p>
-      <table class="count-table" *ngIf="countDays.length">
-        <thead><tr><th>Ngày</th><th class="num">HĐ XML</th><th class="num">Email</th><th class="num">Chênh</th><th>Gợi ý</th><th class="count-act">Gmail</th></tr></thead>
+
+      <!-- Lệch: 2 bảng cạnh nhau -->
+      <div class="count-cols" *ngIf="!r.ok">
+        <div class="count-col col-bad">
+          <h4><i class="fa-solid fa-file-circle-xmark"></i> Có trên cổng thuế (XML) — CHƯA có email <span class="count-badge">{{ r.xmlOnly.length }}</span></h4>
+          <p class="col-hint">NCC chưa gửi email, gửi sang hộp thư khác, hoặc email không nhận diện được HĐ (mở cột bên phải để dò).</p>
+          <div class="seller-chips" *ngIf="missBySeller.length > 1">
+            <span class="seller-chip" *ngFor="let s of missBySeller" [title]="s.seller">{{ s.seller }} <b>{{ s.n }}</b></span>
+          </div>
+          <table class="count-mail-table" *ngIf="r.xmlOnly.length; else noneXml">
+            <thead><tr><th>Ngày lập</th><th>Ký hiệu - Số</th><th>Người bán</th><th class="num">Tổng TT</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let i of r.xmlOnly">
+                <td class="nowrap">{{ viDate(i.date) }}</td>
+                <td class="nowrap"><b>{{ i.symbol }}-{{ i.no }}</b></td>
+                <td class="count-from" [title]="i.seller + ' · ' + i.sellerMst">{{ i.seller }}<br><small class="mst">{{ i.sellerMst }}</small></td>
+                <td class="num">{{ vnd(i.total) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <ng-template #noneXml><p class="col-empty"><i class="fa-solid fa-check"></i> Mọi HĐ XML đều có email.</p></ng-template>
+        </div>
+        <div class="count-col col-warn">
+          <h4><i class="fa-solid fa-envelope-circle-check"></i> Có email — KHÔNG khớp HĐ XML <span class="count-badge">{{ r.emailOnly.length }}</span></h4>
+          <p class="col-hint">Email HĐ mà thư mục XML không có (FDI chưa tải / HĐ ngoài kỳ), hoặc email không phải HĐ.</p>
+          <table class="count-mail-table" *ngIf="r.emailOnly.length; else noneMail">
+            <thead><tr><th>Nhận lúc</th><th>Người gửi · tiêu đề</th><th>Lý do</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let x of r.emailOnly">
+                <td class="nowrap">{{ viMailTime(x.email.at) }}</td>
+                <td class="count-mail-cell" [title]="x.email.from_email + ' — ' + x.email.subject">
+                  <b>{{ x.email.from_name || x.email.from_email }}</b><br><small>{{ x.email.subject }}</small></td>
+                <td><span class="reason-chip" [class.key]="!!x.email.inv">{{ x.reason }}</span></td>
+                <td class="count-act">
+                  <a class="btn-gmail" [href]="countEmailUrl(x.email)" target="_blank" rel="noopener"
+                     (click)="logOpenGmail('email ' + (x.email.thread_id || x.email.id))" title="Mở email gốc trong Gmail">
+                    <i class="fa-solid fa-envelope"></i> Mở Gmail
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <ng-template #noneMail><p class="col-empty"><i class="fa-solid fa-check"></i> Mọi email đều khớp HĐ XML.</p></ng-template>
+        </div>
+      </div>
+
+      <!-- Bảng phụ -->
+      <div class="count-views">
+        <button type="button" class="chip" [class.active]="countView === 'pairs'" (click)="setCountView('pairs')">
+          <i class="fa-solid fa-link"></i> Cặp đã khớp ({{ r.pairs.length | number }})</button>
+        <button type="button" class="chip" [class.active]="countView === 'dups'" (click)="setCountView('dups')" *ngIf="r.duplicates.length">
+          <i class="fa-regular fa-copy"></i> Email gửi trùng ({{ r.duplicates.length | number }})</button>
+      </div>
+      <table class="count-mail-table" *ngIf="countView && (countView === 'pairs' ? r.pairs : r.duplicates).length">
+        <thead><tr><th>Ngày lập</th><th>Ký hiệu - Số</th><th>Người bán</th><th>Email nhận</th><th>Người gửi · tiêu đề</th><th>Ghép theo</th><th></th></tr></thead>
         <tbody>
-          <ng-container *ngFor="let d of countDays">
-            <tr class="count-row" [class.bad]="d.diff" [class.open]="countOpenDay === d.date" (click)="countOpenDay = countOpenDay === d.date ? '' : d.date">
-              <td><i class="fa-solid" [ngClass]="countOpenDay === d.date ? 'fa-caret-down' : 'fa-caret-right'"></i> {{ viDate(d.date) }}</td>
-              <td class="num">{{ d.xml }}</td><td class="num">{{ d.email }}</td>
-              <td class="num">{{ d.diff > 0 ? '+' + d.diff : d.diff }}</td>
-              <td class="xml-hint">{{ d.hint }}</td>
-              <td class="count-act">
-                <a class="btn-gmail" *ngIf="d.email" [href]="countDayUrl(d.date)" target="_blank" rel="noopener"
-                   (click)="$event.stopPropagation(); logOpenGmail('ngày ' + d.date)" title="Mở Gmail: các email đã đếm của ngày này">
-                  <i class="fa-solid fa-envelope-open-text"></i> Gmail ngày này
-                </a>
-              </td>
-            </tr>
-            <tr *ngIf="countOpenDay === d.date" class="count-detail">
-              <td colspan="6">
-                <div class="count-cols">
-                  <div>
-                    <b>Email ({{ d.emails.length }})</b>
-                    <table class="count-mail-table" *ngIf="d.emails.length">
-                      <thead><tr><th>Giờ</th><th>Người gửi</th><th>Tiêu đề</th><th></th></tr></thead>
-                      <tbody>
-                        <tr *ngFor="let e of d.emails">
-                          <td class="num">{{ e.at.slice(11, 16) }}</td>
-                          <td class="count-from" [title]="e.from_email">{{ e.from_name || e.from_email }}</td>
-                          <td class="count-subject" [title]="e.subject">{{ e.subject }}</td>
-                          <td class="count-act">
-                            <a class="btn-gmail" [href]="countEmailUrl(e)" target="_blank" rel="noopener"
-                               (click)="logOpenGmail('email ' + (e.thread_id || e.id))" title="Mở email gốc trong Gmail">
-                              <i class="fa-solid fa-envelope"></i> Mở Gmail
-                            </a>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <div *ngIf="!d.emails.length" class="xml-hint">—</div>
-                  </div>
-                  <div>
-                    <b>HĐ XML ({{ d.invoices.length }})</b>
-                    <div *ngFor="let i of d.invoices" class="count-item">{{ i.symbol }}-{{ i.no }} · {{ i.seller }}</div>
-                    <div *ngIf="!d.invoices.length" class="xml-hint">—</div>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </ng-container>
+          <tr *ngFor="let p of (countView === 'pairs' ? r.pairs : r.duplicates)" [class.late]="p.lag > 0">
+            <td class="nowrap">{{ viDate(p.invoice.date) }}</td>
+            <td class="nowrap">{{ p.invoice.symbol }}-{{ p.invoice.no }}</td>
+            <td class="count-from" [title]="p.invoice.seller">{{ p.invoice.seller }}</td>
+            <td class="nowrap">{{ viMailTime(p.email.at) }}<small class="late-tag" *ngIf="p.lag > 0"> trễ {{ p.lag }} ngày</small></td>
+            <td class="count-subject" [title]="p.email.subject">{{ p.email.from_name || p.email.from_email }} · {{ p.email.subject }}</td>
+            <td><span class="reason-chip" [class.ok]="p.byKey">{{ p.reason }}</span></td>
+            <td class="count-act">
+              <a class="btn-gmail" [href]="countEmailUrl(p.email)" target="_blank" rel="noopener"
+                 (click)="logOpenGmail('email ' + (p.email.thread_id || p.email.id))" title="Mở email trong Gmail"><i class="fa-solid fa-envelope"></i> Mở Gmail</a>
+            </td>
+          </tr>
         </tbody>
       </table>
     </ng-container>
@@ -151,9 +197,47 @@
       <button type="button" class="chip" [class.active]="kindFilter === 'portal'" (click)="setKind('portal')">Tra cứu NCC + mã ({{ counts.portal }})</button>
       <button type="button" class="chip" [class.active]="kindFilter === 'gdt'" (click)="setKind('gdt')">Chỉ tra cứu CQT ({{ counts.gdt }})</button>
       <button type="button" class="chip" [class.active]="kindFilter === 'unknown'" (click)="setKind('unknown')"
-              title="MST nhà cung cấp HĐĐT (MSTTCGP) chưa có trong bảng — gửi 1 XML của NCC này để bổ sung">NCC HĐĐT chưa biết ({{ counts.unknown }})</button>
+              title="MST nhà cung cấp HĐĐT (MSTTCGP) chưa có trong bảng — bấm Gán link ở 1 HĐ để đặt tên + link cho NCC này">NCC HĐĐT chưa biết ({{ counts.unknown }})</button>
       <input class="filter-input link-search" [(ngModel)]="q" (ngModelChange)="page = 1" placeholder="Tìm số HĐ / ký hiệu / MST / người bán / NCC HĐĐT">
     </div>
+
+    <!-- HĐ chưa có link NCC: gán 1 lần cho cả nhóm -->
+    <div class="need-link" *ngIf="needLink.length">
+      <div class="need-link-head">
+        <i class="fa-solid fa-link-slash"></i>
+        <b>{{ counts.gdt }} HĐ chưa có link NCC</b> — chỉ tra được ở cổng CQT. Mở email NCC gửi HĐ, chép link "tra cứu / xem hóa đơn"
+        rồi bấm nhóm bên dưới để gán <b>1 lần</b> cho cả nhóm.
+      </div>
+      <div class="need-link-groups">
+        <button type="button" class="need-chip" *ngFor="let g of needLink" [class.has-code]="g.withCode" (click)="openEdit(g.sample)"
+                [title]="g.withCode ? 'XML có mã tra cứu, chỉ thiếu trang tra cứu của NCC HĐĐT ' + g.sample.tcgp + ' — gán 1 link cho mọi người bán dùng NCC này'
+                                    : 'XML không có mã tra cứu (NCC HĐĐT ' + (g.sample.provider || g.sample.tcgp || '?') + ') — gán trang tra cứu riêng của người bán này'">
+          <i class="fa-solid" [ngClass]="g.withCode ? 'fa-key' : 'fa-store'"></i>
+          <span class="need-chip-label">{{ g.label }}</span>
+          <small>{{ g.withCode ? 'có mã' : 'theo người bán' }}</small>
+          <b>{{ g.n }}</b>
+        </button>
+      </div>
+    </div>
+    <div class="portal-bar">
+      <button type="button" class="chip" [class.active]="showPortals" (click)="showPortals = !showPortals">
+        <i class="fa-solid fa-pen-to-square"></i> Link tra cứu đã gán ({{ portals.length }})</button>
+      <span class="xml-error inline" *ngIf="portalsError"><i class="fa-solid fa-triangle-exclamation"></i> {{ portalsError }}</span>
+    </div>
+    <table class="count-mail-table portal-table" *ngIf="showPortals && portals.length">
+      <thead><tr><th>Phạm vi</th><th>MST</th><th>Tên</th><th>Link</th><th>Người gán</th><th></th></tr></thead>
+      <tbody>
+        <tr *ngFor="let p of portals">
+          <td><span class="reason-chip" [class.ok]="p.url.includes('{code}')">{{ scopeLabel(p.scope) }}</span></td>
+          <td class="nowrap">{{ p.mst }}</td>
+          <td>{{ p.name || '—' }}</td>
+          <td class="portal-url" [title]="p.url">{{ p.url }}</td>
+          <td class="nowrap"><small>{{ p.updated_by }}<br>{{ viIsoTime(p.updated_at) }}</small></td>
+          <td><button type="button" class="btn-copy" (click)="deletePortal(p)" title="Xóa link gán"><i class="fa-solid fa-trash"></i></button></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="xml-hint" *ngIf="showPortals && !portals.length">Chưa gán link tra cứu nào.</p>
 
     <app-table-loading *ngIf="savedLoading && !rows.length" text="Đang đọc link HĐ gốc đã lưu..."></app-table-loading>
     <p class="xml-hint" *ngIf="!savedLoading && !rows.length">Chưa có HĐ nào của kỳ — chọn thư mục XML HĐ đầu vào (máy khác đã chọn và lưu thì danh sách hiện ở đây).</p>
@@ -183,6 +267,12 @@
                  (click)="onOpenLink(r)" [title]="kindTitle(r)">
                 <i class="fa-solid" [ngClass]="r.kind === 'gdt' ? 'fa-landmark' : 'fa-arrow-up-right-from-square'"></i> {{ kindLabel(r) }}
               </a>
+              <a class="btn-mini" *ngIf="emailOf(r) as m" [href]="countEmailUrl(m)" target="_blank" rel="noopener"
+                 (click)="logOpenGmail('link HĐ ' + (m.thread_id || m.id))" title="Mở email NCC gửi HĐ này (đã ghép ở Đếm nhanh) — trong email có link tra cứu">
+                <i class="fa-solid fa-envelope"></i></a>
+              <button type="button" class="btn-mini" [class.assigned]="!!r.assigned" (click)="openEdit(r)"
+                      [title]="r.assigned ? 'Link gán tay ' + scopeLabel(r.assigned) + ' — bấm để sửa / bỏ' : 'Gán link tra cứu (dán link từ email NCC)'">
+                <i class="fa-solid fa-pen"></i></button>
             </td>
           </tr>
         </tbody>
@@ -193,5 +283,75 @@
       <span>Trang {{ page }} / {{ pageCount }} · {{ filteredRows.length }} HĐ</span>
       <button type="button" class="btn btn-outline-secondary" (click)="page = page + 1" [disabled]="page >= pageCount"><i class="fa-solid fa-chevron-right"></i></button>
     </div>
+  </div>
+</div>
+
+<!-- Gán link tra cứu -->
+<div class="assign-overlay" *ngIf="editRow as r" (click)="closeEdit()">
+  <div class="assign-box" (click)="$event.stopPropagation()" role="dialog" aria-label="Gán link tra cứu HĐ gốc">
+    <div class="assign-head">
+      <h4><i class="fa-solid fa-link"></i> Gán link tra cứu HĐ gốc</h4>
+      <button type="button" class="btn-copy" (click)="closeEdit()" title="Đóng"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="assign-info">
+      <div><small>HĐ</small><b>{{ r.template }}{{ r.series }}-{{ r.no }}</b> · {{ viDate(r.date) }}</div>
+      <div><small>Người bán</small>{{ r.sellerName }} <span class="mst">{{ r.sellerMst }}</span></div>
+      <div><small>NCC HĐĐT</small>{{ r.provider || 'Chưa biết' }} <span class="mst">{{ r.tcgp || '(XML không ghi)' }}</span></div>
+      <div><small>Mã tra cứu</small><code class="lookup-code" *ngIf="r.code">{{ r.code }}</code><span class="xml-hint" *ngIf="!r.code">XML không có</span></div>
+    </div>
+
+    <div class="assign-step">
+      <span class="step-no">1</span>
+      <div>Mở email NCC gửi HĐ này → bấm link "tra cứu / xem hóa đơn" → chép địa chỉ trên thanh trình duyệt.
+        <a class="btn-gmail" *ngIf="emailOf(r) as m" [href]="countEmailUrl(m)" target="_blank" rel="noopener"
+           (click)="logOpenGmail('gán link ' + (m.thread_id || m.id))"><i class="fa-solid fa-envelope"></i> Mở email HĐ này</a>
+        <span class="xml-hint" *ngIf="!emailOf(r)">(Chạy "Đếm nhanh" để có nút mở thẳng email của HĐ này.)</span>
+      </div>
+    </div>
+    <div class="assign-step">
+      <span class="step-no">2</span>
+      <div class="assign-field">
+        <input class="filter-input" [(ngModel)]="editUrl" placeholder="Dán link vào đây — https://..." autofocus>
+      </div>
+    </div>
+    <div class="assign-step">
+      <span class="step-no">3</span>
+      <div class="assign-scopes">
+        <label [class.disabled]="!r.tcgp">
+          <input type="radio" name="scope" value="tcgp" [(ngModel)]="editScope" [disabled]="!r.tcgp">
+          <b>Mọi HĐ dùng NCC HĐĐT này</b> <small>{{ r.provider || r.tcgp || '—' }} · {{ scopeCount('tcgp') }} HĐ trong kỳ</small>
+          <em>Hợp khi XML có mã tra cứu (1 link dùng chung cho nhiều người bán).</em>
+        </label>
+        <label>
+          <input type="radio" name="scope" value="seller" [(ngModel)]="editScope">
+          <b>Mọi HĐ của người bán này</b> <small>{{ r.sellerName || r.sellerMst }} · {{ scopeCount('seller') }} HĐ trong kỳ</small>
+          <em>Hợp với VNPT / BKAV… (mỗi người bán 1 trang tra cứu riêng).</em>
+        </label>
+        <label [class.disabled]="!r.saved">
+          <input type="radio" name="scope" value="invoice" [(ngModel)]="editScope" [disabled]="!r.saved">
+          <b>Chỉ HĐ này</b> <small>link riêng (có mã trong link) — mở thẳng đúng HĐ</small>
+        </label>
+        <div class="assign-field" *ngIf="editScope === 'tcgp'">
+          <input class="filter-input" [(ngModel)]="editName" maxlength="120" placeholder="Tên NCC HĐĐT (không bắt buộc) — vd FAST e-Invoice">
+        </div>
+      </div>
+    </div>
+
+    <ng-container *ngIf="editPlan as plan">
+      <div class="assign-plan" *ngIf="!plan.error" [class.direct]="plan.direct">
+        <i class="fa-solid" [ngClass]="plan.direct ? 'fa-circle-check' : 'fa-circle-info'"></i> {{ plan.note }}
+      </div>
+      <div class="assign-warn" *ngIf="plan.warn"><i class="fa-solid fa-triangle-exclamation"></i> {{ plan.warn }}</div>
+      <div class="xml-hint" *ngIf="plan.error && editUrl.trim()">{{ plan.error }}</div>
+      <div class="xml-error" *ngIf="editError"><i class="fa-solid fa-triangle-exclamation"></i> {{ editError }}</div>
+      <div class="assign-actions">
+        <button type="button" class="btn btn-outline-danger" *ngIf="r.assigned" (click)="removeAssigned(r)" [disabled]="editBusy">
+          <i class="fa-solid fa-trash"></i> Bỏ link đã gán ({{ scopeLabel(r.assigned) }})</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-outline-secondary" (click)="closeEdit()" [disabled]="editBusy">Hủy</button>
+        <button type="button" class="btn btn-primary" (click)="saveEdit()" [disabled]="!!plan.error || editBusy">
+          <i class="fa-solid" [ngClass]="editBusy ? 'fa-spinner fa-spin' : 'fa-floppy-disk'"></i> Lưu</button>
+      </div>
+    </ng-container>
   </div>
 </div>

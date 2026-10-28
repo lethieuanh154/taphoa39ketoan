@@ -63,7 +63,7 @@ export class PurchaseInvoiceSourceService {
 
   // ===== Đếm nhanh (25/10/2026) =====
   gmailCountKey(label: string, from: string, to: string): string {
-    return `gmail-count:${label || '*'}:${from}:${to}`;
+    return `gmail-count2:${label || '*'}:${from}:${to}`;   // 2 = có khóa HĐ từng email (28/10/2026) — bỏ bản đếm cũ
   }
 
   cachedGmailCount(p: GmailParams): Promise<CacheEntry<GmailCount> | null> {
@@ -71,7 +71,7 @@ export class PurchaseInvoiceSourceService {
   }
 
   runningGmailCount(): BgJob<GmailCount> | undefined {
-    return this.jobs.find<GmailCount>('gmail-count:');
+    return this.jobs.find<GmailCount>('gmail-count2:');
   }
 
   /** Đếm email nhận trong [from, to] (giờ VN) — chỉ header, không nội dung / đính kèm; chạy nền, lưu IndexedDB */

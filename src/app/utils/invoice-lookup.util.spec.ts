@@ -1,4 +1,4 @@
-import { detectLookup, normField } from './invoice-lookup.util';
+import { LookupPortal, applyPortal, detectLookup, linkTemplate, looksInvoiceSpecific, normField } from './invoice-lookup.util';
 import { parseInvoiceXml } from './invoice-xml.util';
 
 const ttin = (k: string, v: string) => `<TTin><TTruong>${k}</TTruong><KDLieu>string</KDLieu><DLieu>${v}</DLieu></TTin>`;
@@ -44,5 +44,24 @@ describe('invoice-lookup.util', () => {
     expect(inv.mccqt).toBe('00ABC');
     const none = parseInvoiceXml(xml('0101300842', '', ttin('Mã TC', 'LINE9999')), 'b.xml')!;
     expect(none.lookup?.code).toBe('');
+  });
+
+  it('link gán tay: link mẫu {code} mở thẳng bằng mã; HĐ không mã → trang tra cứu', () => {
+    const p: LookupPortal = { id: 'tcgp-0401486901', scope: 'tcgp', mst: '0401486901', url: 'https://tc.x.vn/?ma={code}' };
+    expect(applyPortal(p, '2360P64K3YFJ')).toEqual({ url: 'https://tc.x.vn/?ma=2360P64K3YFJ', direct: true });
+    expect(applyPortal(p, '')).toEqual({ url: 'https://tc.x.vn/?ma=', direct: false });
+    expect(applyPortal({ ...p, url: 'https://0400101891-tt78.vnpt-invoice.com.vn/' }, 'A1')).toEqual(
+      { url: 'https://0400101891-tt78.vnpt-invoice.com.vn/', direct: false });
+  });
+
+  it('link dán từ email: nhận ra mã → link mẫu; link riêng 1 HĐ không có mã thì cảnh báo', () => {
+    expect(linkTemplate('https://tc.x.vn/tra-cuu?ma=4522d028f8&t=1', '4522D028F8')).toBe('https://tc.x.vn/tra-cuu?ma={code}&t=1');
+    expect(linkTemplate('https://tc.x.vn/', '4522D028F8')).toBe('');
+    expect(linkTemplate('https://tc.x.vn/?k=AQ%2BB', 'AQ+B')).toBe('https://tc.x.vn/?k={code}');
+    expect(looksInvoiceSpecific('https://x.vnpt-invoice.com.vn/HomeNoLogin/SearchByFkey?strFkey=AB12CD34EF')).toBeTrue();
+    expect(looksInvoiceSpecific('https://x.vnpt-invoice.com.vn/')).toBeFalse();
+    expect(looksInvoiceSpecific('http://tracuu.ehoadon.vn/AB12CD34EF5')).toBeTrue();
+    expect(looksInvoiceSpecific('https://tracuuhoadon.mobifoneinvoice.vn/tra-cuu')).toBeFalse();
+    expect(looksInvoiceSpecific('http://ehoadon.vn/hdpb6a')).toBeFalse();
   });
 });

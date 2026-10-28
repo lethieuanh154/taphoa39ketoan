@@ -67,8 +67,10 @@ function headerFields(doc: Document): [string, string][] {
 export function parseInvoiceXml(xml: string, file: string): LocalXmlInvoice | null {
   const doc = new DOMParser().parseFromString(xml, 'text/xml');
   if (doc.getElementsByTagName('parsererror').length) throw new Error('XML không hợp lệ');
-  const ttc = first(doc, 'TTChung');
-  const nd = first(doc, 'NDHDon');
+  // XML dạng thông điệp `TDiep` có TTChung RIÊNG ở lớp vỏ (không có số HĐ) → lấy TTChung trong DLHDon (28/10/2026)
+  const dl = first(doc, 'DLHDon');
+  const ttc = dl ? first(dl, 'TTChung') : first(doc, 'TTChung');
+  const nd = dl ? first(dl, 'NDHDon') : first(doc, 'NDHDon');
   if (!ttc || !nd) return null;
   const shdon = parseInt(text(ttc, 'SHDon'), 10);
   if (!Number.isFinite(shdon)) return null;

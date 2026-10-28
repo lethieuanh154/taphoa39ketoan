@@ -503,6 +503,22 @@ def kw_same(a, b):
     return bool(ka) and ka == kb and la and lb
 
 
+def unit_same(a, b):
+    return norm_unit(a) == norm_unit(b) or bool(kw_same(a, b))
+
+
+def suggest_vietda_factor(vd_unit, unit_after, g):
+    """Hệ số Vietda = số ĐVT Vietda trong 1 ĐVT sau quy đổi (ĐVT master; chưa có master thì ĐVT HĐ).
+    Cùng ĐVT → 1; ĐVT Vietda là 1 ĐVT KiotViet của master → 1/hệ số KiotViet; không suy ra được → None."""
+    if not vd_unit or not unit_after or unit_same(vd_unit, unit_after):
+        return 1.0
+    if g and unit_same(unit_after, g["unit"]):
+        conv, how, _, _ = match_unit(g, vd_unit, None)
+        if conv and how in ("exact", "keyword"):
+            return 1.0 / conv
+    return None
+
+
 def raw_kiotviet_to_products(items):
     """Dữ liệu gốc KiotViet (/api/kiotviet/items/all) -> danh sách products như bảng quy đổi. Bỏ hàng xóa / ngừng KD."""
     by_id = {it.get("Id"): it for it in items}
@@ -654,13 +670,15 @@ def find_catalog(data_dir, patterns):
 
 MAP_HEADERS = ["Chiều", "MST người bán", "Tên người bán", "Mã hàng (HĐ)", "Tên hàng (HĐ)", "ĐVT (HĐ)", "Số dòng",
                "Tổng SL (HĐ)", "Mã master", "Tên master", "ĐVT master", "Hệ số quy đổi", "Tổng SL quy đổi",
-               "Mã Vietda", "Tên Vietda", "ĐVT Vietda", "Cách ghép Vietda",
+               "Mã Vietda", "Tên Vietda", "ĐVT Vietda", "Hệ số Vietda", "Cách ghép Vietda",
                "Cách ghép", "Độ tin cậy", "Cần xem", "Bản sao XML", "Gợi ý khác", "Đã kiểm (x)",
-               "Máy gợi ý mã", "Máy gợi ý hệ số", "Máy gợi ý Vietda", "Khóa (không sửa)"]
+               "Máy gợi ý mã", "Máy gợi ý hệ số", "Máy gợi ý Vietda", "Máy gợi ý hệ số Vietda", "Khóa (không sửa)"]
 XML_PLAN_KEEP = "Giữ nguyên — kiểm rồi đánh x"
+XML_PLAN_NO_VD_FACTOR = "Giữ nguyên — thiếu Hệ số Vietda"
+XML_PLAN_VD_UNIT = "Giữ nguyên — ĐVT Vietda khác ĐVT HĐ, chờ xác nhận Mã master"
 COL = {h: i for i, h in enumerate(MAP_HEADERS)}
-EDITABLE = ("Mã master", "Hệ số quy đổi", "Mã Vietda", "Đã kiểm (x)")
-HIDDEN = ("Máy gợi ý mã", "Máy gợi ý hệ số", "Máy gợi ý Vietda")
+EDITABLE = ("Mã master", "Hệ số quy đổi", "Mã Vietda", "Hệ số Vietda", "Đã kiểm (x)")
+HIDDEN = ("Máy gợi ý mã", "Máy gợi ý hệ số", "Máy gợi ý Vietda", "Máy gợi ý hệ số Vietda")
 
 
 class VietdaCatalog:
@@ -890,10 +908,17 @@ def build_mapping(items, existing, cat, threshold, vd=None):
     for k, row in result.items():
         factor = parse_num(row[COL["Hệ số quy đổi"]]) if row[COL["Hệ số quy đổi"]] not in (None, "") else 0
         unit_ok = master_ok[k] and row[COL["Mã master"]] and factor > 0
+        vd_f = parse_num(row[COL["Hệ số Vietda"]]) if row[COL["Hệ số Vietda"]] not in (None, "") else 0
         if unit_ok:
-            plan = "Đổi ĐVT + " + ("mã Vietda" if vd_ok.get(k) else "mã master")
+            if vd_ok.get(k) and not vd_f > 0:
+                plan = XML_PLAN_NO_VD_FACTOR
+            else:
+                plan = "Đổi ĐVT + " + ("mã Vietda" if vd_ok.get(k) else "mã master")
         elif vd_ok.get(k):
-            plan = "Chỉ đổi mã Vietda" + (" (quy đổi ĐVT chờ xác nhận)" if row[COL["Mã master"]] else "")
+            if row[COL["ĐVT Vietda"]] and not unit_same(row[COL["ĐVT Vietda"]], row[COL["ĐVT (HĐ)"]]):
+                plan = XML_PLAN_VD_UNIT
+            else:
+                plan = "Chỉ đổi mã Vietda" + (" (quy đổi ĐVT chờ xác nhận)" if row[COL["Mã master"]] else "")
         else:
             plan = XML_PLAN_KEEP
         row[COL["Bản sao XML"]] = plan
@@ -939,9 +964,19 @@ def _apply_vietda(items, result, olds, vd, cat, threshold, master_ok):
         row[COL["Tên Vietda"]] = r["ten"] if r else ""
         row[COL["ĐVT Vietda"]] = r["dvt"] if r else ""
         unit_after = row[COL["ĐVT master"]] or it["dvt"]
-        if r and r["dvt"] and unit_after and norm_unit(r["dvt"]) != norm_unit(unit_after) and not kw_same(r["dvt"], unit_after):
-            if not confirmed:
-                flags.append(f"ĐVT Vietda '{r['dvt']}' khác ĐVT sau quy đổi '{unit_after}'")
+        mk = row[COL["Mã master"]]
+        g = cat.masters.get(norm_code(mk)) if mk else None
+        sug = suggest_vietda_factor(r["dvt"], unit_after, g) if r else None
+        row[COL["Máy gợi ý hệ số Vietda"]] = sug
+        old_f = old[COL["Hệ số Vietda"]] if old else None
+        f_edited = old_f not in (None, "") and not _same(old_f, old[COL["Máy gợi ý hệ số Vietda"]])
+        row[COL["Hệ số Vietda"]] = old_f if f_edited else sug
+        if r and row[COL["Hệ số Vietda"]] in (None, ""):
+            flags.append(f"Thiếu Hệ số Vietda: ĐVT Vietda '{r['dvt']}' khác ĐVT '{unit_after}' — điền số {r['dvt']} "
+                         f"trong 1 {unit_after}")
+        elif r and not unit_same(r["dvt"], unit_after) and not confirmed and not f_edited:
+            flags.append(f"ĐVT Vietda '{r['dvt']}' khác ĐVT sau quy đổi '{unit_after}' — Hệ số Vietda theo KiotViet "
+                         f"{row[COL['Hệ số Vietda']]:g}")
         if flags:
             row[COL["Cần xem"]] = "; ".join(x for x in (row[COL["Cần xem"]], "; ".join(flags)) if x)
         # chắc chắn = kế toán xác nhận, hoặc ghép CHÍNH XÁC mà không có cờ nào: tên HĐ trùng đúng tên Vietda, hay theo mã
@@ -956,7 +991,7 @@ def save_mapping(path, mapping):
     ws0 = wb.active
     ws0.title = "Huong dan"
     guide = [
-        "ÁNH XẠ MẶT HÀNG → MÃ MASTER KIOTVIET — kế toán chỉ sửa 2 cột tô vàng: 'Mã master' và 'Hệ số quy đổi'",
+        "ÁNH XẠ MẶT HÀNG → MÃ MASTER KIOTVIET — kế toán chỉ sửa các cột tô vàng: 'Mã master', 'Hệ số quy đổi' (+ 'Mã Vietda', 'Hệ số Vietda')",
         "",
         "• Mã master: mã hàng KiotViet của ĐVT NHỎ NHẤT (ĐVT master). Dòng vào và dòng ra cùng 1 mặt hàng phải cùng Mã master.",
         "• Hệ số quy đổi: 1 ĐVT trên HĐ = bao nhiêu ĐVT master. VD HĐ vào 'Thùng' sữa chua 48 hộp → 48.",
@@ -967,6 +1002,9 @@ def save_mapping(path, mapping):
         "• Mã Vietda: mã hàng kế toán tự đặt trong Vietda (file QUYDOI*.xlsx ở thư mục gốc). Bản sao XML quy đổi đổi mã hàng",
         "  sang mã này (không có thì dùng Mã master). Máy gợi ý: tên trên HĐ trùng tên Vietda → mã Vietda của các dòng cùng",
         "  Mã master → tên gần giống (có cờ 'Cần xem'). Sai thì sửa cột 'Mã Vietda'.",
+        "• Hệ số Vietda: 1 ĐVT master = bao nhiêu ĐVT Vietda. VD KiotViet chỉ có 'lốc', Vietda khai 'Hộp', 1 lốc = 4 hộp → 4.",
+        "  Bản sao XML: SL × hệ số, đơn giá ÷ hệ số, ĐVT = ĐVT Vietda (thành tiền giữ nguyên). Cùng ĐVT → 1; ĐVT Vietda có",
+        "  trên KiotViet → máy tự điền. Trống = dòng đó giữ nguyên trong XML.",
         "• Đánh 'x' cột 'Đã kiểm' để khóa dòng. Dòng đã sửa tay cũng tự được giữ ở lần chạy sau.",
         "• KHÔNG sửa cột 'Khóa' và các cột 'Máy gợi ý' (đang ẩn). Đóng file Excel trước khi chạy lại script.",
     ]
@@ -974,7 +1012,7 @@ def save_mapping(path, mapping):
         ws0.append([line])
     ws0.column_dimensions["A"].width = 140
     ws0["A1"].font = Font(bold=True, size=13)
-    widths = [6, 13, 26, 15, 45, 8, 7, 9, 15, 38, 9, 8, 11, 12, 38, 9, 18, 18, 8, 50, 26, 50, 8, 14, 9, 12, 30]
+    widths = [6, 13, 26, 15, 45, 8, 7, 9, 15, 38, 9, 8, 11, 12, 38, 9, 9, 18, 18, 8, 50, 26, 50, 8, 14, 9, 12, 9, 30]
     for title, direction in (("Dau vao", "Vào"), ("Dau ra", "Ra")):
         ws = wb.create_sheet(title)
         ws.append(MAP_HEADERS)
@@ -1324,7 +1362,19 @@ def _convert_xml_bytes(data, src, company, mapping, doi_ma, doi_ten, stamp, stri
                    else "Ánh xạ chưa chắc chắn — kiểm ở anh_xa_hang_hoa.xlsx rồi đánh x")
             rows.append((*ref, ln["ma"], "", ln["ten"], "", ln["dvt"], "", sl, None, dg, None, None, why + " → giữ nguyên dòng này"))
             continue
-        new_unit = str(row[COL["ĐVT master"]] or "").strip() if do_unit else ""
+        vd_f = parse_num(row[COL["Hệ số Vietda"]]) if row[COL["Hệ số Vietda"]] not in (None, "") else 0.0
+        vd_unit = str(row[COL["ĐVT Vietda"]] or "").strip()
+        why = ""
+        if do_vd and do_unit and not vd_f > 0:
+            why = f"Thiếu Hệ số Vietda (ĐVT Vietda '{vd_unit}' khác ĐVT master '{row[COL['ĐVT master']]}')"
+        elif do_vd and not do_unit and vd_unit and not unit_same(vd_unit, ln["dvt"]):
+            why = f"ĐVT Vietda '{vd_unit}' khác ĐVT HĐ '{ln['dvt']}' — chưa quy đổi được (cần Mã master + Hệ số đã kiểm)"
+        if why:
+            rows.append((*ref, ln["ma"], "", ln["ten"], "", ln["dvt"], "", sl, None, dg, None, None, why + " → giữ nguyên dòng này"))
+            continue
+        if do_vd and do_unit:
+            factor *= vd_f
+        new_unit = ((vd_unit if do_vd and vd_unit else str(row[COL["ĐVT master"]] or "").strip())) if do_unit else ""
         if do_vd:
             code, new_name = vd_code, str(row[COL["Tên Vietda"]] or "").strip()
         else:

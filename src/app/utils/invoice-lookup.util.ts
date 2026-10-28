@@ -77,3 +77,53 @@ export function detectLookup(tcgpRaw: string, fields: [string, string][]): Invoi
   const url = direct ? p!.direct!(code) : (xmlUrl || (code ? p?.portal || '' : ''));
   return { tcgp, provider: p?.name || '', code, codeField, url, direct };
 }
+
+/**
+ * LINK TRA CỨU KẾ TOÁN GÁN TAY (28/10/2026) — Firestore `invoice_lookup_portals` qua InvoiceLookupService. Dùng cho NCC HĐĐT chưa
+ * có trong PROVIDERS (XML có mã nhưng không biết trang tra cứu) và người bán có trang tra cứu riêng (VNPT / BKAV: mỗi người bán 1
+ * tên miền, XML không có mã). `url` chứa CODE_TOKEN = mở thẳng HĐ bằng mã tra cứu trong XML.
+ */
+export interface LookupPortal {
+  id: string;
+  scope: 'tcgp' | 'seller';
+  mst: string;
+  name?: string;
+  url: string;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export const CODE_TOKEN = '{code}';
+
+/** Link gán tay → link mở cho 1 HĐ. Link mẫu có `{code}` mà HĐ không có mã → mở trang tra cứu (bỏ `{code}`). */
+export function applyPortal(p: LookupPortal, code: string): { url: string; direct: boolean } {
+  if (!p.url.includes(CODE_TOKEN)) return { url: p.url, direct: false };
+  if (code) return { url: p.url.split(CODE_TOKEN).join(encodeURIComponent(code)), direct: true };
+  return { url: p.url.split(CODE_TOKEN).join(''), direct: false };
+}
+
+/** Link dán từ email NCC có chứa mã tra cứu của HĐ → link mẫu (thay mã bằng `{code}`); không chứa mã → '' */
+export function linkTemplate(url: string, code: string): string {
+  const u = (url || '').trim();
+  if (!code || code.length < 4) return '';
+  for (const c of [code, encodeURIComponent(code)]) {
+    const i = u.toLowerCase().indexOf(c.toLowerCase());
+    if (i >= 0) return u.slice(0, i) + CODE_TOKEN + u.slice(i + c.length);
+  }
+  return '';
+}
+
+/**
+ * Link có tham số (?a=...) hoặc đoạn cuối đường dẫn giống mã (BKAV `tracuu.ehoadon.vn/<mã>`) mà không nhận ra mã → nhiều khả năng là
+ * link riêng 1 HĐ, không dùng chung cho cả NCC được
+ */
+export function looksInvoiceSpecific(url: string): boolean {
+  const u = url || '';
+  if (/[?&#][^=]+=[A-Za-z0-9+/=_\-.%]{6,}/.test(u)) return true;
+  const last = u.replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '').split('/').filter(Boolean).pop() || '';
+  return /^[A-Za-z0-9_\-]{8,}$/.test(last) && /\d/.test(last) && /[A-Za-z]/.test(last);
+}
+
+export function isHttpUrl(url: string): boolean {
+  return /^https?:\/\/[^\s<>"']{3,500}$/i.test((url || '').trim());
+}

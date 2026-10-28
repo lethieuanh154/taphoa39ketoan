@@ -56,7 +56,9 @@ export interface CatalogStatus { exists: boolean; exportedAt?: string; count?: n
 export interface CatalogItem { code: string; name: string; unit: string; score: number; units: { unit: string; conversion: number }[]; }
 
 /** Giá trị hiện tại của 1 dòng ánh xạ kế toán đã đổi (gửi đủ 4 cột sửa được) */
-export interface MappingEdit { key: string; ma_master: string; he_so: number | null; ma_vietda: string; da_kiem: boolean; }
+export interface MappingEdit {
+  key: string; ma_master: string; he_so: number | null; ma_vietda: string; he_so_vietda: number | null; da_kiem: boolean;
+}
 
 /** 1 dòng so với tờ khai đã nộp: [chỉ tiêu, đã nộp, tính ra, chênh, kết luận] */
 export type CompareRow = [string, number | null, number | null, number, string];

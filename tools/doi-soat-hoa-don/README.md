@@ -126,6 +126,16 @@ Vietda mà các dòng cùng mã master có tên trùng đúng đang dùng, hay t
 Mã master của dòng đã chắc chắn; hoặc kế toán sửa / đánh `x`. Gợi ý theo tên gần giống, tên trùng nhiều mã Vietda, ĐVT
 Vietda khác ĐVT sau quy đổi → cờ "Cần xem", chưa đổi. Kế toán kiểm 1 lần + đánh `x` → các lần chạy sau tự đổi.
 
+**Hệ số Vietda** (28/10/2026) — cột sửa được: 1 ĐVT master = bao nhiêu ĐVT Vietda. Dùng khi ĐVT khai trong Vietda khác ĐVT
+master KiotViet (vd KUN 110: KiotViet chỉ có `lốc`, Vietda HH967 khai `Hộp`, 1 lốc = 4 hộp → **4**). Khi đổi sang mã Vietda,
+bản sao XML dùng **Hệ số quy đổi × Hệ số Vietda**: `SLuong` × tổng, `DGia` ÷ tổng, `DVTinh` = **ĐVT Vietda**
+(2 lốc × 17.592,59 → 8 Hộp × 4.398,1475; thành tiền giữ nguyên).
+- Máy tự điền (`suggest_vietda_factor`): cùng ĐVT → 1; ĐVT Vietda là 1 ĐVT KiotViet của master → 1 / hệ số KiotViet
+  (master hộp, Vietda thùng 48 → 1/48); không suy ra được → trống + cờ "Thiếu Hệ số Vietda".
+- Trống → dòng **giữ nguyên** trong bản sao (`Giữ nguyên — thiếu Hệ số Vietda`), không còn ra "2 Hộp × giá 1 lốc".
+- `Chỉ đổi mã Vietda` chỉ khi ĐVT HĐ = ĐVT Vietda; khác → `Giữ nguyên — ĐVT Vietda khác ĐVT HĐ, chờ xác nhận Mã master`.
+- Không ảnh hưởng đối soát tồn (vẫn tính theo ĐVT master); cột ẩn `Máy gợi ý hệ số Vietda` để biết kế toán đã sửa.
+
 - **Không đổi**: thành tiền, chiết khấu, thuế suất, tiền thuế, tổng tiền, thông tin người bán/mua, chữ ký… — script chỉ thay
   đúng các thẻ trên trong dòng hàng, phần còn lại của file giữ nguyên từng ký tự.
 - Dòng đã ở **mã + ĐVT master** (hệ số 1) giữ nguyên; HĐ không có dòng nào cần sửa → bản sao **giống hệt** file gốc.

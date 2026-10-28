@@ -86,7 +86,7 @@
               <tr>
                 @for (c of columns; track c.header) {
                   <th [style.min-width.px]="c.width" (click)="toggleSort(c)" [class.sorted]="query.sort === col[c.header]"
-                      [class.editable]="c.kind === 'master' || c.kind === 'factor' || c.kind === 'vietda' || c.kind === 'check'">
+                      [class.editable]="c.kind === 'master' || c.kind === 'factor' || c.kind === 'vietda' || c.kind === 'vdfactor' || c.kind === 'check'">
                     {{ c.label }}
                     @if (query.sort === col[c.header]) {
                       <i class="fa-solid" [class.fa-arrow-down-wide-short]="query.desc" [class.fa-arrow-up-short-wide]="!query.desc"></i>
@@ -143,6 +143,14 @@
                         <td class="edit">
                           <input type="text" [ngModel]="current(row).ma_vietda" (ngModelChange)="setVietda(row, $event)"
                                  [attr.aria-label]="'Mã Vietda ' + raw(row, 'Tên hàng (HĐ)')">
+                        </td>
+                      }
+                      @case ('vdfactor') {
+                        <td class="edit">
+                          <input type="text" inputmode="decimal" class="num" [class.invalid]="isVdFactorInvalid(row)"
+                                 [ngModel]="vdFactorValue(row)" (ngModelChange)="setVdFactor(row, $event)" placeholder="(trống)"
+                                 [title]="'1 ' + (raw(row, 'ĐVT master') || 'ĐVT master') + ' = bao nhiêu ' + (raw(row, 'ĐVT Vietda') || 'ĐVT Vietda')"
+                                 [attr.aria-label]="'Hệ số Vietda ' + raw(row, 'Tên hàng (HĐ)')">
                         </td>
                       }
                       @default {

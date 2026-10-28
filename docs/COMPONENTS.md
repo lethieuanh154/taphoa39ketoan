@@ -340,6 +340,14 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
   - **ledger-9**: XML máy tính tiền không có mã tra cứu → cột "Mã tra cứu" = `verify_code` của HĐĐT KiotViet (`/api/einvoice-check/bills`
     trả thêm `verify_code`, `cqt_code`), link HĐ gốc = einvoiceapp. Mỗi lần lấy HĐĐT MỚI từ KiotViet → tự lưu link (chiều `out`, không
     gửi thông tin người mua). Bản HĐĐT lưu trên máy trước 28/10 không có mã → nhắc "Lấy lại từ KiotViet".
+  - **ledger-8 — Gán link tra cứu** (28/10/2026 tối, user: "chỉ vài NCC mới hiện Mở HĐ gốc / Tra cứu NCC"): khảo sát 150 XML thật — 38 HĐ
+    không có mã (BKAV 22 · VNPT 11 · MobiFone 3 · 0101162173 2), 10 HĐ có mã nhưng NCC HĐĐT chưa biết trang tra cứu (0401486901
+    `QuanLy_SoBaoMat`, 0312303803 `Mã tra cứu hóa đơn`, 0100727825 `KeySearch`, 0105232093). Thay vì đoán tên miền NCC: khung vàng
+    **"N HĐ chưa có link NCC"** gom nhóm (có mã → theo NCC HĐĐT; không mã → theo người bán), bấm nhóm / nút ✎ ở dòng → hộp thoại 3
+    bước: mở email HĐ (nếu Đếm nhanh đã ghép) → dán link → chọn phạm vi (mọi HĐ dùng NCC HĐĐT / mọi HĐ của người bán / chỉ HĐ này).
+    Link dán chứa mã tra cứu của HĐ → tự thành link mẫu `{code}` → mọi HĐ cùng nhóm MỞ THẲNG; link có tham số lạ → cảnh báo link riêng
+    1 HĐ. Ưu tiên khi hiển thị: link riêng HĐ > theo người bán > theo NCC HĐĐT > XML / `PROVIDERS` (không đè link mở thẳng có sẵn).
+    Chip "Link tra cứu đã gán (n)" → bảng xem / xóa. Ước tính 150 XML thật: 13 lần gán (4 NCC HĐĐT + 9 người bán) là phủ hết.
 - (lịch sử, đã gỡ 28/10/2026) **Đầu vào** (`ledger-8-dong-bo-hoa-don-v2`): giữ HĐ bên mua = công ty → đối chiếu với Gmail portal-links (thay GDT), kỳ mặc định
   theo thanh chọn kỳ. Logic so khớp `_matchAndCompare` giữ nguyên (trường `gdtData` nay là dữ liệu XML). Gmail thiếu MST (HAR
   23/10: 17/20 email) → khớp số HĐ + ký hiệu (bỏ chữ số mẫu số đầu); Gmail lấy đúng kỳ (`before_date`, page_size 500).
@@ -464,7 +472,21 @@ Giống "Chuyển khoản HĐ đầu ra" nhưng HĐ là HĐ **mua vào** và ti�
   giờ, không nội dung / đính kèm / scrape) ⇄ số HĐ XML trong kỳ (kể cả HĐ thay thế / điều chỉnh). Tổng bằng nhau = **Khớp số lượng**;
   lệch → bảng theo NGÀY (ngày lập HĐ ⇄ ngày Gmail nhận), chỉ hiện ngày chênh (tùy chọn hiện mọi ngày), bấm 1 ngày xem email + HĐ XML
   của ngày đó, gợi ý "gửi trễ / sớm 1 ngày". Chạy nền + lưu IndexedDB `gmail-count:<nhãn>:<từ>:<đến>`; nhãn NCC đang chọn thì lọc theo nhãn.
-  28/10/2026: mỗi ngày có nút **"Gmail ngày này"** (`countDayUrl` — tìm `after:/before:` epoch giờ VN, cùng điều kiện BE); email trong
+  **28/10/2026 (user) — bỏ so theo ngày + nút "Gmail ngày này"**: NCC gửi email trễ (HĐ 27/10 → Gmail 28/10; cuối kỳ HĐ 31/10 → email
+  01/11 nằm ngoài kỳ) làm so theo ngày báo lệch sai. Nay `compareCounts` GHÉP mỗi HĐ với 1 email nhận trong [ngày lập, ngày lập +
+  `LAG_DAYS` = 3] (ưu tiên tiêu đề / người gửi có số HĐ, MST bán, tên NCC; còn lại gần ngày lập nhất). Email lấy tới `countFetchTo(to)`
+  = cuối kỳ + 3 ngày; email sau kỳ không ghép HĐ nào → không tính; HĐ 3 ngày trước kỳ chỉ dùng ghép (email đầu kỳ của HĐ kỳ trước
+  không tính). Hiện **Tổng email ⇄ Tổng HĐ XML** → KHỚP / LỆCH + 2 cột cạnh nhau "HĐ XML chưa thấy email" | "Email chưa ghép được HĐ"
+  (nút Mở Gmail) + tùy chọn hiện các cặp đã khớp (trễ mấy ngày, ghép theo gì). Không đọc nội dung / đính kèm email (spec
+  `invoice-count.util.spec.ts`). Đoạn ngay dưới (bảng theo ngày, "Gmail ngày này") là lịch sử.
+  **28/10/2026 tối — Hướng 2 (ghép theo KHÓA HĐ):** BE `message-count` trả `inv` (khóa HĐ đọc từ XML đính kèm / tên file / tiêu đề) +
+  `att`; `compareCounts` ghép theo khóa trước (MST + ký hiệu + số → ký hiệu + số → chỉ số HĐ lập trong [nhận − 7, nhận + 1] ngày), email
+  không có khóa mới ghép theo ngày. Khóa không có trong XML → "email không khớp" kèm lý do (HĐ có email mà cổng thuế / thư mục XML
+  không có); 2 email cùng HĐ → "gửi trùng" (không tính). Giao diện: banner KHỚP / LỆCH, 6 thẻ số (HĐ XML, email HĐ, đã khớp — theo
+  khóa / theo ngày, HĐ chưa có email, email không khớp, gửi trùng), 2 bảng lệch cạnh nhau (đỏ: "Có trên cổng thuế — CHƯA có email" +
+  chip theo NCC; vàng: "Có email — KHÔNG khớp HĐ XML" + lý do + Mở Gmail), nút xem cặp đã khớp / gửi trùng; cảnh báo khi máy chủ đọc
+  lỗi email (`listed` > số email). Khóa cache đổi `gmail-count2:` (bản cũ không có khóa HĐ).
+  (lịch sử) 28/10/2026: mỗi ngày có nút **"Gmail ngày này"** (`countDayUrl` — tìm `after:/before:` epoch giờ VN, cùng điều kiện BE); email trong
   ngày hiện thành bảng Giờ / Người gửi / Tiêu đề + nút **"Mở Gmail"** (`countEmailUrl`). Link là thẻ `<a>` (Ctrl/bấm giữa mở tab
   mới, không bị chặn popup), mở đúng hộp thư hóa đơn bằng `?authuser=<GMAIL_INVOICE_ACCOUNT>` (lấy từ `/api/gmail/auth/status`; lỗi → `/u/1/`).
   ⚠ KHÔNG dùng `/mail/u/<email>/` (email trong path) — Gmail trả "Temporary Error (404)" (user báo 28/10/2026).
