@@ -410,6 +410,7 @@ Logic khớp: `utils/transfer-reconcile.util.ts` + `utils/tpbank-statement.util.
 listRuns(): Promise<RunList>                 // busy, scheduler {enabled, jobs}, check_time, einvoice_url, runs
 start(scope: 'draft'|'accepted', from?, to?) // → id (409 khi đang kiểm)
 getRun(id)                                   // progress khi đang chạy; counts, bills, unknown, unmapped khi xong
+deleteRuns(ids)                              // POST /runs/delete → {deleted, skipped}; xóa cả bản lưu `check-run:<id>` (26/10/2026)
 taxRates() / setTaxRate(master, name, rate)  // thuế suất đúng theo mã master; rate '' = bỏ thuế suất kế toán đặt
 listBills(from, to)                          // HĐĐT KiotViet mọi trạng thái ≤ 92 ngày (Kiểm tra số lượng HĐ đầu ra)
 setTaxRatesBulk(items)                       // xác nhận hàng loạt thuế suất đúng (mặt hàng chỉ dùng 1 thuế suất)
@@ -446,12 +447,12 @@ Lỗi IndexedDB chỉ log cảnh báo (trang chạy như không có cache). Mụ
 |---|---|---|---|
 | `xml-in` / `xml-out` | XML đã đọc từ thư mục (ledger-8 / ledger-9) | mở lại trang hiện ngay, không phải chọn lại thư mục | chọn lại thư mục |
 | `einvoice-bills:<from>:<to>` | HĐĐT KiotViet theo khoảng ngày | ledger-9 | nút "Lấy lại từ KiotViet" |
-| `gmail-links:<nhãn>:<from>:<to>` | link HĐ gốc Gmail (đã gộp số tiền scrape) | ledger-8 | nút "Tải lại" |
+| `gmail-count:<nhãn>:<from>:<to>` | Đếm nhanh email Gmail (28/10/2026 bỏ `gmail-links` — link HĐ gốc nay ở máy chủ) | ledger-8 | "Đếm lại email" |
 | `ck-range:<from>:<to>` | HĐ CK của khoảng ngày kết thúc trước hôm nay > 8 ngày, đủ mọi ngày | BankReconciliationService.load | "Lấy lại từ KiotViet" (force) |
 | `check-run:<id>` | lần Kiểm tra HĐ đã xong / lỗi | EinvoiceCheckService.getRun | không đổi nữa |
 | `figures:<id>` | số liệu khai thuế của 1 lần đối soát | ReconciliationService.getFigures | không đổi nữa (xóa lần chạy → xóa) |
 
-Mở lại ledger-8 / ledger-9: có XML lưu + kết quả HĐĐT / Gmail lưu cho kỳ đang chọn → đối chiếu lại ngay từ bản lưu (không gọi máy chủ);
+Mở lại ledger-8 / ledger-9: có XML lưu + kết quả HĐĐT / Đếm nhanh lưu cho kỳ đang chọn → đối chiếu lại ngay từ bản lưu (không gọi máy chủ);
 trang ghi "đọc lúc … / lấy lúc … (đã lưu trên máy)".
 
 ## BackgroundJobService — việc chạy nền của trang Tiện ích (23/10/2026)
@@ -463,7 +464,7 @@ get<T>(key) / find<T>(prefix)                                  // việc đang c
 BgJob = { key, label, startedAt, progress, log[], meta, promise }
 ```
 Dùng ở Kiểm tra số lượng HĐ: đọc thư mục XML (`xml-in` / `xml-out`, `progress` = "120/450 file"), lấy HĐĐT KiotViet
-(`einvoice-bills:<from>:<to>`), lấy Gmail + scrape (`gmail-links:...`, `log` = khung log). Việc tự ghi kết quả vào IndexedDB
+(`einvoice-bills:<from>:<to>`), Đếm nhanh Gmail (`gmail-count:...`). Việc tự ghi kết quả vào IndexedDB
 (TienIchCacheService) → quay lại trang: còn chạy thì hiện tiến độ / log và chờ tiếp, xong rồi thì đọc bản lưu. Tải lại cả trang (F5)
 thì việc đang chạy mất (bản đã lưu vẫn còn).
 `active = signal<BgJob[]>` (25/10/2026) — danh sách việc đang chạy; MainLayout hiện khung **"Đang chạy nền (N)"** góc phải dưới,
@@ -471,12 +472,26 @@ thấy ở mọi trang (tên việc · tiến độ · giờ bắt đầu), hế
 
 ## PurchaseInvoiceSourceService — nguồn HĐ đầu vào dùng chung (23/10/2026)
 
-`services/purchase-invoice-source.service.ts` — Kiểm tra số lượng HĐ đầu vào + Chuyển khoản HĐ đầu vào dùng CHUNG 1 bản XML / Gmail.
+`services/purchase-invoice-source.service.ts` — Kiểm tra số lượng HĐ đầu vào + Chuyển khoản HĐ đầu vào dùng CHUNG 1 bản XML.
+28/10/2026: gỡ `startGmail` / `runningGmail` / `cachedGmail` / `fromGmail` (portal-links + scrape) — Chuyển khoản HĐ đầu vào chỉ còn nguồn XML.
 ```typescript
 startXml(files, folder) / runningXml() / cachedXml()          // IndexedDB `xml-in`, chạy nền (BackgroundJobService)
 xmlPurchases(result, companyMst) → { mst, detected, invoices }   // bên mua = MST công ty (chưa nhập → tự nhận)
-startGmail({label, labelId?, from, to}) / runningGmail() / cachedGmail(p)   // portal-links + scrape, khóa `gmail-links:<nhãn>:<từ>:<đến>`
-static fromXml(LocalXmlInvoice) / fromGmail(links, from, to) → PurchaseInv[]  // Gmail: chỉ email có số HĐ + số tiền, bỏ trùng
+static fromXml(LocalXmlInvoice) → PurchaseInv
 ```
 - (25/10/2026) `PurchaseInvoiceSourceService`: `startGmailCount(p)` / `runningGmailCount()` / `cachedGmailCount(p)` — Đếm nhanh
   (`GET /api/gmail/message-count`, chạy nền, IndexedDB `gmail-count:*`) → `GmailCount {count, listed, truncated, emails[]}`.
+
+## InvoiceLookupService — link HĐ gốc (mã tra cứu) lưu máy chủ (28/10/2026)
+
+`services/invoice-lookup.service.ts` → KeToanBackEnd `/api/invoice-lookups` (Firestore `invoice_lookups`, ghi merge: trường rỗng không đè mã đã lưu).
+```typescript
+list(dir: 'in' | 'out', from, to): Promise<SavedLookup[]>        // ≤ 92 ngày
+save(dir, items: LookupItem[]): Promise<{saved, skipped}>          // gửi từng gói 2.000 HĐ
+fromXml(LocalXmlInvoice) → LookupItem                              // số / ký hiệu / tiền + mã tra cứu, KHÔNG gửi tên người mua
+lookupKey(mstBán, mẫuSố, kýHiệu, số) / gdtLookupText(...)           // khóa gộp XML ⇄ bản lưu; chuỗi chép để tra ở cổng CQT
+```
+Mã tra cứu lấy từ XML: `utils/invoice-lookup.util.ts` `detectLookup(MSTTCGP, [TTruong, DLieu][])` (thuần hàm, có spec) — bảng `PROVIDERS`
+theo MST nhà cung cấp HĐĐT, `CODE_FIELDS` / `URL_FIELDS` theo tên trường đã bỏ dấu. Dùng ở ledger-8 (chiều `in`) và ledger-9 (`out`,
+mã = `verify_code` HĐĐT KiotViet).
+

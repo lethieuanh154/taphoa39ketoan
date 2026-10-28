@@ -12,10 +12,6 @@
 .step { width: 22px; height: 22px; border-radius: 50%; background: #2c5282; color: #fff; display: inline-flex; align-items: center;
   justify-content: center; font-size: 0.72rem; font-weight: 700; }
 
-.seg { display: inline-flex; border: 1px solid #d1d5db; border-radius: 7px; overflow: hidden; margin-left: auto; }
-.seg button { border: none; background: #fff; padding: 0.35rem 0.8rem; font-size: 0.78rem; cursor: pointer; color: #374151; }
-.seg button + button { border-left: 1px solid #d1d5db; }
-.seg button.active { background: #2c5282; color: #fff; }
 
 .btn {
   height: 32px; padding: 0 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #374151;
@@ -29,8 +25,6 @@
 .btn-link { border: none; background: none; color: #2563eb; cursor: pointer; font-size: 0.78rem; }
 label.pick.disabled { opacity: 0.6; pointer-events: none; }
 
-.log { background: #1e1e1e; color: #d4d4d4; font-family: monospace; font-size: 12px; padding: 8px 12px; border-radius: 6px; max-height: 140px;
-  overflow-y: auto; line-height: 1.6; }
 
 .msg { padding: 0.5rem 0.8rem; border-radius: 6px; font-size: 0.8rem; }
 .msg.error { background: #fef2f2; color: #b91c1c; }
@@ -65,13 +59,12 @@ tr.k-invoice_only td, tr.k-bank_only td { background: #fffbeb; }
 .b-matched, .b-matched_group, .b-matched_split { background: #dcfce7; color: #15803d; }
 .b-invoice_only, .b-bank_only { background: #fef3c7; color: #b45309; }
 .conf { display: block; font-size: 0.68rem; color: #b45309; margin-top: 2px; }
-.btn-mail { border: none; background: none; color: #2563eb; cursor: pointer; padding: 0 2px; font-size: 11px; }
 
 .pager { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; }
 .pager button { border: 1px solid #d1d5db; background: #fff; border-radius: 6px; padding: 2px 9px; cursor: pointer; }
 .pager button:disabled { opacity: 0.4; cursor: default; }
 
-@media (max-width: 768px) { .page { padding: 0.75rem; } .seg { margin-left: 0; } }
+@media (max-width: 768px) { .page { padding: 0.75rem; } }
 
 /* vòng xoay đang tải (app-table-loading overlay) */
 .card.rel { position: relative; }

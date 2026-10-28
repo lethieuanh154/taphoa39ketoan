@@ -1,4 +1,4 @@
-<!-- ĐỐI SOÁT CK → CHUYỂN KHOẢN HĐ ĐẦU VÀO: HĐ mua vào (XML / Gmail) ⇄ tiền ra trên sao kê TPBank (23/10/2026) -->
+<!-- ĐỐI SOÁT CK → CHUYỂN KHOẢN HĐ ĐẦU VÀO: HĐ mua vào (thư mục XML) ⇄ tiền ra trên sao kê TPBank (23/10/2026) -->
 <div class="page">
   <header class="page-head">
     <h1><i class="fa-solid fa-money-bill-transfer"></i> Chuyển khoản hóa đơn đầu vào</h1>
@@ -12,42 +12,21 @@
     <div class="row">
       <span class="step">1</span><b>Hóa đơn đầu vào</b>
       <span class="hint">kỳ <b>{{ periodLabel() }}</b> (đổi ở thanh chọn kỳ)</span>
-      <div class="seg">
-        <button type="button" [class.active]="src === 'xml'" (click)="setSource('xml')"><i class="fa-regular fa-folder-open"></i> Thư mục XML</button>
-        <button type="button" [class.active]="src === 'gmail'" (click)="setSource('gmail')"><i class="fa-solid fa-envelope"></i> Gmail</button>
-      </div>
     </div>
-    @if (src === 'xml') {
-      <div class="row">
-        <label class="btn btn-primary pick" [class.disabled]="xmlReading">
-          <i class="fa-solid" [ngClass]="xmlReading ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
-          {{ xmlReading ? ('Đang đọc ' + (xmlJob?.progress || '...')) : 'Chọn thư mục XML HĐ đầu vào' }}
-          <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
-        </label>
-        @if (xmlInfo) {
-          <span><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
-            @if (xmlSavedAt) { <span class="hint">· đọc lúc {{ viTime(xmlSavedAt) }} (dùng chung với Kiểm tra số lượng HĐ đầu vào)</span> }</span>
-        } @else if (!xmlReading) {
-          <span class="hint">Thư mục app FDI tải về (<code>…\purchase\xml</code>), nên chọn cả quý để ghép được tiền trả HĐ tháng trước. Có ZIP cũng được.</span>
-        }
-      </div>
-      @if (mstWarning) { <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstWarning }}</div> }
-    } @else {
-      <div class="row">
-        <button type="button" class="btn btn-primary" (click)="loadGmail(!!gmailInfo)" [disabled]="gmailLoading">
-          <i class="fa-solid" [ngClass]="gmailLoading ? 'fa-spinner fa-spin' : 'fa-envelope-open-text'"></i>
-          {{ gmailLoading ? 'Đang lấy Gmail...' : (gmailInfo ? 'Lấy lại từ Gmail' : 'Lấy HĐ từ Gmail') }}
-        </button>
-        @if (gmailInfo) {
-          <span>{{ gmailInfo }} @if (gmailFetchedAt) { <span class="hint">· lấy lúc {{ viTime(gmailFetchedAt) }} (dùng chung với Kiểm tra số lượng HĐ đầu vào)</span> }</span>
-        } @else if (!gmailLoading) {
-          <span class="hint">Email HĐ nhà cung cấp gửi về hộp thư hóa đơn trong kỳ — chỉ HĐ lấy được số tiền mới đối soát được.</span>
-        }
-      </div>
-      @if (gmailLoading && gmailJob?.log?.length) {
-        <div class="log">@for (l of gmailJob!.log; track $index) { <div>{{ l }}</div> }</div>
+    <div class="row">
+      <label class="btn btn-primary pick" [class.disabled]="xmlReading">
+        <i class="fa-solid" [ngClass]="xmlReading ? 'fa-spinner fa-spin' : 'fa-folder-open'"></i>
+        {{ xmlReading ? ('Đang đọc ' + (xmlJob?.progress || '...')) : 'Chọn thư mục XML HĐ đầu vào' }}
+        <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
+      </label>
+      @if (xmlInfo) {
+        <span><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
+          @if (xmlSavedAt) { <span class="hint">· đọc lúc {{ viTime(xmlSavedAt) }} (dùng chung với Kiểm tra số lượng HĐ đầu vào)</span> }</span>
+      } @else if (!xmlReading) {
+        <span class="hint">Thư mục app FDI tải về (<code>…\purchase\xml</code>), nên chọn cả quý để ghép được tiền trả HĐ tháng trước. Có ZIP cũng được.</span>
       }
-    }
+    </div>
+    @if (mstWarning) { <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstWarning }}</div> }
   </section>
 
   <!-- 2. Sao kê -->
@@ -87,17 +66,17 @@
 
   @if (error) { <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div> }
 
-  @if (!result && (xmlReading || gmailLoading || parsing)) {
+  @if (!result && (xmlReading || parsing)) {
     <section class="card">
-      <app-table-loading [text]="parsing ? 'Đang đọc sao kê...' : xmlReading ? 'Đang đọc thư mục XML... ' + (xmlJob?.progress || '') : 'Đang lấy hóa đơn từ Gmail...'"></app-table-loading>
+      <app-table-loading [text]="parsing ? 'Đang đọc sao kê...' : xmlReading ? 'Đang đọc thư mục XML... ' + (xmlJob?.progress || '') : ''"></app-table-loading>
     </section>
   } @else if (!result) {
     <div class="msg muted"><i class="fa-solid fa-circle-info"></i>
-      @if (!sourceReady) { Chọn nguồn hóa đơn (bước 1) } @if (!sourceReady && !bank) { và } @if (!bank) { chọn file sao kê (bước 2) } để đối soát.</div>
+      @if (!sourceReady) { Chọn thư mục XML hóa đơn (bước 1) } @if (!sourceReady && !bank) { và } @if (!bank) { chọn file sao kê (bước 2) } để đối soát.</div>
   } @else {
     <section class="card rel">
-      @if (xmlReading || gmailLoading || parsing) {
-        <app-table-loading [overlay]="true" [text]="parsing ? 'Đang đọc sao kê...' : xmlReading ? 'Đang đọc thư mục XML...' : 'Đang lấy hóa đơn từ Gmail...'"></app-table-loading>
+      @if (xmlReading || parsing) {
+        <app-table-loading [overlay]="true" [text]="parsing ? 'Đang đọc sao kê...' : xmlReading ? 'Đang đọc thư mục XML...' : ''"></app-table-loading>
       }
       <div class="stats">
         <div class="stat"><b>{{ vnd(result.invoiceTotal) }}</b><small>Tổng HĐ trong kỳ</small></div>
@@ -137,7 +116,6 @@
                 <td>
                   @for (i of r.invoices; track i.key) {
                     <div class="inv"><b>{{ i.symbol }}-{{ i.no }}</b> · {{ viDate(i.date) }}
-                      @if (i.gmailThreadId) { <button type="button" class="btn-mail" (click)="openGmail(i)" title="Mở email gốc"><i class="fa-solid fa-envelope"></i></button> }
                       <small>{{ i.sellerName }}@if (i.sellerMst) { · {{ i.sellerMst }} }@if (r.invoices.length > 1) { · {{ vnd(i.total) }} }</small></div>
                   } @empty { <span class="muted">—</span> }
                 </td>

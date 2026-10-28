@@ -3,14 +3,14 @@ import { IndexedDBService } from './indexed-db.service';
 
 /**
  * CACHE INDEXEDDB CHO CÁC TRANG TIỆN ÍCH (23/10/2026) — giữ dữ liệu đã tải để mở lại trang / quay lại không phải tải lại:
- * XML đã đọc từ thư mục (Kiểm tra số lượng HĐ), HĐĐT KiotViet, link Gmail, HĐ CK theo ngày đã chốt, kết quả kiểm HĐ / số liệu
+ * XML đã đọc từ thư mục (Kiểm tra số lượng HĐ), HĐĐT KiotViet, Đếm nhanh Gmail, HĐ CK theo ngày đã chốt, kết quả kiểm HĐ / số liệu
  * khai thuế của lần chạy đã xong (không đổi nữa).
  * Mọi lỗi IndexedDB chỉ log cảnh báo → trang vẫn chạy như không có cache. Đăng xuất xóa hết (AuthService.logout).
  *
  * Khóa (prefix):
  * - `xml-in` / `xml-out`       XML đã đọc ở trang Kiểm tra số lượng HĐ đầu vào / đầu ra
  * - `einvoice-bills:<from>:<to>` HĐĐT KiotViet theo khoảng ngày
- * - `gmail-links:<from>:<to>`  link HĐ gốc trong Gmail theo khoảng ngày
+ * - `gmail-count:<nhãn>:<from>:<to>` Đếm nhanh email Gmail (28/10/2026 bỏ `gmail-links` — link HĐ gốc nay lưu máy chủ, InvoiceLookupService)
  * - `ck-range:<from>:<to>`    HĐ CK của khoảng ngày đã chốt (kết thúc trước hôm nay > 8 ngày — máy chủ không tự lấy lại nữa)
  * - `check-run:<id>`           kết quả 1 lần Kiểm tra HĐ đã xong
  * - `figures:<id>`             số liệu khai thuế của 1 lần đối soát

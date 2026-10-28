@@ -50,6 +50,7 @@ export interface CheckRun {
 export interface EinvoiceBill {
   id: string; code: string; template: string; series: string; number: number | null; date: string; status: string;
   status_display: string; payment: string; amount: number; amount_vat: number; total: number;
+  verify_code?: string; cqt_code?: string;   // mã tra cứu + mã CQT (chỉ HĐ đã phát hành; bản lưu IndexedDB trước 28/10/2026 không có)
 }
 
 export interface SchedulerJob { name: string; label: string; time: string; next_at: string; last_result: string; }
@@ -89,6 +90,14 @@ export class EinvoiceCheckService {
     const run = await firstValueFrom(this.http.get<CheckRun & { einvoice_url: string }>(`${BASE}/runs/${encodeURIComponent(id)}`));
     if (run.status === 'done' || run.status === 'error') await this.cache.set(key, run);
     return run;
+  }
+
+  /** Xóa lần kiểm (cả thủ công lẫn lịch tự động) trên máy chủ + bản lưu trên máy; lần đang chạy máy chủ bỏ qua (`skipped`) */
+  async deleteRuns(ids: string[]): Promise<{ deleted: string[]; skipped: string[] }> {
+    const res = await firstValueFrom(this.http.post<{ deleted: string[]; skipped: string[] }>(`${BASE}/runs/delete`, { ids }));
+    await Promise.all(res.deleted.map(id => this.cache.remove(`check-run:${id}`)));
+    console.log(`${LOG} Đã xóa ${res.deleted.length} lần kiểm${res.skipped.length ? `, bỏ qua ${res.skipped.length} lần đang chạy` : ''}`);
+    return res;
   }
 
   /** HĐĐT KiotViet mọi trạng thái [from, to] (≤ 92 ngày) — Kiểm tra số lượng HĐ đầu ra */

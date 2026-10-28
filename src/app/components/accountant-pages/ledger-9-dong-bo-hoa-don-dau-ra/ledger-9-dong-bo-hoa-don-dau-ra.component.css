@@ -26,6 +26,9 @@ label.pick.disabled { opacity: 0.6; pointer-events: none; }
 .msg { padding: 0.5rem 0.8rem; border-radius: 6px; font-size: 0.8rem; }
 .msg.error { background: #fef2f2; color: #b91c1c; }
 .msg.warn { background: #fffbeb; color: #92400e; }
+.msg.ok { background: #ecfdf5; color: #065f46; margin: 0.4rem 0; }
+.lookup-code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+.btn-copy { border: none; background: none; color: #2563eb; cursor: pointer; padding: 2px 6px; font-size: 13px; }
 
 .stats { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .stat { min-width: 120px; padding: 0.5rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; flex-direction: column; }

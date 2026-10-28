@@ -39,7 +39,10 @@
       <h2>Kết quả {{ comparedRange }}</h2>
       <p class="hint"><i class="fa-solid fa-clock-rotate-left"></i> HĐĐT KiotViet lấy lúc {{ viTime(kvFetchedAt) }} (đã lưu trên máy)
         <button type="button" class="btn small" (click)="compare(true)" [disabled]="kvBusy">
-          <i class="fa-solid fa-rotate"></i> Lấy lại từ KiotViet</button></p>
+          <i class="fa-solid fa-rotate"></i> Lấy lại từ KiotViet</button>
+        @if (linkInfo) { <span>· {{ linkInfo }}</span> }</p>
+      @if (kvNoCode) { <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> HĐĐT lưu trên máy lấy trước khi có mã tra cứu — bấm "Lấy lại từ KiotViet" để có mã + lưu link HĐ gốc lên máy chủ.</div> }
+      @if (copiedMsg) { <div class="msg ok"><i class="fa-solid fa-clipboard-check"></i> {{ copiedMsg }}</div> }
       <div class="stats">
         <div class="stat"><b>{{ counts.xml | number }}</b><small>HĐ trong XML</small></div>
         <div class="stat"><b>{{ counts.kv | number }}</b><small>HĐĐT KiotViet đã phát hành</small></div>
@@ -76,7 +79,7 @@
               <th>Kết quả</th><th>Ký hiệu - Số</th>
               <th class="grp-xml">Ngày (XML)</th><th class="grp-xml">Người mua</th><th class="grp-xml num">Tổng TT (XML)</th>
               <th class="grp-kv">Mã HĐ KiotViet</th><th class="grp-kv">Ngày HĐĐT</th><th class="grp-kv num">Tổng TT (KiotViet)</th>
-              <th>Chi tiết</th>
+              <th class="grp-kv">Mã tra cứu</th><th>Chi tiết</th>
             </tr>
           </thead>
           <tbody>
@@ -88,14 +91,20 @@
                 <td class="name">{{ r.xml?.nmten }}</td>
                 <td class="num">{{ vnd(r.xml?.tgtttbso) }}</td>
                 <td class="nowrap">
-                  @if (r.kv) { <a [href]="billUrl(r.kv)" target="_blank" rel="noopener" title="Mở HĐ trên HĐĐT KiotViet">{{ r.kv.code }} <i class="fa-solid fa-arrow-up-right-from-square"></i></a> }
+                  @if (r.kv) { <a [href]="billUrl(r.kv)" target="_blank" rel="noopener" title="Mở HĐ gốc trên HĐĐT KiotViet">{{ r.kv.code }} <i class="fa-solid fa-arrow-up-right-from-square"></i></a> }
                 </td>
                 <td class="nowrap">{{ r.kv ? viDate(r.kv.date) : '' }}</td>
                 <td class="num">{{ vnd(r.kv?.total) }}</td>
+                <td class="nowrap">
+                  @if (r.kv?.verify_code) {
+                    <code class="lookup-code">{{ r.kv!.verify_code }}</code>
+                    <button type="button" class="btn-copy" (click)="copy(r.kv!.verify_code!)" title="Chép mã tra cứu (gửi khách / tra cứu HĐ)"><i class="fa-regular fa-copy"></i></button>
+                  }
+                </td>
                 <td class="small">{{ r.diffs.join(' · ') }}</td>
               </tr>
             } @empty {
-              <tr><td colspan="9" class="empty">Không có dòng nào.</td></tr>
+              <tr><td colspan="10" class="empty">Không có dòng nào.</td></tr>
             }
           </tbody>
         </table>

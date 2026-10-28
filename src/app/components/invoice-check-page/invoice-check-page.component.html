@@ -109,7 +109,7 @@
           <div class="wrap">
             <table>
               <thead>
-                <tr><th>Mã HĐ</th><th>HĐĐT</th><th>Ngày</th><th>TT</th><th class="num">Chưa thuế</th><th class="num">Thuế</th>
+                <tr><th>Mã HĐ</th><th>HĐĐT</th><th>Ngày</th><th>Hình thức thanh toán</th><th class="num">Chưa thuế</th><th class="num">Thuế</th>
                   <th class="num">Tổng TT</th><th>Kết quả</th><th>Chi tiết</th></tr>
               </thead>
               <tbody>
@@ -288,12 +288,24 @@
   @if (list?.runs?.length) {
     <section class="card">
       <h2>Các lần kiểm gần đây</h2>
+      <div class="run-tools">
+        <span class="hint">Chọn:</span>
+        <button type="button" class="chip" (click)="selectRuns('all')">Tất cả</button>
+        <button type="button" class="chip" (click)="selectRuns('schedule')">Lịch tự động</button>
+        <button type="button" class="chip" (click)="selectRuns('manual')">Người bấm</button>
+        @if (selectedRuns.size) { <button type="button" class="chip" (click)="selectRuns('none')">Bỏ chọn</button> }
+        <button type="button" class="btn small danger" (click)="deleteSelectedRuns()" [disabled]="!selectedRuns.size || deletingRuns">
+          <i class="fa-solid" [ngClass]="deletingRuns ? 'fa-spinner fa-spin' : 'fa-trash'"></i> Xóa đã chọn ({{ selectedRuns.size }})</button>
+        <span class="hint">Máy chủ tự giữ 60 lần gần nhất (khoảng 15 ngày lịch tự động), cũ hơn tự xóa.</span>
+      </div>
       <div class="wrap">
         <table>
-          <thead><tr><th>Thời gian</th><th>Ai chạy</th><th>Phạm vi</th><th class="num">HĐ</th><th class="num">Lỗi</th><th class="num">Cần xem</th><th>Trạng thái</th><th></th></tr></thead>
+          <thead><tr><th class="sel"><input type="checkbox" [checked]="allRunsSelected" (change)="selectRuns($any($event.target).checked ? 'all' : 'none')" title="Chọn tất cả"></th><th>Thời gian</th><th>Ai chạy</th><th>Phạm vi</th><th class="num">HĐ</th><th class="num">Lỗi</th><th class="num">Cần xem</th><th>Trạng thái</th><th></th></tr></thead>
           <tbody>
             @for (r of list!.runs; track r.id) {
               <tr [class.current]="run?.id === r.id">
+                <td class="sel"><input type="checkbox" [checked]="selectedRuns.has(r.id)" [disabled]="r.status === 'running'"
+                  (change)="toggleRun(r.id, $any($event.target).checked)"></td>
                 <td class="nowrap">{{ viTime(r.started_at) }}</td>
                 <td>{{ r.trigger === 'schedule' ? 'Lịch tự động' : r.created_by }}</td>
                 <td>{{ r.scope_label }}@if (r.scope === 'accepted') { {{ viDate(r.from) }} → {{ viDate(r.to) }} }</td>
@@ -301,7 +313,9 @@
                 <td class="num" [class.bad-text]="r.counts.bills_error">{{ r.counts.bills_error ?? '' }}</td>
                 <td class="num">{{ r.counts.bills_warn ?? '' }}</td>
                 <td>{{ r.status === 'done' ? 'Xong' : r.status === 'running' ? 'Đang kiểm' : 'Lỗi' }}</td>
-                <td><button type="button" class="btn tiny" (click)="openRun(r.id)" [disabled]="loadingRun">Xem</button></td>
+                <td class="nowrap"><button type="button" class="btn tiny" (click)="openRun(r.id)" [disabled]="loadingRun">Xem</button>
+                  <button type="button" class="btn tiny danger" (click)="deleteRuns([r.id])" [disabled]="deletingRuns || r.status === 'running'"
+                    title="Xóa lần kiểm này"><i class="fa-solid fa-trash"></i></button></td>
               </tr>
             }
           </tbody>

@@ -72,7 +72,7 @@ Thêm / bớt trang trong menu → sửa `menu.config.ts`, không sửa HTML. Nh
 | Tiện ích | `/invoice-reconciliation-page` | InvoiceReconciliationPageComponent (`loadComponent`, tải riêng) | Đối soát hóa đơn XML (23/10/2026). `?run=<id>` = mở 1 lần đối soát |
 | Tiện ích (mục cuối, sau các nhóm — `tailItems`) | `/tax-figures-page` | TaxFiguresPageComponent (`loadComponent`) | Số liệu khai thuế (bước 5, 23/10/2026): 01/GTGT, PL142, bảng kê bán ra / mua vào, 05/KK-TNCN. `?run=<id>` |
 | Tiện ích | `/item-mapping-page` | ItemMappingPageComponent (`loadComponent`) | Ánh xạ hàng hóa (23/10/2026). `?run=<id>` (trống = lần đối soát mới nhất). `canDeactivate` hỏi lại khi còn thay đổi chưa lưu |
-| Tiện ích | nhóm **Kiểm tra số lượng hóa đơn** (đổi tên từ "Đồng bộ hóa đơn" 23/10/2026): `/accountant-pages/ledger-8-dong-bo-hoa-don-v2` (đầu vào: XML máy ⇄ Gmail), `/accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra` (đầu ra: XML máy ⇄ HĐĐT KiotViet) | | Trước là nhóm 0 "Kiểm tra hóa đơn tự động"; chuyển sang Tiện ích (user 22/10/2026) |
+| Tiện ích | nhóm **Kiểm tra số lượng hóa đơn** (đổi tên từ "Đồng bộ hóa đơn" 23/10/2026): `/accountant-pages/ledger-8-dong-bo-hoa-don-v2` (đầu vào: XML máy — Đếm nhanh email Gmail + link HĐ gốc, 28/10/2026), `/accountant-pages/ledger-9-dong-bo-hoa-don-dau-ra` (đầu ra: XML máy ⇄ HĐĐT KiotViet) | | Trước là nhóm 0 "Kiểm tra hóa đơn tự động"; chuyển sang Tiện ích (user 22/10/2026) |
 | Kế toán chi tiết | 1. Danh mục … 10. Báo cáo, **11. Khóa sổ & Kiểm toán** (`period-lock-page`, `audit-trail-page`) | | |
 | Thiết lập | `/user-roles-page`, `/system-settings-page` | | Chuyển khỏi nhóm "Hệ thống" cũ |
 

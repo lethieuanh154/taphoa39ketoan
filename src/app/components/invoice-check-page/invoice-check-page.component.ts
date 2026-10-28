@@ -124,6 +124,56 @@ export class InvoiceCheckPageComponent implements OnInit {
       .sort((a, b) => b.next_at.localeCompare(a.next_at))[0]?.last_result || '';
   }
 
+  // Xóa lần kiểm (26/10/2026) — tích chọn rồi "Xóa đã chọn", hoặc nút thùng rác từng dòng
+  selectedRuns = new Set<string>();
+  deletingRuns = false;
+
+  toggleRun(id: string, on: boolean): void {
+    if (on) this.selectedRuns.add(id); else this.selectedRuns.delete(id);
+  }
+
+  /** all = tất cả trong bảng, schedule = chỉ lịch tự động, manual = chỉ người bấm; lần đang chạy không chọn */
+  selectRuns(kind: 'all' | 'schedule' | 'manual' | 'none'): void {
+    this.selectedRuns = new Set((this.list?.runs || [])
+      .filter(r => r.status !== 'running' && (kind === 'all' || (kind === 'schedule') === (r.trigger === 'schedule')) && kind !== 'none')
+      .map(r => r.id));
+  }
+
+  get allRunsSelected(): boolean {
+    const ids = (this.list?.runs || []).filter(r => r.status !== 'running').map(r => r.id);
+    return !!ids.length && ids.every(id => this.selectedRuns.has(id));
+  }
+
+  deleteSelectedRuns(): Promise<void> {
+    return this.deleteRuns(Array.from(this.selectedRuns));
+  }
+
+  async deleteRuns(ids: string[]): Promise<void> {
+    if (!ids.length || this.deletingRuns) return;
+    if (!confirm(`Xóa ${ids.length} lần kiểm? Kết quả của các lần này sẽ mất, không khôi phục được.`)) return;
+    this.deletingRuns = true;
+    this.error = '';
+    this.msg = '';
+    try {
+      const res = await this.service.deleteRuns(ids);
+      res.deleted.forEach(id => this.selectedRuns.delete(id));
+      this.msg = `Đã xóa ${res.deleted.length} lần kiểm` + (res.skipped.length ? ` — bỏ qua ${res.skipped.length} lần đang chạy` : '');
+      const wasOpen = !!this.run && res.deleted.includes(this.run.id);
+      await this.loadList();
+      if (wasOpen) {
+        this.stopPoll();
+        this.run = null;
+        const next = this.list?.runs[0]?.id;
+        if (next) await this.openRun(next); else this.router.navigate([], { queryParams: {}, replaceUrl: true });
+      }
+    } catch (e: any) {
+      console.error(`${LOG} Xóa ${ids.length} lần kiểm lỗi: ${httpErrorText(e)}`);
+      this.error = `Không xóa được: ${e?.error?.detail || httpErrorText(e)}`;
+    } finally {
+      this.deletingRuns = false;
+    }
+  }
+
   private stopPoll(): void {
     if (this.pollTimer) clearTimeout(this.pollTimer);
     this.pollTimer = null;

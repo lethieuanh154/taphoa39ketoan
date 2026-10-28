@@ -326,7 +326,21 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 
 - Đọc thư mục XML HĐĐT trên máy (app FDI) bằng `utils/invoice-xml.util.ts` (`readInvoiceFiles` — XML + ZIP lồng, `DOMParser`,
   khóa trùng MST bán | ký hiệu | số; `detectCompanyMst(invoices, 'buyer' | 'seller')`) — không tải XML lên máy chủ.
-- **Đầu vào** (`ledger-8-dong-bo-hoa-don-v2`): giữ HĐ bên mua = công ty → đối chiếu với Gmail portal-links (thay GDT), kỳ mặc định
+- **28/10/2026 — Link HĐ gốc (mã tra cứu), bỏ đối chiếu Gmail ở ledger-8** (user): `utils/invoice-lookup.util.ts` `detectLookup(MSTTCGP,
+  TTKhac phần đầu HĐ)` → `LocalXmlInvoice.lookup {tcgp, provider, code, codeField, url, direct}` + `mccqt`. Bảng NCC HĐĐT theo MSTTCGP
+  (MISA `TransactionID` → mở thẳng `meinvoice.vn/tra-cuu/?sc=`; Viettel `Mã số bí mật`; Thái Sơn `Mã TC` + `DC TC`; M-invoice
+  `Số bảo mật`; EasyInvoice `Fkey` + `PortalLink`…). Khảo sát 144 HĐ đầu vào thật: 111 có mã; BKAV / VNPT / MobiFone không ghi mã
+  vào XML → nút "Tra cứu CQT" (hoadondientu.gdt.gov.vn, chép sẵn MST bán / ký hiệu / số / tiền). MSTTCGP lạ → chip "NCC HĐĐT chưa
+  biết" → gửi 1 XML để thêm vào `PROVIDERS`. Lưu máy chủ: `InvoiceLookupService` → `/api/invoice-lookups` (Firestore `invoice_lookups`).
+  - **ledger-8** viết lại: chọn thư mục XML + **Đếm nhanh** (giữ) + bảng **Danh sách HĐ đầu vào — link HĐ gốc** = XML trong kỳ gộp bản
+    lưu máy chủ của kỳ (≤ 92 ngày; máy khác không cần thư mục), khóa MST bán | mẫu số + ký hiệu | số. Chọn thư mục → tự lưu MỌI HĐ
+    trong thư mục lên máy chủ (+ nút "Lưu lên máy chủ"). Nút HĐ gốc là thẻ `<a>`: mở thẳng (xanh lá) / trang tra cứu NCC + chép mã
+    (xanh dương) / cổng CQT + chép thông tin (xám). Lọc theo loại link, tìm, phân trang 50, Xuất CSV. Bản XML lưu IndexedDB trước
+    28/10 không có `lookup` → nhắc chọn lại thư mục. Đã gỡ tab "Links HĐ Gốc (Gmail)" và "Đối chiếu Gmail vs XML" (đoạn dưới là lịch sử).
+  - **ledger-9**: XML máy tính tiền không có mã tra cứu → cột "Mã tra cứu" = `verify_code` của HĐĐT KiotViet (`/api/einvoice-check/bills`
+    trả thêm `verify_code`, `cqt_code`), link HĐ gốc = einvoiceapp. Mỗi lần lấy HĐĐT MỚI từ KiotViet → tự lưu link (chiều `out`, không
+    gửi thông tin người mua). Bản HĐĐT lưu trên máy trước 28/10 không có mã → nhắc "Lấy lại từ KiotViet".
+- (lịch sử, đã gỡ 28/10/2026) **Đầu vào** (`ledger-8-dong-bo-hoa-don-v2`): giữ HĐ bên mua = công ty → đối chiếu với Gmail portal-links (thay GDT), kỳ mặc định
   theo thanh chọn kỳ. Logic so khớp `_matchAndCompare` giữ nguyên (trường `gdtData` nay là dữ liệu XML). Gmail thiếu MST (HAR
   23/10: 17/20 email) → khớp số HĐ + ký hiệu (bỏ chữ số mẫu số đầu); Gmail lấy đúng kỳ (`before_date`, page_size 500).
   Ghép viết lại 23/10/2026 (`_matchAndCompare`, sau lần chạy Gmail thật tháng 10: 143 email chỉ ra 101 dòng): email không đọc
@@ -358,6 +372,9 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
   Mã HĐ = link mở đúng HĐ trên einvoiceapp (`?id=`) + nút copy. Lệch tiền ≥ 1đ = Lỗi, TRỪ thuế làm tròn lên / xuống < 1đ (thuế dòng; thuế nhóm = cộng các dòng đúng) — user 23/10/2026 chiều.
 - Đặt thuế suất đúng: tại dòng lỗi ("Đúng là 10%" / "Khóa 8%"), tại bảng chưa có thuế suất, hoặc bảng thuế suất (chọn / bỏ) →
   `PUT /tax-rates`, áp dụng từ lần kiểm sau. Lịch sử các lần kiểm.
+- (26/10/2026) Xóa lần kiểm: ô chọn từng dòng + chọn nhanh Tất cả / Lịch tự động / Người bấm → **Xóa đã chọn**; nút thùng rác
+  từng dòng. Có hỏi xác nhận; lần đang chạy không chọn / xóa được. Xóa lần đang xem → mở lần mới nhất còn lại. Máy chủ vẫn tự
+  giữ 60 lần gần nhất (`EINVOICE_CHECK_KEEP_RUNS`).
 
 ## ItemMappingPageComponent — Tiện ích "Ánh xạ hàng hóa" (23/10/2026)
 
@@ -447,3 +464,7 @@ Giống "Chuyển khoản HĐ đầu ra" nhưng HĐ là HĐ **mua vào** và ti�
   giờ, không nội dung / đính kèm / scrape) ⇄ số HĐ XML trong kỳ (kể cả HĐ thay thế / điều chỉnh). Tổng bằng nhau = **Khớp số lượng**;
   lệch → bảng theo NGÀY (ngày lập HĐ ⇄ ngày Gmail nhận), chỉ hiện ngày chênh (tùy chọn hiện mọi ngày), bấm 1 ngày xem email + HĐ XML
   của ngày đó, gợi ý "gửi trễ / sớm 1 ngày". Chạy nền + lưu IndexedDB `gmail-count:<nhãn>:<từ>:<đến>`; nhãn NCC đang chọn thì lọc theo nhãn.
+  28/10/2026: mỗi ngày có nút **"Gmail ngày này"** (`countDayUrl` — tìm `after:/before:` epoch giờ VN, cùng điều kiện BE); email trong
+  ngày hiện thành bảng Giờ / Người gửi / Tiêu đề + nút **"Mở Gmail"** (`countEmailUrl`). Link là thẻ `<a>` (Ctrl/bấm giữa mở tab
+  mới, không bị chặn popup), mở đúng hộp thư hóa đơn bằng `?authuser=<GMAIL_INVOICE_ACCOUNT>` (lấy từ `/api/gmail/auth/status`; lỗi → `/u/1/`).
+  ⚠ KHÔNG dùng `/mail/u/<email>/` (email trong path) — Gmail trả "Temporary Error (404)" (user báo 28/10/2026).

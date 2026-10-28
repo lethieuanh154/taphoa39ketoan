@@ -1,20 +1,18 @@
 /**
  * ĐỐI SOÁT CK → CHUYỂN KHOẢN HĐ ĐẦU VÀO (23/10/2026) — HĐ mua vào ⇄ tiền RA (Ghi nợ) trên sao kê TPBank.
- * Giống "Chuyển khoản HĐ đầu ra" nhưng nguồn HĐ là 1 trong 2: thư mục XML (app FDI, `…\purchase`) hoặc Gmail (email HĐ NCC gửi) —
- * dùng chung bản đã đọc / đã lấy với "Kiểm tra số lượng HĐ đầu vào" (PurchaseInvoiceSourceService, IndexedDB, chạy nền).
+ * Giống "Chuyển khoản HĐ đầu ra", nguồn HĐ = thư mục XML (app FDI, `…\purchase`) — dùng chung bản đã đọc với "Kiểm tra số lượng HĐ
+ * đầu vào" (PurchaseInvoiceSourceService, IndexedDB, chạy nền). 28/10/2026: bỏ nguồn Gmail (portal-links + scrape cổng NCC đã gỡ).
  * HĐ: theo KỲ ở thanh chọn kỳ (XML: dùng cả HĐ ngoài kỳ để ghép tiền trả HĐ cũ, nhưng chỉ báo "HĐ chưa thấy CK" cho HĐ trong kỳ).
  * Sao kê: mọi GD tiền ra trong file đã chọn (lưu IndexedDB `tpbank-debit`). Ghép: utils/purchase-transfer-reconcile.util.ts.
  */
 import { Component, effect, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { httpErrorText } from '../../services/auth.service';
 import { PeriodService } from '../../services/period.service';
 import { CompanyService } from '../../services/company.service';
 import { TienIchCacheService } from '../../services/tien-ich-cache.service';
 import { BgJob } from '../../services/background-job.service';
 import { CachedXml, PurchaseInvoiceSourceService } from '../../services/purchase-invoice-source.service';
-import { PortalLink } from '../accountant-pages/invoice.service.v2';
 import { DebitStatement, mergeDebitStatements, parseTpBankDebitFiles } from '../../utils/tpbank-debit.util';
 import {
   PURCHASE_KIND_LABEL, PurchaseInv, PurchaseMatchKind, PurchaseMatchRow, PurchaseReconResult, buildPurchaseReconCsv,
@@ -24,9 +22,6 @@ import { TableLoadingComponent } from '../shared/table-loading/table-loading.com
 
 const LOG = '[BankReconIn]';
 const BANK_KEY = 'tpbank-debit';
-const SOURCE_KEY = 'ketoan_ck_in_source';
-
-type Source = 'xml' | 'gmail';
 
 @Component({
   selector: 'app-bank-reconciliation-in-page',
@@ -47,8 +42,6 @@ export class BankReconciliationInPageComponent implements OnInit {
   from = '';
   to = '';
 
-  src: Source = this.readSource();
-
   // XML
   xmlFolder = '';
   xmlJob: BgJob<CachedXml> | null = null;
@@ -58,14 +51,6 @@ export class BankReconciliationInPageComponent implements OnInit {
   mstWarning = '';
   private xmlRaw: CachedXml | null = null;
   private xmlInvoices: PurchaseInv[] = [];
-
-  // Gmail
-  gmailJob: BgJob<PortalLink[]> | null = null;
-  gmailLoading = false;
-  gmailFetchedAt: number | null = null;
-  gmailInfo = '';
-  private gmailLinks: PortalLink[] | null = null;
-  private gmailInvoices: PurchaseInv[] = [];
 
   // Sao kê
   bank: DebitStatement | null = null;
@@ -93,10 +78,6 @@ export class BankReconciliationInPageComponent implements OnInit {
       this.to = p.to;
       if (changed) {
         console.log(`${LOG} Kỳ đổi → ${p.from} → ${p.to}`);
-        this.gmailLinks = null;
-        this.gmailInvoices = [];
-        this.gmailInfo = '';
-        if (this.src === 'gmail') void this.loadGmail(false, true);
         if (this.xmlRaw) this.applyXml();
         this.recompute();
       }
@@ -114,7 +95,7 @@ export class BankReconciliationInPageComponent implements OnInit {
     void this.restore();
   }
 
-  /** Mở lại trang: sao kê + XML / Gmail đã lưu (hoặc đang chạy nền) → đối soát ngay */
+  /** Mở lại trang: sao kê + XML đã lưu (hoặc đang chạy nền) → đối soát ngay */
   private async restore(): Promise<void> {
     const b = await this.cache.get<DebitStatement>(BANK_KEY);
     if (b) {
@@ -134,21 +115,7 @@ export class BankReconciliationInPageComponent implements OnInit {
         this.applyXml();
       }
     }
-    await this.loadGmail(false, true);
     this.recompute();
-  }
-
-  // ===== nguồn HĐ =====
-  setSource(s: Source): void {
-    this.src = s;
-    try { localStorage.setItem(SOURCE_KEY, s); } catch { /* chỉ là tiện ích */ }
-    console.log(`${LOG} Nguồn HĐ: ${s === 'xml' ? 'thư mục XML' : 'Gmail'}`);
-    if (s === 'gmail' && !this.gmailLinks) void this.loadGmail(false, true);
-    this.recompute();
-  }
-
-  private readSource(): Source {
-    try { return localStorage.getItem(SOURCE_KEY) === 'gmail' ? 'gmail' : 'xml'; } catch { return 'xml'; }
   }
 
   async onXmlSelected(event: Event): Promise<void> {
@@ -189,48 +156,6 @@ export class BankReconciliationInPageComponent implements OnInit {
     const inPeriod = this.xmlInvoices.filter(i => i.date >= this.from && i.date <= this.to).length;
     this.xmlInfo = `${this.xmlInvoices.length} HĐ đầu vào (MST ${mst || '?'}) · ${inPeriod} HĐ trong kỳ`;
     console.log(`${LOG} XML "${this.xmlFolder}": ${this.xmlInfo}`);
-  }
-
-  /** `force` = lấy lại Gmail; `cacheOnly` = chỉ dùng bản đã lưu / việc đang chạy, không gọi máy chủ */
-  async loadGmail(force = false, cacheOnly = false): Promise<void> {
-    const p = { label: '', from: this.from, to: this.to };
-    let job = this.source.runningGmail();
-    if (job && (job.meta['from'] !== p.from || job.meta['to'] !== p.to || job.meta['label'])) job = undefined;
-    if (!job) {
-      const c = force ? null : await this.source.cachedGmail(p);
-      if (c) {
-        this.gmailFetchedAt = c.savedAt;
-        this.setGmail(c.data);
-        return;
-      }
-      if (cacheOnly) return;
-      job = this.source.startGmail(p);
-    }
-    this.gmailJob = job;
-    this.gmailLoading = true;
-    this.error = '';
-    try {
-      const links = await job.promise;
-      this.gmailFetchedAt = Date.now();
-      this.setGmail(links);
-    } catch (e: any) {
-      console.error(`${LOG} Lấy Gmail lỗi: ${httpErrorText(e)}`);
-      this.error = `Không lấy được Gmail: ${e?.error?.detail || e?.error?.error || httpErrorText(e)}`;
-    } finally {
-      this.gmailLoading = false;
-      this.gmailJob = null;
-      this.recompute();
-    }
-  }
-
-  private setGmail(links: PortalLink[]): void {
-    this.gmailLinks = links;
-    const g = PurchaseInvoiceSourceService.fromGmail(links, this.from, this.to);
-    this.gmailInvoices = g.invoices;
-    this.gmailInfo = `${links.length} email · ${g.invoices.length} HĐ có số tiền`
-      + (g.noAmount ? ` · ${g.noAmount} HĐ chưa lấy được số tiền (không đối soát được)` : '')
-      + (g.noNumber ? ` · ${g.noNumber} email không đọc được số HĐ` : '');
-    console.log(`${LOG} Gmail ${this.from} → ${this.to}: ${this.gmailInfo}`);
   }
 
   // ===== sao kê =====
@@ -318,11 +243,11 @@ export class BankReconciliationInPageComponent implements OnInit {
 
   // ===== đối soát =====
   get invoices(): PurchaseInv[] {
-    return this.src === 'xml' ? this.xmlInvoices : this.gmailInvoices;
+    return this.xmlInvoices;
   }
 
   get sourceReady(): boolean {
-    return this.src === 'xml' ? !!this.xmlRaw : !!this.gmailLinks;
+    return !!this.xmlRaw;
   }
 
   private recompute(): void {
@@ -334,7 +259,7 @@ export class BankReconciliationInPageComponent implements OnInit {
     this.result = reconcilePurchaseTransfers(this.invoices, this.bank.transactions, { from: this.from, to: this.to });
     this.page = 1;
     const c = this.result.counts;
-    console.log(`${LOG} Đối soát (${this.src}) ${this.invoices.length} HĐ ⇄ ${this.bank.transactions.length} GD: khớp ${c.matched}, `
+    console.log(`${LOG} Đối soát ${this.invoices.length} HĐ ⇄ ${this.bank.transactions.length} GD: khớp ${c.matched}, `
       + `gộp ${c.matched_group}, tách ${c.matched_split}, HĐ chưa thấy CK ${c.invoice_only}, CK không có HĐ ${c.bank_only} `
       + `(${(performance.now() - t0).toFixed(0)} ms)`);
   }
@@ -380,10 +305,6 @@ export class BankReconciliationInPageComponent implements OnInit {
     a.click();
     URL.revokeObjectURL(url);
     console.log(`${LOG} Xuất ${name} (${this.filteredRows.length} dòng)`);
-  }
-
-  openGmail(inv: PurchaseInv): void {
-    if (inv.gmailThreadId) window.open(`https://mail.google.com/mail/u/1/#all/${inv.gmailThreadId}`, '_blank');
   }
 
   vnd(n: number | null | undefined): string {

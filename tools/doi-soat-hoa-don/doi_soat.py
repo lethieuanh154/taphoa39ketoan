@@ -519,6 +519,23 @@ def raw_kiotviet_to_products(items):
     return out
 
 
+def drop_unit_suffix(name, unit):
+    """'Tên (KM) (chai)' + 'chai' → 'Tên (KM)': bỏ '(ĐVT)' KiotViet tự ghép cuối FullName (ĐVT đã có cột riêng)."""
+    s, u = (name or "").strip(), (unit or "").strip()
+    suffix = f"({u})".lower()
+    if u and s.lower().endswith(suffix) and len(s) > len(suffix):
+        s = s[:-len(suffix)].rstrip()
+    return s
+
+
+def _master_name(master, first):
+    if master and (master.get("fullName") or master.get("name")):
+        return drop_unit_suffix(master.get("fullName") or master.get("name"), master.get("unit"))
+    if first.get("masterName"):
+        return drop_unit_suffix(first["masterName"], first.get("masterUnit"))
+    return drop_unit_suffix(first.get("fullName"), first.get("unit"))
+
+
 class Catalog:
     """Bảng quy đổi KiotViet: mỗi mã hàng → mã master + hệ số. Nhận file từ nút 'Xuất bảng quy đổi' (BanHang /
     BE /api/kiotviet/unit-conversion) hoặc dữ liệu gốc /api/kiotviet/items/all."""
@@ -549,7 +566,7 @@ class Catalog:
                 continue
             g = self.masters.setdefault(norm_code(mcode), {
                 "code": mcode,
-                "name": (master or {}).get("fullName") or (master or {}).get("name") or prods[0].get("masterName") or prods[0].get("fullName"),
+                "name": _master_name(master, prods[0]),
                 "unit": (master or {}).get("unit") or prods[0].get("masterUnit") or "",
                 "units": {}, "unit_list": [], "names": set(), "tax": (master or {}).get("tax"),
             })
@@ -1588,6 +1605,27 @@ def reconcile(invoices, cat, cfg, company="", existing=None, opening=None, vd=No
     if vd is not None:
         log(f"  Danh mục Vietda: {os.path.basename(vd.path)} — {len(vd.rows):,} mã hàng")
     mapping = build_mapping(items, existing, cat, float(cfg["nguong_tin_cay_goi_y"]), vd)
+    # bản sao XML gồm cả HĐ ngoài kỳ / bị thay thế → ánh xạ riêng cho mặt hàng chỉ có ở các HĐ đó (không vào báo cáo)
+    extra_items = {}
+    for inv in invoices:
+        if id(inv) in active_ids:
+            continue
+        for ln in inv["lines"]:
+            if ln["tchat"] not in ("1", "2") or not ln["sl"]:
+                continue
+            k = item_key(inv["direction"], inv["mst_ban"], ln["ma"], ln["ten"], ln["dvt"])
+            if k in items:
+                continue
+            it = extra_items.get(k)
+            if it is None:
+                it = extra_items[k] = {"direction": inv["direction"], "mst": inv["mst_ban"], "ten_ban": inv["ten_ban"],
+                                       "ma": ln["ma"], "ten": ln["ten"], "dvt": ln["dvt"], "lines": 0, "qty": 0.0}
+            it["lines"] += 1
+            it["qty"] += ln["sl"]
+    mapping_xml = mapping
+    if extra_items:
+        mapping_xml = {**build_mapping(extra_items, existing, cat, float(cfg["nguong_tin_cay_goi_y"]), vd), **mapping}
+        log(f"  Bản sao XML: thêm ánh xạ {len(extra_items):,} mặt hàng chỉ có ở HĐ ngoài kỳ / bị thay thế (không vào báo cáo)")
     if vd is not None:
         n_vd = sum(1 for r in mapping.values() if r[COL["Mã Vietda"]])
         log(f"  Mã Vietda: {n_vd:,}/{len(mapping):,} mặt hàng — "
@@ -1828,7 +1866,7 @@ def reconcile(invoices, cat, cfg, company="", existing=None, opening=None, vd=No
     return {"company": company, "invoices": invoices, "active": active, "unrelated": unrelated, "duplicates": duplicates,
             "out_of_period": out_of_period, "repl_rows": repl_rows, "repl_adj": repl_adj,
             "period": (d_from, d_to, ky_label, ky_short), "n_arith": n_arith, "n_round": n_round,
-            "items": items, "mapping": mapping, "method_count": method_count, "n_review": n_review,
+            "items": items, "mapping": mapping, "mapping_xml": mapping_xml, "method_count": method_count, "n_review": n_review,
             "group_info": group_info, "opening": opening, "unmapped": unmapped, "converted_rows": converted_rows,
             "nxt_rows": nxt_rows, "trace_rows": trace_rows, "lot_rows": lot_rows, "below_rows": below_rows,
             "shortage_rows": shortage_rows, "exceptions": exceptions, "sev_count": Counter(e[0] for e in exceptions),
@@ -2056,7 +2094,7 @@ def main(args):
     # ---------- 7b. Bản sao XML đã quy đổi ĐVT (file gốc giữ nguyên)
     clone_rows, clone_stats = [], Counter()
     if cfg.get("xuat_xml_quy_doi", True):
-        clone_rows, clone_stats = export_converted_xml(data_dir, invoices, company, mapping, cfg)
+        clone_rows, clone_stats = export_converted_xml(data_dir, invoices, company, res["mapping_xml"], cfg)
         log(f"  XML quy đổi: '{CLONE_DIRS['VAO']}' {clone_stats['dir_VAO']:,} file, '{CLONE_DIRS['RA']}' "
             f"{clone_stats['dir_RA']:,} file — sửa {clone_stats['sua']:,} file / {clone_stats['dong_sua']:,} dòng hàng; "
             f"chép nguyên {clone_stats['giu']:,} file")

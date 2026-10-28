@@ -1,31 +1,11 @@
 <!--
-  LEDGER 8 - ĐỐI CHIẾU HÓA ĐƠN ĐẦU VÀO
-  Kiểm tra số lượng HĐ đầu vào: Gmail vs danh sách HĐ trong thư mục XML trên máy (app FDI) — 23/10/2026 bỏ GDT
+  LEDGER 8 - KIỂM TRA SỐ LƯỢNG HÓA ĐƠN ĐẦU VÀO
+  Thư mục XML trên máy (app FDI) → Đếm nhanh (số email Gmail ⇄ số HĐ) + Danh sách HĐ có link HĐ gốc (mã tra cứu trong XML, lưu máy chủ)
+  28/10/2026: bỏ đối chiếu Gmail ⇄ XML và tab Links HĐ gốc (Gmail)
 -->
 <div class="invoice-page">
-  <!-- Page Title -->
   <h2 class="page-title">KIỂM TRA SỐ LƯỢNG HÓA ĐƠN ĐẦU VÀO</h2>
 
-  <!-- Main Tab Bar -->
-  <div class="main-tab-bar">
-    <button class="main-tab" [class.active]="activeMainTab === 'reconcile'"
-            (click)="switchMainTab('reconcile')">
-      <i class="fa-solid fa-balance-scale"></i> Đối chiếu HĐ
-    </button>
-    <button class="main-tab" [class.active]="activeMainTab === 'portal'"
-            (click)="switchMainTab('portal')">
-      <i class="fa-solid fa-link"></i> Links HĐ Gốc (Gmail)
-    </button>
-  </div>
-
-  <!-- ============================================ -->
-  <!-- RECONCILE TAB -->
-  <!-- ============================================ -->
-  <ng-container *ngIf="activeMainTab === 'reconcile'">
-
-  <!-- ============================================ -->
-  <!-- FILTER SECTION -->
-  <!-- ============================================ -->
   <div class="filter-section">
     <h3 class="section-title">Danh sách HĐ trên máy (XML)</h3>
     <div class="xml-picker">
@@ -34,83 +14,39 @@
         {{ xmlBusy ? ('Đang đọc ' + (xmlProgressText || '...')) : 'Chọn thư mục XML HĐ đầu vào' }}
         <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlBusy" hidden>
       </label>
-      <span class="xml-hint" *ngIf="!xmlInfo && !xmlBusy">Thư mục app FDI tải về (vd <code>...\T9\&lt;MST&gt;\purchase\xml</code>) — đọc ngay trên máy, không tải lên máy chủ. Có ZIP cũng được.</span>
+      <span class="xml-hint" *ngIf="!xmlInfo && !xmlBusy">Thư mục app FDI tải về (vd <code>...\T9\&lt;MST&gt;\purchase\xml</code>) — đọc ngay trên máy, chỉ gửi lên máy chủ số / ký hiệu / tiền + mã tra cứu (để lưu link HĐ gốc). Có ZIP cũng được.</span>
       <span class="xml-info" *ngIf="xmlInfo"><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
         <span class="xml-hint" *ngIf="xmlSavedAt">· đọc lúc {{ viTime(xmlSavedAt) }} (đã lưu trên máy — FDI tải thêm thì chọn lại thư mục)</span></span>
     </div>
     <app-table-loading *ngIf="xmlBusy" [text]="'Đang đọc thư mục XML... ' + xmlProgressText"></app-table-loading>
     <div class="xml-error" *ngIf="mstWarning"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstWarning }}</div>
     <div class="xml-error" *ngIf="xmlError"><i class="fa-solid fa-triangle-exclamation"></i> {{ xmlError }}</div>
-
-    <h3 class="section-title">Bộ lọc</h3>
+    <div class="xml-error" *ngIf="xmlNoLookup"><i class="fa-solid fa-triangle-exclamation"></i>
+      Bản XML lưu trên máy đọc trước khi có mã tra cứu → bấm "Chọn thư mục XML HĐ đầu vào" chọn lại thư mục để lấy link HĐ gốc.</div>
 
     <form [formGroup]="filterForm" class="filter-form">
       <div class="filter-row">
-        <!-- Khoảng ngày = kỳ ở thanh chọn kỳ (23/10/2026: bỏ ô Từ / Đến riêng) -->
         <div class="filter-group">
           <label>Kỳ</label>
           <span class="period-chip"><i class="fa-solid fa-calendar-day"></i> {{ periodLabel() }}</span>
         </div>
-
-        <!-- Nhà cung cấp (Gmail labels) -->
         <div class="filter-group filter-group-wide">
-          <label>Nhà cung cấp <span *ngIf="loadingLabels" class="loading-inline">...</span></label>
+          <label>Nhà cung cấp (nhãn Gmail — cho Đếm nhanh) <span *ngIf="loadingLabels" class="loading-inline">...</span></label>
           <select formControlName="gmailLabel" class="filter-input">
             <option value="">Tất cả NCC</option>
-            <option *ngFor="let label of gmailLabels" [value]="label.name">
-              {{ label.displayName }}
-            </option>
+            <option *ngFor="let label of gmailLabels" [value]="label.name">{{ label.displayName }}</option>
           </select>
-        </div>
-
-        <!-- Page Size -->
-        <div class="filter-group">
-          <label>Số dòng/trang</label>
-          <select formControlName="pageSize" class="filter-input">
-            <option [value]="25">25</option>
-            <option [value]="50">50</option>
-            <option [value]="100">100</option>
-          </select>
-        </div>
-
-        <!-- Actions -->
-        <div class="filter-group">
-          <label>&nbsp;</label>
-          <div class="button-group">
-            <button type="button" class="btn btn-primary" (click)="runLiveReconciliation()" [disabled]="liveBusy">
-              <i class="fa-solid fa-search" *ngIf="!liveBusy"></i>
-              <i class="fa-solid fa-spinner fa-spin" *ngIf="liveBusy"></i>
-              Tìm kiếm
-            </button>
-            <button type="button" class="btn btn-outline-secondary" (click)="resetFilter()">
-              <i class="fa-solid fa-rotate-left"></i> Đặt lại
-            </button>
-            <button type="button" class="btn btn-outline-primary" (click)="forceReloadReconcile()" [disabled]="liveBusy" title="Tải lại từ server (bỏ qua cache)">
-              <i class="fa-solid fa-sync"></i> Tải lại
-            </button>
-          </div>
         </div>
       </div>
     </form>
   </div>
 
-  <!-- ============================================ -->
-  <!-- ACTION BUTTON -->
-  <!-- ============================================ -->
   <div class="action-section">
     <div class="action-center">
       <button class="btn btn-primary btn-large" (click)="runQuickCount(!!countResult)" [disabled]="countBusy"
               title="Chỉ đếm email nhận trong kỳ (người gửi / tiêu đề / giờ) rồi so với số HĐ XML theo ngày — nhanh, không đọc nội dung / đính kèm">
         <i class="fa-solid" [ngClass]="countBusy ? 'fa-spinner fa-spin' : 'fa-list-ol'"></i>
         {{ countBusy ? 'Đang đếm email...' : (countResult ? 'Đếm lại email' : 'Đếm nhanh (số email ⇄ số HĐ)') }}
-      </button>
-      <button class="btn btn-warning btn-large" (click)="runLiveReconciliation()" [disabled]="liveBusy">
-        <span *ngIf="!liveBusy">
-          <i class="fa-solid fa-bolt"></i> Đối chiếu Gmail vs XML
-        </span>
-        <span *ngIf="liveBusy">
-          <i class="fa-solid fa-spinner fa-spin"></i> Đang đối chiếu...
-        </span>
       </button>
     </div>
   </div>
@@ -133,24 +69,42 @@
       <p class="xml-hint" *ngIf="!r.ok || countDays.length">So theo ngày: ngày lập HĐ (XML) ⇄ ngày Gmail nhận email. Bấm 1 ngày để xem email và HĐ của ngày đó.
         NCC gửi trễ / sớm 1 ngày thì ngày này thiếu, ngày kế thừa (có ghi gợi ý).</p>
       <table class="count-table" *ngIf="countDays.length">
-        <thead><tr><th>Ngày</th><th class="num">HĐ XML</th><th class="num">Email</th><th class="num">Chênh</th><th>Gợi ý</th></tr></thead>
+        <thead><tr><th>Ngày</th><th class="num">HĐ XML</th><th class="num">Email</th><th class="num">Chênh</th><th>Gợi ý</th><th class="count-act">Gmail</th></tr></thead>
         <tbody>
           <ng-container *ngFor="let d of countDays">
-            <tr class="count-row" [class.bad]="d.diff" (click)="countOpenDay = countOpenDay === d.date ? '' : d.date">
-              <td><i class="fa-solid" [ngClass]="countOpenDay === d.date ? 'fa-caret-down' : 'fa-caret-right'"></i> {{ formatGdtDate(d.date) }}</td>
+            <tr class="count-row" [class.bad]="d.diff" [class.open]="countOpenDay === d.date" (click)="countOpenDay = countOpenDay === d.date ? '' : d.date">
+              <td><i class="fa-solid" [ngClass]="countOpenDay === d.date ? 'fa-caret-down' : 'fa-caret-right'"></i> {{ viDate(d.date) }}</td>
               <td class="num">{{ d.xml }}</td><td class="num">{{ d.email }}</td>
               <td class="num">{{ d.diff > 0 ? '+' + d.diff : d.diff }}</td>
               <td class="xml-hint">{{ d.hint }}</td>
+              <td class="count-act">
+                <a class="btn-gmail" *ngIf="d.email" [href]="countDayUrl(d.date)" target="_blank" rel="noopener"
+                   (click)="$event.stopPropagation(); logOpenGmail('ngày ' + d.date)" title="Mở Gmail: các email đã đếm của ngày này">
+                  <i class="fa-solid fa-envelope-open-text"></i> Gmail ngày này
+                </a>
+              </td>
             </tr>
             <tr *ngIf="countOpenDay === d.date" class="count-detail">
-              <td colspan="5">
+              <td colspan="6">
                 <div class="count-cols">
                   <div>
                     <b>Email ({{ d.emails.length }})</b>
-                    <div *ngFor="let e of d.emails" class="count-item">
-                      <button type="button" class="btn-mail" (click)="openCountEmail(e)" title="Mở email gốc"><i class="fa-solid fa-envelope"></i></button>
-                      {{ e.at.slice(11, 16) }} · {{ e.from_name || e.from_email }} <small>{{ e.subject }}</small>
-                    </div>
+                    <table class="count-mail-table" *ngIf="d.emails.length">
+                      <thead><tr><th>Giờ</th><th>Người gửi</th><th>Tiêu đề</th><th></th></tr></thead>
+                      <tbody>
+                        <tr *ngFor="let e of d.emails">
+                          <td class="num">{{ e.at.slice(11, 16) }}</td>
+                          <td class="count-from" [title]="e.from_email">{{ e.from_name || e.from_email }}</td>
+                          <td class="count-subject" [title]="e.subject">{{ e.subject }}</td>
+                          <td class="count-act">
+                            <a class="btn-gmail" [href]="countEmailUrl(e)" target="_blank" rel="noopener"
+                               (click)="logOpenGmail('email ' + (e.thread_id || e.id))" title="Mở email gốc trong Gmail">
+                              <i class="fa-solid fa-envelope"></i> Mở Gmail
+                            </a>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                     <div *ngIf="!d.emails.length" class="xml-hint">—</div>
                   </div>
                   <div>
@@ -168,286 +122,76 @@
   </div>
 
   <!-- ============================================ -->
-  <!-- KẾT QUẢ ĐỐI CHIẾU (Gmail vs XML) -->
+  <!-- DANH SÁCH HĐ ĐẦU VÀO + LINK HĐ GỐC (28/10/2026) -->
   <!-- ============================================ -->
-  <div class="live-reconciliation-section" *ngIf="liveResults.length > 0 || liveBusy">
-    <div class="section-header">
-      <h3><i class="fa-solid fa-bolt"></i> Đối chiếu: Gmail vs thư mục XML</h3>
-      <span class="xml-hint" *ngIf="gmailFetchedAt && !liveBusy">Gmail lấy lúc {{ viTime(gmailFetchedAt) }} (đã lưu trên máy) —
-        bấm <b>Tải lại</b> để lấy email mới</span>
-      <div class="live-actions" *ngIf="liveResults.length > 0">
-        <button class="btn btn-sm btn-primary" (click)="saveLiveResults()" [disabled]="liveSaving || liveSaved">
-          <span *ngIf="liveSaving"><i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...</span>
-          <span *ngIf="liveSaved"><i class="fa-solid fa-check"></i> Đã lưu</span>
-          <span *ngIf="!liveSaving && !liveSaved"><i class="fa-solid fa-save"></i> Lưu kết quả</span>
+  <div class="link-section">
+    <div class="link-head">
+      <h3 class="section-title"><i class="fa-solid fa-link"></i> Danh sách HĐ đầu vào — link HĐ gốc</h3>
+      <span class="xml-hint" *ngIf="!savedLoading">{{ counts.saved }} / {{ counts.all }} HĐ của kỳ đã lưu trên máy chủ (mọi máy xem được)</span>
+      <div class="link-actions">
+        <button type="button" class="btn btn-outline-primary" (click)="saveLinks()" [disabled]="saving || !xmlInvoices.length"
+                title="Lưu mã / link tra cứu của mọi HĐ trong thư mục đang chọn lên máy chủ (tự lưu sau mỗi lần chọn thư mục)">
+          <i class="fa-solid" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'"></i> {{ saving ? 'Đang lưu...' : 'Lưu lên máy chủ' }}
+        </button>
+        <button type="button" class="btn btn-outline-secondary" (click)="loadSaved()" [disabled]="savedLoading" title="Đọc lại link đã lưu của kỳ">
+          <i class="fa-solid fa-rotate"></i> Tải lại
+        </button>
+        <button type="button" class="btn btn-outline-secondary" (click)="exportCsv()" [disabled]="!filteredRows.length">
+          <i class="fa-solid fa-file-csv"></i> Xuất CSV
         </button>
       </div>
     </div>
+    <div class="xml-info" *ngIf="saveInfo">{{ saveInfo }}</div>
+    <div class="xml-error" *ngIf="savedError"><i class="fa-solid fa-triangle-exclamation"></i> {{ savedError }}</div>
+    <div class="copied-toast" *ngIf="copiedMsg"><i class="fa-solid fa-clipboard-check"></i> {{ copiedMsg }}</div>
 
-    <!-- Summary cards -->
-    <div class="live-summary-cards" *ngIf="liveResults.length > 0">
-      <div class="summary-card">
-        <div class="card-label">Gmail</div>
-        <div class="card-value">{{ liveGmailCount }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="card-label">XML</div>
-        <div class="card-value">{{ liveGdtCount }}</div>
-      </div>
-      <div class="summary-card card-success">
-        <div class="card-label">Khớp</div>
-        <div class="card-value">{{ liveSummary.matched }}</div>
-      </div>
-      <div class="summary-card card-warning">
-        <div class="card-label">Thiếu Gmail</div>
-        <div class="card-value">{{ liveSummary.missingGmail }}</div>
-      </div>
-      <div class="summary-card card-warning">
-        <div class="card-label">Thiếu XML</div>
-        <div class="card-value">{{ liveSummary.missingGdt }}</div>
-      </div>
-      <div class="summary-card card-danger">
-        <div class="card-label">Sai số</div>
-        <div class="card-value">{{ liveSummary.mismatch }}</div>
-      </div>
-      <div class="summary-card" *ngIf="liveSummary.noAmount">
-        <div class="card-label">Chưa có số tiền</div>
-        <div class="card-value">{{ liveSummary.noAmount }}</div>
-      </div>
-      <div class="summary-card card-warning" *ngIf="liveSummary.noInvoiceNo">
-        <div class="card-label">Gmail không đọc được số HĐ</div>
-        <div class="card-value">{{ liveSummary.noInvoiceNo }}</div>
-      </div>
-      <div class="summary-card" *ngIf="liveSummary.dupEmails" title="Email gửi thêm của HĐ đã có trong bảng (NCC gửi lại) — đã gộp vào dòng của HĐ đó">
-        <div class="card-label">Email gửi trùng</div>
-        <div class="card-value">{{ liveSummary.dupEmails }}</div>
-      </div>
-    </div>
-    <p class="xml-hint" *ngIf="liveResults.length > 0">
-      Gmail {{ liveGmailCount }} email = {{ liveSummary.total - liveSummary.missingGmail - liveSummary.noInvoiceNo }} HĐ ghép được
-      + {{ liveSummary.noInvoiceNo }} email không đọc được số HĐ + {{ liveSummary.dupEmails }} email gửi trùng.
-      "Gmail không đọc được số HĐ": bấm <i class="fa-solid fa-envelope"></i> để mở email, đối chiếu tay.
-    </p>
-
-    <!-- Status log -->
-    <div *ngIf="liveStatusLog.length > 0" class="status-log-section" style="background:#1e1e1e;color:#d4d4d4;font-family:monospace;font-size:12px;padding:10px 14px;border-radius:6px;margin-bottom:12px;max-height:160px;overflow-y:auto;">
-      <div *ngFor="let line of liveStatusLog" style="line-height:1.6;">{{ line }}</div>
-      <div *ngIf="liveBusy" style="line-height:1.6;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:4px;"></i> Đang xử lý...</div>
+    <div class="link-filter">
+      <button type="button" class="chip" [class.active]="kindFilter === ''" (click)="setKind('')">Tất cả ({{ counts.all }})</button>
+      <button type="button" class="chip" [class.active]="kindFilter === 'direct'" (click)="setKind('direct')">Mở thẳng ({{ counts.direct }})</button>
+      <button type="button" class="chip" [class.active]="kindFilter === 'portal'" (click)="setKind('portal')">Tra cứu NCC + mã ({{ counts.portal }})</button>
+      <button type="button" class="chip" [class.active]="kindFilter === 'gdt'" (click)="setKind('gdt')">Chỉ tra cứu CQT ({{ counts.gdt }})</button>
+      <button type="button" class="chip" [class.active]="kindFilter === 'unknown'" (click)="setKind('unknown')"
+              title="MST nhà cung cấp HĐĐT (MSTTCGP) chưa có trong bảng — gửi 1 XML của NCC này để bổ sung">NCC HĐĐT chưa biết ({{ counts.unknown }})</button>
+      <input class="filter-input link-search" [(ngModel)]="q" (ngModelChange)="page = 1" placeholder="Tìm số HĐ / ký hiệu / MST / người bán / NCC HĐĐT">
     </div>
 
-    <!-- Results table -->
-    <app-table-loading *ngIf="liveBusy && liveResults.length === 0" text="Đang đối chiếu Gmail với thư mục XML..."></app-table-loading>
-    <div class="live-results-table-wrapper" *ngIf="liveResults.length > 0">
-      <table class="live-results-table">
+    <app-table-loading *ngIf="savedLoading && !rows.length" text="Đang đọc link HĐ gốc đã lưu..."></app-table-loading>
+    <p class="xml-hint" *ngIf="!savedLoading && !rows.length">Chưa có HĐ nào của kỳ — chọn thư mục XML HĐ đầu vào (máy khác đã chọn và lưu thì danh sách hiện ở đây).</p>
+
+    <div class="table-wrap" *ngIf="rows.length">
+      <table class="link-table">
         <thead>
-          <tr>
-            <th rowspan="2">#</th>
-            <th rowspan="2">Số HĐ</th>
-            <th rowspan="2">Ký hiệu</th>
-            <th rowspan="2">MST NCC</th>
-            <th rowspan="2">Tên NCC</th>
-            <th rowspan="2">Ngày</th>
-            <th colspan="3" class="th-group th-gmail">Gmail (Email)</th>
-            <th colspan="3" class="th-group th-gdt">XML (thư mục máy)</th>
-            <th rowspan="2">Kết quả</th>
-          </tr>
-          <tr>
-            <th class="th-gmail">Trước thuế</th>
-            <th class="th-gmail">Thuế</th>
-            <th class="th-gmail">Tổng TT</th>
-            <th class="th-gdt">Trước thuế</th>
-            <th class="th-gdt">Thuế</th>
-            <th class="th-gdt">Tổng TT</th>
-          </tr>
+          <tr><th>Ngày</th><th>Ký hiệu - Số</th><th>Người bán</th><th class="num">Tổng TT</th><th>NCC HĐĐT</th><th>Mã tra cứu</th><th class="count-act">HĐ gốc</th></tr>
         </thead>
         <tbody>
-          <tr *ngFor="let row of liveResults; let i = index" [ngClass]="getLiveStatusClass(row.status)">
-            <td>{{ i + 1 }}</td>
-            <td>{{ row.gdtData?.shdon || row.gmailData?.invoiceNo || '-' }}
-              <button type="button" class="btn-mail" *ngIf="row.gmailThreadId" (click)="openLiveGmail(row)" title="Mở email gốc trong Gmail">
-                <i class="fa-solid fa-envelope"></i></button>
-              <span class="mail-count" *ngIf="(row.gmailCount || 0) > 1" title="Số email Gmail của HĐ này (NCC gửi lại)">{{ row.gmailCount }} email</span>
-            </td>
-            <td>{{ row.gdtData?.khhdon || row.gmailData?.invoiceSymbol || '-' }}</td>
-            <td>{{ row.gdtData?.nbmst || row.gmailData?.supplierTaxCode || '-' }}</td>
-            <td class="td-name" [title]="row.gdtData?.nbten || row.gmailData?.supplierName || row.gmailData?.gmailFrom || ''">
-              {{ row.gdtData?.nbten || row.gmailData?.supplierName || row.gmailData?.gmailFrom || '-' }}
-              <small class="mail-subject" *ngIf="row.status === 'NO_INVOICE_NO'" [title]="row.gmailData?.gmailSubject || ''">{{ row.gmailData?.gmailSubject }}</small>
-            </td>
-            <td>{{ row.gdtData ? formatGdtDate(row.gdtData.tdlap) : (row.gmailData?.invoiceDate | date:'dd/MM/yyyy') }}</td>
-            <!-- Gmail amounts -->
-            <!-- email chưa lấy được số tiền (không đính kèm XML, cổng NCC chặn tải) → '?' thay vì 0 đ -->
-            <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
-              {{ row.gmailData ? (row.gmailData.hasAmounts ? formatCurrency(row.gmailData.totalBeforeVat) : '?') : '-' }}
-            </td>
-            <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
-              {{ row.gmailData ? (row.gmailData.hasAmounts ? formatCurrency(row.gmailData.vatAmount) : '?') : '-' }}
-            </td>
-            <td class="td-amount" [class.td-diff]="row.fieldDiffs.length > 0 && row.gmailData">
-              {{ row.gmailData ? (row.gmailData.hasAmounts ? formatCurrency(row.gmailData.totalAmount) : '?') : '-' }}
-            </td>
-            <!-- XML amounts -->
-            <td class="td-amount">
-              {{ row.gdtData ? formatCurrency(row.gdtData.tgtcthue) : '-' }}
-            </td>
-            <td class="td-amount">
-              {{ row.gdtData ? formatCurrency(row.gdtData.tgtthue) : '-' }}
-            </td>
-            <td class="td-amount">
-              {{ row.gdtData ? formatCurrency(row.gdtData.tgtttbso) : '-' }}
-            </td>
-            <!-- Status -->
+          <tr *ngFor="let r of pageRows">
+            <td>{{ viDate(r.date) }}</td>
+            <td>{{ r.template }}{{ r.series }}-{{ r.no }}
+              <i class="fa-solid fa-cloud src-icon" *ngIf="r.saved && !r.inXml" title="Chỉ có trên máy chủ (không có trong thư mục đang chọn)"></i></td>
+            <td class="td-name" [title]="r.sellerName">{{ r.sellerName }} <small>{{ r.sellerMst }}</small></td>
+            <td class="num">{{ vnd(r.total) }}</td>
+            <td><span [class.unknown]="!r.provider" [title]="'MST NCC HĐĐT: ' + (r.tcgp || '(không có)')">{{ r.provider || ('Chưa biết ' + (r.tcgp || '')) }}</span></td>
             <td>
-              <span class="live-status-badge" [ngClass]="getLiveStatusClass(row.status)">
-                {{ getLiveStatusLabel(row.status) }}
-              </span>
-              <div class="diff-detail" *ngIf="row.fieldDiffs.length > 0">
-                <small *ngFor="let d of row.fieldDiffs">
-                  {{ d.fieldLabel }}: {{ formatDiffValue(d) }}
-                </small>
-              </div>
-              <div class="diff-detail" *ngIf="row.note"><small>{{ row.note }}</small></div>
+              <ng-container *ngIf="r.code; else noCode">
+                <code class="lookup-code">{{ r.code }}</code>
+                <button type="button" class="btn-copy" (click)="copy(r.code, 'Đã chép mã tra cứu ' + r.code)" title="Chép mã tra cứu"><i class="fa-regular fa-copy"></i></button>
+              </ng-container>
+              <ng-template #noCode><span class="xml-hint">XML không có</span></ng-template>
+            </td>
+            <td class="count-act">
+              <a class="btn-link-goc" [ngClass]="'k-' + r.kind" [href]="linkOf(r)" target="_blank" rel="noopener"
+                 (click)="onOpenLink(r)" [title]="kindTitle(r)">
+                <i class="fa-solid" [ngClass]="r.kind === 'gdt' ? 'fa-landmark' : 'fa-arrow-up-right-from-square'"></i> {{ kindLabel(r) }}
+              </a>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-  </div>
-
-  </ng-container><!-- end reconcile tab -->
-
-  <!-- ============================================ -->
-  <!-- PORTAL LINKS TAB — Links HĐ Gốc (Gmail) -->
-  <!-- ============================================ -->
-  <ng-container *ngIf="activeMainTab === 'portal'">
-    <div class="portal-section">
-
-      <!-- Filter bar -->
-      <div class="portal-filter-bar">
-        <div class="portal-filter-group">
-          <label>Gmail Label (NCC)</label>
-          <div class="custom-label-select" [class.open]="labelDropdownOpen">
-            <div class="custom-label-trigger filter-input" (click)="onLabelTriggerClick($event)">
-              <span>{{ getSelectedLabelName() || 'Tất cả email' }}</span>
-              <span class="custom-label-arrow">▼</span>
-            </div>
-            <div class="custom-label-panel" *ngIf="labelDropdownOpen" (click)="$event.stopPropagation()">
-              <div class="custom-label-search">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6c757d" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" [(ngModel)]="portalLinksLabelSearch" placeholder="Tìm label..." (keydown)="$event.stopPropagation()" autofocus>
-              </div>
-              <div class="custom-label-option" (click)="selectPortalLabel('')">Tất cả email</div>
-              <div class="custom-label-option" *ngFor="let label of filteredGmailLabels" (click)="selectPortalLabel(label.id)">{{ label.displayName }}</div>
-              <div *ngIf="filteredGmailLabels.length === 0" class="custom-label-no-results">Không tìm thấy</div>
-            </div>
-          </div>
-        </div>
-        <div class="portal-filter-group">
-          <label>Kỳ</label>
-          <span class="period-chip"><i class="fa-solid fa-calendar-day"></i> {{ periodLabel() }}</span>
-        </div>
-        <div class="portal-filter-group">
-          <label>Tìm số HĐ / tên NCC</label>
-          <input type="text" class="filter-input" [(ngModel)]="portalLinksSearchNo"
-                 placeholder="Nhập để lọc..." (input)="applyPortalLinksSearch()">
-        </div>
-        <div class="portal-filter-group">
-          <label>&nbsp;</label>
-          <button class="btn btn-primary" (click)="loadPortalLinks()" [disabled]="loadingPortalLinks">
-            <i class="fa-solid fa-search" *ngIf="!loadingPortalLinks"></i>
-            <i class="fa-solid fa-spinner fa-spin" *ngIf="loadingPortalLinks"></i>
-            Tìm kiếm
-          </button>
-        </div>
-      </div>
-
-      <!-- Count -->
-      <div class="portal-count" *ngIf="portalLinks.length > 0 || loadingPortalLinks">
-        <span *ngIf="!loadingPortalLinks">
-          {{ portalLinksFiltered.length }} hóa đơn
-          <span *ngIf="portalLinksFiltered.length !== portalLinks.length">
-            (lọc từ {{ portalLinks.length }})
-          </span>
-        </span>
-        <span *ngIf="loadingPortalLinks"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</span>
-      </div>
-
-      <!-- Table -->
-      <div class="portal-table-wrapper">
-        <table class="portal-table">
-          <thead>
-            <tr>
-              <th>Số HĐ</th>
-              <th>Ngày HĐ</th>
-              <th>Nhà cung cấp</th>
-              <th>MST</th>
-              <th>Provider</th>
-              <th>Email gửi</th>
-              <th>Mã tra cứu</th>
-              <th>Mã bí mật</th>
-              <th>Link HĐ gốc</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let inv of portalLinksFiltered" (dblclick)="openGmailMessage(inv)" class="portal-row-clickable">
-              <td class="inv-no-col">
-                {{ inv.invoiceSymbol ? inv.invoiceSymbol + '-' : '' }}{{ inv.invoiceNo }}
-              </td>
-              <td class="date-col">{{ formatDate(inv.issueDate || inv.createdAt) }}</td>
-              <td class="supplier-col" [title]="inv.supplierName">{{ inv.supplierName }}</td>
-              <td class="mst-col">{{ inv.supplierTaxCode }}</td>
-              <td>
-                <span *ngIf="inv.invoiceProvider" class="provider-badge" [ngClass]="getProviderClass(inv.invoiceProvider)">
-                  {{ inv.invoiceProvider }}
-                </span>
-                <span *ngIf="!inv.invoiceProvider" class="text-muted">—</span>
-              </td>
-              <td class="supplier-col" [title]="inv.gmailFrom || ''">
-                {{ inv.gmailFrom || '—' }}
-              </td>
-              <td class="creds-col">
-                <span *ngIf="getLookupCode(inv)" class="creds-text">{{ getLookupCode(inv) }}</span>
-                <span *ngIf="!getLookupCode(inv)" class="text-muted">—</span>
-              </td>
-              <td class="creds-col">
-                <span *ngIf="getSecretCode(inv)" class="creds-text">{{ getSecretCode(inv) }}</span>
-                <span *ngIf="!getSecretCode(inv)" class="text-muted">—</span>
-              </td>
-              <td class="link-col">
-                <button class="btn btn-xs btn-portal"
-                        (click)="openPortalUrl(inv)"
-                        [disabled]="!inv.portalUrl"
-                        [title]="inv.portalUrl || 'Không có link'">
-                  <i class="fa-solid fa-external-link-alt"></i> Mở
-                </button>
-              </td>
-            </tr>
-
-            <!-- No data -->
-            <tr *ngIf="portalLinksFiltered.length === 0 && !loadingPortalLinks">
-              <td colspan="9" class="no-data">
-                <span *ngIf="portalLinks.length === 0">Nhấn Tìm kiếm để tải danh sách</span>
-                <span *ngIf="portalLinks.length > 0">Không tìm thấy kết quả</span>
-              </td>
-            </tr>
-            <tr *ngIf="loadingPortalLinks">
-              <td colspan="9" class="loading-data"><app-table-loading text="Đang tải link HĐ gốc từ Gmail..."></app-table-loading></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination -->
-      <div class="portal-pagination" *ngIf="portalLinks.length > 0">
-        <button class="btn btn-sm" (click)="prevPortalPage()" [disabled]="!portalLinksPagination.hasPrev || loadingPortalLinks">
-          <i class="fa-solid fa-chevron-left"></i> Trước
-        </button>
-        <button class="btn btn-sm" (click)="nextPortalPage()" [disabled]="!portalLinksPagination.hasNext || loadingPortalLinks">
-          Sau <i class="fa-solid fa-chevron-right"></i>
-        </button>
-      </div>
-
+    <div class="pager" *ngIf="pageCount > 1">
+      <button type="button" class="btn btn-outline-secondary" (click)="page = page - 1" [disabled]="page <= 1"><i class="fa-solid fa-chevron-left"></i></button>
+      <span>Trang {{ page }} / {{ pageCount }} · {{ filteredRows.length }} HĐ</span>
+      <button type="button" class="btn btn-outline-secondary" (click)="page = page + 1" [disabled]="page >= pageCount"><i class="fa-solid fa-chevron-right"></i></button>
     </div>
-  </ng-container><!-- end portal tab -->
-
+  </div>
 </div>

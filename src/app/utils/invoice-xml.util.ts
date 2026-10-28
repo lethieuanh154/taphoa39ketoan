@@ -1,4 +1,5 @@
 import { unzipSync } from 'fflate';
+import { InvoiceLookup, detectLookup } from './invoice-lookup.util';
 
 /**
  * ĐỌC DANH SÁCH HĐĐT TỪ FILE XML TRÊN MÁY (thư mục app FDI tải về: `<MST>\T<tháng>\<MST>\{purchase|sold}\xml`) — chạy trong
@@ -15,6 +16,8 @@ export interface LocalXmlInvoice {
   nmmst: string; nmten: string;   // người mua
   tgtcthue: number; tgtthue: number; tgtttbso: number;
   file: string;       // đường dẫn file (hoặc zip/tên trong zip)
+  mccqt?: string;     // mã CQT cấp (28/10/2026 — bản lưu IndexedDB cũ không có)
+  lookup?: InvoiceLookup;   // mã / link tra cứu HĐ gốc (invoice-lookup.util.ts)
 }
 
 export interface XmlReadResult {
@@ -42,6 +45,24 @@ function num(s: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
+/** Các cặp TTruong / DLieu của mọi TTKhac phần đầu HĐ (bỏ TTKhac trong dòng hàng HHDVu) */
+function headerFields(doc: Document): [string, string][] {
+  const out: [string, string][] = [];
+  const all = doc.getElementsByTagNameNS('*', 'TTin');
+  for (let i = 0; i < all.length; i++) {
+    const t = all[i];
+    let p = t.parentElement, inLine = false;
+    for (; p; p = p.parentElement) {
+      if (p.localName === 'HHDVu') {
+        inLine = true;
+        break;
+      }
+    }
+    if (!inLine) out.push([text(t, 'TTruong'), text(t, 'DLieu')]);
+  }
+  return out;
+}
+
 /** 1 file XML → HĐ (null nếu không phải HĐĐT). Lỗi cú pháp XML → throw. */
 export function parseInvoiceXml(xml: string, file: string): LocalXmlInvoice | null {
   const doc = new DOMParser().parseFromString(xml, 'text/xml');
@@ -58,7 +79,8 @@ export function parseInvoiceXml(xml: string, file: string): LocalXmlInvoice | nu
     khmshdon: text(ttc, 'KHMSHDon'), khhdon: text(ttc, 'KHHDon'), shdon, tdlap: text(ttc, 'NLap').slice(0, 10),
     nbmst: text(nban, 'MST'), nbten: text(nban, 'Ten'), nmmst: text(nmua, 'MST'), nmten: text(nmua, 'Ten'),
     tgtcthue: num(text(tt, 'TgTCThue')), tgtthue: num(text(tt, 'TgTThue')), tgtttbso: num(text(tt, 'TgTTTBSo')),
-    file,
+    file, mccqt: (first(doc, 'MCCQT')?.textContent || '').trim(),
+    lookup: detectLookup(text(ttc, 'MSTTCGP'), headerFields(doc)),
   };
 }
 

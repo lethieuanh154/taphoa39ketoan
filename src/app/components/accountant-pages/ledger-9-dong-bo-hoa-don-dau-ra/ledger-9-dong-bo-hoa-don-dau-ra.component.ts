@@ -8,6 +8,8 @@
  * (TienIchCacheService) → mở lại trang hiện ngay kết quả cũ, bấm "Lấy lại từ KiotViet" / chọn lại thư mục để cập nhật.
  * 23/10/2026: khoảng ngày = KỲ ở thanh chọn kỳ (bỏ ô Từ / Đến riêng — trùng, dễ lệch với kỳ). Đọc XML + lấy HĐĐT chạy NỀN
  * (BackgroundJobService) → chuyển trang không dừng; quay lại thấy tiến độ / kết quả.
+ * 28/10/2026: link HĐ gốc — XML máy tính tiền KHÔNG có mã tra cứu → mã = `verify_code` của HĐĐT KiotViet, link = trang einvoiceapp;
+ * mỗi lần lấy HĐĐT mới từ KiotViet tự lưu lên máy chủ (InvoiceLookupService, Firestore `invoice_lookups` chiều 'out').
  */
 import { Component, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -20,6 +22,7 @@ import { TienIchCacheService } from '../../../services/tien-ich-cache.service';
 import { BackgroundJobService, BgJob } from '../../../services/background-job.service';
 import { LocalXmlInvoice, XmlReadResult, detectCompanyMst, readInvoiceFiles } from '../../../utils/invoice-xml.util';
 import { TableLoadingComponent } from '../../shared/table-loading/table-loading.component';
+import { InvoiceLookupService, LookupItem } from '../../../services/invoice-lookup.service';
 
 const LOG = '[InvoiceCountOut]';
 const TOL = 1;
@@ -52,6 +55,7 @@ export class Ledger9DongBoHoaDonDauRaComponent {
   private companyService = inject(CompanyService);
   private cache = inject(TienIchCacheService);
   private jobs = inject(BackgroundJobService);
+  private lookups = inject(InvoiceLookupService);
   readonly periodLabel = this.periodService.label;
 
   fromDate = '';
@@ -89,6 +93,10 @@ export class Ledger9DongBoHoaDonDauRaComponent {
   page = 1;
   readonly pageSize = 100;
   error = '';
+  /** lưu link HĐ gốc lên máy chủ */
+  linkInfo = '';
+  copiedMsg = '';
+  private copiedTimer: any = null;
 
   readonly statusLabel: Record<RowStatus, string> = {
     mismatch: 'Lệch số tiền', only_xml: 'Chỉ có trên XML', only_kv: 'Chỉ có trên KiotViet', match: 'Khớp'
@@ -237,6 +245,7 @@ export class Ledger9DongBoHoaDonDauRaComponent {
     if (cacheOnly && !cached) return;
     this.loadingKv = true;
     this.error = '';
+    let fresh = false;
     try {
       let res: CachedBills;
       if (cached) {
@@ -253,6 +262,7 @@ export class Ledger9DongBoHoaDonDauRaComponent {
           return data;
         }).promise;
         this.kvFetchedAt = Date.now();
+        fresh = true;
       }
       this.einvoiceUrl = res.einvoice_url;
       const published = res.bills.filter(b => b.number);
@@ -267,6 +277,52 @@ export class Ledger9DongBoHoaDonDauRaComponent {
     } finally {
       this.loadingKv = false;
     }
+    if (fresh && this.rows.length) await this.saveLinks();
+  }
+
+  /** HĐĐT đã lưu trên máy trước 28/10/2026 không có mã tra cứu → cần "Lấy lại từ KiotViet" */
+  get kvNoCode(): boolean {
+    return this.rows.some(r => r.kv) && this.rows.every(r => !r.kv || r.kv.verify_code === undefined);
+  }
+
+  /** Lưu link HĐ gốc (mã tra cứu KiotViet + link einvoiceapp) của mọi dòng đang so lên máy chủ. Không gửi thông tin người mua. */
+  async saveLinks(): Promise<void> {
+    const items: LookupItem[] = [];
+    for (const r of this.rows) {
+      const x = r.xml, b = r.kv;
+      const number = x?.shdon ?? Number(b?.number);
+      if (!number) continue;
+      items.push({
+        date: x?.tdlap || (b?.date || '').slice(0, 10), seller_mst: this.companyMst, template: x?.khmshdon || b?.template || '1',
+        series: x?.khhdon || b?.series || '', number, total_before_vat: x?.tgtcthue ?? b?.amount, vat: x?.tgtthue ?? b?.amount_vat,
+        total: x?.tgtttbso ?? b?.total, mccqt: x?.mccqt || b?.cqt_code || '', provider: b ? 'KiotViet HĐĐT' : '',
+        code: b?.verify_code || '', code_field: b?.verify_code ? 'verify_code' : '', url: b ? this.billUrl(b) : '', direct: b ? true : undefined,
+        einvoice_id: b?.id || '', kv_code: b?.code || '',
+      });
+    }
+    if (!items.length || !this.companyMst) {
+      console.warn(`${LOG} Không lưu link HĐ gốc: ${!this.companyMst ? 'chưa biết MST công ty' : 'không có dòng nào'}`);
+      return;
+    }
+    try {
+      const r = await this.lookups.save('out', items);
+      this.linkInfo = `Đã lưu link HĐ gốc lên máy chủ: ${r.saved} HĐ (${items.filter(i => i.code).length} có mã tra cứu)`;
+    } catch (e: any) {
+      console.error(`${LOG} Lưu link HĐ gốc lỗi: ${httpErrorText(e)}`);
+      this.linkInfo = `Không lưu được link HĐ gốc lên máy chủ: ${e?.error?.detail || httpErrorText(e)}`;
+    }
+  }
+
+  async copy(text: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.copiedMsg = `Đã chép mã tra cứu ${text}`;
+    } catch (e: any) {
+      console.warn(`${LOG} Không chép được vào clipboard: ${e?.message || e}`);
+      this.copiedMsg = `Không chép tự động được — tự chép: ${text}`;
+    }
+    clearTimeout(this.copiedTimer);
+    this.copiedTimer = setTimeout(() => this.copiedMsg = '', 5000);
   }
 
   private build(bills: EinvoiceBill[]): void {
@@ -335,11 +391,11 @@ export class Ledger9DongBoHoaDonDauRaComponent {
       return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const head = ['Kết quả', 'Ký hiệu - Số', 'Ngày XML', 'Người mua (XML)', 'Chưa thuế XML', 'Thuế XML', 'Tổng TT XML',
-      'Mã HĐ KiotViet', 'Ngày HĐĐT', 'Chưa thuế KiotViet', 'Thuế KiotViet', 'Tổng TT KiotViet', 'Chi tiết lệch'];
+      'Mã HĐ KiotViet', 'Ngày HĐĐT', 'Chưa thuế KiotViet', 'Thuế KiotViet', 'Tổng TT KiotViet', 'Mã tra cứu', 'Chi tiết lệch'];
     const lines = [head.join(';'), ...this.filteredRows.map(r => [
       this.statusLabel[r.status], r.key, r.xml ? this.viDate(r.xml.tdlap) : '', r.xml?.nmten || '', r.xml?.tgtcthue, r.xml?.tgtthue,
       r.xml?.tgtttbso, r.kv?.code || '', r.kv ? r.kv.date.slice(0, 10) : '', r.kv?.amount, r.kv?.amount_vat, r.kv?.total,
-      r.diffs.join(' | ')].map(cell).join(';'))];
+      r.kv?.verify_code || '', r.diffs.join(' | ')].map(cell).join(';'))];
     const name = `kiem-tra-so-luong-hd-dau-ra_${this.fromDate}_${this.toDate}.csv`;
     const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
