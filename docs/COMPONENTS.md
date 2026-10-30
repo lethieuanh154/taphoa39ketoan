@@ -340,6 +340,12 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
   - **ledger-9**: XML máy tính tiền không có mã tra cứu → cột "Mã tra cứu" = `verify_code` của HĐĐT KiotViet (`/api/einvoice-check/bills`
     trả thêm `verify_code`, `cqt_code`), link HĐ gốc = einvoiceapp. Mỗi lần lấy HĐĐT MỚI từ KiotViet → tự lưu link (chiều `out`, không
     gửi thông tin người mua). Bản HĐĐT lưu trên máy trước 28/10 không có mã → nhắc "Lấy lại từ KiotViet".
+  - **Chọn file ZIP / RAR** (30/10/2026, user): ledger-8, ledger-9, Chuyển khoản HĐ đầu vào, Đối soát hóa đơn thêm nút "Chọn file
+    ZIP / RAR" cạnh "Chọn thư mục" (`accept=".zip,.rar,.xml"`, chọn nhiều file). `utils/archive.util.ts` `expandArchives(files, keep)`
+    giải nén trên trình duyệt (ZIP fflate, RAR `node-unrar-js` WASM — chỉ tải ~42 KB JS + 200 KB `unrar/unrar.wasm` khi gặp .rar),
+    file nén lồng nhau ≤ 3 cấp, bỏ 1 cấp thư mục chung (nén cả thư mục "T10" → như chọn thư mục T10). `readInvoiceFiles` đọc thẳng
+    .zip / .rar. Đối soát hóa đơn: file chọn giải nén rồi `scanFolder` như thư mục (bảng lương / danh mục ở gốc file nén vẫn nhận); RAR
+    nằm trong thư mục chọn cũng giải nén trên máy (máy chủ không đọc RAR). Spec `archive.util.spec.ts` có RAR thật (XML giả lập).
   - **ledger-8 — Gán link tra cứu** (28/10/2026 tối, user: "chỉ vài NCC mới hiện Mở HĐ gốc / Tra cứu NCC"): khảo sát 150 XML thật — 38 HĐ
     không có mã (BKAV 22 · VNPT 11 · MobiFone 3 · 0101162173 2), 10 HĐ có mã nhưng NCC HĐĐT chưa biết trang tra cứu (0401486901
     `QuanLy_SoBaoMat`, 0312303803 `Mã tra cứu hóa đơn`, 0100727825 `KeySearch`, 0105232093). Thay vì đoán tên miền NCC: khung vàng

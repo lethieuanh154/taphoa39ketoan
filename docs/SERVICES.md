@@ -414,6 +414,7 @@ deleteRuns(ids)                              // POST /runs/delete → {deleted, 
 taxRates() / setTaxRate(master, name, rate)  // thuế suất đúng theo mã master; rate '' = bỏ thuế suất kế toán đặt
 listBills(from, to)                          // HĐĐT KiotViet mọi trạng thái ≤ 92 ngày (Kiểm tra số lượng HĐ đầu ra)
 setTaxRatesBulk(items)                       // xác nhận hàng loạt thuế suất đúng (mặt hàng chỉ dùng 1 thuế suất)
+billPdf(id): Promise<Blob>                   // (30/10/2026) GET /bills/{id}/pdf — PDF như lúc bấm Phát hành; CheckBill.pdf = ok|diff|error
 ```
 ReconciliationService thêm (bước 5): `getFigures(id)` (01/GTGT + PL142 + TNCN + định nghĩa dòng), `downloadBangKe(id)`,
 `tncnFromPayroll(file, from, to, toKhai[])`.
