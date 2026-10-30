@@ -49,6 +49,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "unrar.wasm",
+                "input": "node_modules/node-unrar-js/esm/js",
+                "output": "unrar"
               }
             ],
             "styles": [
@@ -113,6 +118,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "unrar.wasm",
+                "input": "node_modules/node-unrar-js/esm/js",
+                "output": "unrar"
               }
             ],
             "styles": [

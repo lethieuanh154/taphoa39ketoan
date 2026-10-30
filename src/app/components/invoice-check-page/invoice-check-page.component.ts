@@ -5,7 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { httpErrorText } from '../../services/auth.service';
 import { TableLoadingComponent } from '../shared/table-loading/table-loading.component';
 import {
-  BillLevel, CheckBill, CheckIssue, CheckRun, EinvoiceCheckService, RunList, TaxRate, UnknownMaster
+  BillLevel, CheckBill, CheckIssue, CheckRun, EinvoiceCheckService, PdfStatus, RunList, TaxRate, UnknownMaster
 } from '../../services/einvoice-check.service';
 
 /**
@@ -236,6 +236,37 @@ export class InvoiceCheckPageComponent implements OnInit {
   /** Link mở đúng HĐ: trang danh sách einvoiceapp đọc ?id=<id HĐ einvoice> → lọc + mở sẵn dòng đó (đọc từ JS einvoiceapp 23/10/2026) */
   billUrl(b: CheckBill): string {
     return `${this.einvoiceUrl}?id=${encodeURIComponent(b.id)}`;
+  }
+
+  // ===== PDF lúc phát hành (30/10/2026) — cột PDF + nút xem file =====
+  readonly pdfLabel: Record<PdfStatus, string> = { ok: 'Khớp', diff: 'Khác dữ liệu', error: 'Không đọc được' };
+  readonly pdfLevel: Record<PdfStatus, BillLevel> = { ok: 'ok', diff: 'error', error: 'warn' };
+  /** id HĐ đang tải PDF (einvoice dựng ~5–8 giây) */
+  pdfLoading = '';
+
+  /** Mở tab trống NGAY lúc bấm (trình duyệt chặn window.open sau await) rồi gán PDF tải qua HttpClient (có X-Id-Token) */
+  async openPdf(b: CheckBill): Promise<void> {
+    if (this.pdfLoading) return;
+    const win = window.open('', '_blank');
+    this.pdfLoading = b.id;
+    this.error = '';
+    try {
+      const blob = await this.service.billPdf(b.id);
+      const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      if (win) win.location.href = url; else window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      console.log(`${LOG} Xem PDF HĐ ${b.code} (${Math.round(blob.size / 1024)} KB)`);
+    } catch (e: any) {
+      win?.close();
+      let detail = '';
+      try {
+        detail = e?.error instanceof Blob ? JSON.parse(await e.error.text())?.detail || '' : e?.error?.detail || '';
+      } catch { /* phản hồi lỗi không phải JSON → dùng httpErrorText */ }
+      console.warn(`${LOG} Không xem được PDF HĐ ${b.code}: ${httpErrorText(e)}${detail ? ` — ${detail}` : ''}`);
+      this.error = `Không xem được PDF HĐ ${b.code}: ${detail || httpErrorText(e)}`;
+    } finally {
+      this.pdfLoading = '';
+    }
   }
 
   async copy(text: string): Promise<void> {

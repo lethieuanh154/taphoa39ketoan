@@ -14,11 +14,15 @@
         {{ xmlBusy ? ('Đang đọc ' + (xmlProgressText || '...')) : 'Chọn thư mục XML HĐ đầu ra' }}
         <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlBusy" hidden>
       </label>
+      <label class="btn btn-outline-primary pick" [class.disabled]="xmlBusy" title="Chọn 1 hoặc nhiều file .zip / .rar (hoặc .xml) — giải nén ngay trên máy">
+        <i class="fa-solid fa-file-zipper"></i> Chọn file ZIP / RAR
+        <input type="file" accept=".zip,.rar,.xml" multiple (change)="onXmlSelected($event)" [disabled]="xmlBusy" hidden>
+      </label>
       @if (xmlInfo) {
         <span><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
           @if (xmlSavedAt) { <span class="hint">· đọc lúc {{ viTime(xmlSavedAt) }} (đã lưu trên máy — FDI tải thêm thì chọn lại thư mục)</span> }</span>
       } @else if (!xmlBusy) {
-        <span class="hint">Vd <code>D:\D\TAI HOA DON HANG LOAT\&lt;MST&gt;\T9\&lt;MST&gt;\sold\xml</code> — có ZIP cũng được.</span>
+        <span class="hint">Vd <code>D:\D\TAI HOA DON HANG LOAT\&lt;MST&gt;\T9\&lt;MST&gt;\sold\xml</code> — hoặc file ZIP / RAR của thư mục đó.</span>
       }
     </div>
     <div class="row">

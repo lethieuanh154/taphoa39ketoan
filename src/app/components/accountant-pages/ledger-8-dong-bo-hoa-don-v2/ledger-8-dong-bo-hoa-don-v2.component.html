@@ -14,7 +14,11 @@
         {{ xmlBusy ? ('Đang đọc ' + (xmlProgressText || '...')) : 'Chọn thư mục XML HĐ đầu vào' }}
         <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlBusy" hidden>
       </label>
-      <span class="xml-hint" *ngIf="!xmlInfo && !xmlBusy">Thư mục app FDI tải về (vd <code>...\T9\&lt;MST&gt;\purchase\xml</code>) — đọc ngay trên máy, chỉ gửi lên máy chủ số / ký hiệu / tiền + mã tra cứu (để lưu link HĐ gốc). Có ZIP cũng được.</span>
+      <label class="btn btn-outline-primary" [class.disabled]="xmlBusy" title="Chọn 1 hoặc nhiều file .zip / .rar (hoặc .xml) — giải nén ngay trên máy">
+        <i class="fa-solid fa-file-zipper"></i> Chọn file ZIP / RAR
+        <input type="file" accept=".zip,.rar,.xml" multiple (change)="onXmlSelected($event)" [disabled]="xmlBusy" hidden>
+      </label>
+      <span class="xml-hint" *ngIf="!xmlInfo && !xmlBusy">Thư mục app FDI tải về (vd <code>...\T9\&lt;MST&gt;\purchase\xml</code>) hoặc file ZIP / RAR của thư mục đó — đọc ngay trên máy, chỉ gửi lên máy chủ số / ký hiệu / tiền + mã tra cứu (để lưu link HĐ gốc).</span>
       <span class="xml-info" *ngIf="xmlInfo"><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
         <span class="xml-hint" *ngIf="xmlSavedAt">· đọc lúc {{ viTime(xmlSavedAt) }} (đã lưu trên máy — FDI tải thêm thì chọn lại thư mục)</span></span>
     </div>

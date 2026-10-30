@@ -27,7 +27,13 @@ export interface CheckBill {
   amount: number; amount_vat: number; total: number; n_lines: number; level: BillLevel; issues: CheckIssue[];
   /** Tổng HĐ bán KiotViet cùng mã (đã so) */
   kv_total?: number;
+  /** Kiểm PDF lúc phát hành (30/10/2026): ok = khớp dữ liệu, diff = khác, error = không đọc được; lần kiểm cũ không có */
+  pdf?: PdfStatus;
+  /** không khớp PDF gộp (phát hành nhiều HĐ) → máy đã đọc PDF riêng */
+  pdf_single?: boolean;
 }
+
+export type PdfStatus = 'ok' | 'diff' | 'error';
 
 export interface UnknownMaster { master_code: string; master_name: string; name: string; codes: string[]; rates: { [rate: string]: number }; lines: number; }
 export interface UnmappedCode { code: string; name: string; rates: { [rate: string]: number }; lines: number; }
@@ -105,6 +111,11 @@ export class EinvoiceCheckService {
   /** HĐĐT KiotViet mọi trạng thái [from, to] (≤ 92 ngày) — Kiểm tra số lượng HĐ đầu ra */
   listBills(from: string, to: string): Promise<{ count: number; einvoice_url: string; bills: EinvoiceBill[] }> {
     return firstValueFrom(this.http.get<{ count: number; einvoice_url: string; bills: EinvoiceBill[] }>(`${BASE}/bills`, { params: { from, to } }));
+  }
+
+  /** PDF 1 HĐ đúng như lúc bấm Phát hành (BE gọi einvoice /v2/bills/view, ~5–8 giây) — qua HttpClient để có X-Id-Token */
+  billPdf(id: string): Promise<Blob> {
+    return firstValueFrom(this.http.get(`${BASE}/bills/${encodeURIComponent(id)}/pdf`, { responseType: 'blob' }));
   }
 
   taxRates(): Promise<{ rates: TaxRate[]; valid: string[] }> {

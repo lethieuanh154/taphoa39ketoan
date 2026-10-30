@@ -183,7 +183,8 @@ export class Ledger9DongBoHoaDonDauRaComponent {
     const files = Array.from(input.files || []);
     input.value = '';
     if (!files.length) return;
-    const folder = (files[0] as any).webkitRelativePath?.split('/')[0] || `${files.length} file`;
+    // chọn file ZIP / RAR (không phải thư mục) → không có webkitRelativePath: lấy tên file
+    const folder = (files[0] as any).webkitRelativePath?.split('/')[0] || (files.length === 1 ? files[0].name : `${files.length} file`);
     this.error = '';
     this.xmlInfo = '';
     this.compared = false;

@@ -1,11 +1,11 @@
-import { unzipSync } from 'fflate';
 import { InvoiceLookup, detectLookup } from './invoice-lookup.util';
+import { ARCHIVE_RE, expandArchives } from './archive.util';
 
 /**
  * ĐỌC DANH SÁCH HĐĐT TỪ FILE XML TRÊN MÁY (thư mục app FDI tải về: `<MST>\T<tháng>\<MST>\{purchase|sold}\xml`) — chạy trong
  * trình duyệt, không tải XML lên máy chủ. Thay nguồn GDT (cổng thuế chặn tự động hóa) cho trang Kiểm tra số lượng hóa đơn.
  * XML theo TT78: HDon/DLHDon/TTChung (KHMSHDon, KHHDon, SHDon, NLap) + NDHDon/NBan, NMua (Ten, MST) + NDHDon/TToan
- * (TgTCThue, TgTThue, TgTTTBSo). ZIP (kể cả ZIP lồng) được giải nén bằng fflate.
+ * (TgTCThue, TgTThue, TgTTTBSo). ZIP / RAR (kể cả lồng nhau) giải nén trên trình duyệt — utils/archive.util.ts (RAR từ 30/10/2026).
  */
 export interface LocalXmlInvoice {
   khmshdon: string;   // ký hiệu mẫu số (1 = GTGT)
@@ -27,8 +27,6 @@ export interface XmlReadResult {
   nDuplicates: number;  // trùng khóa MST bán | ký hiệu | số
   errors: string[];     // file lỗi (tối đa 50)
 }
-
-const MAX_ZIP_DEPTH = 3;
 
 function first(root: Document | Element, name: string): Element | null {
   return root.getElementsByTagNameNS('*', name)[0] || root.getElementsByTagName(name)[0] || null;
@@ -92,7 +90,7 @@ export function invoiceKey(i: LocalXmlInvoice): string {
 }
 
 /**
- * Đọc nhiều file (.xml / .zip) — chọn bằng `<input webkitdirectory>` hoặc chọn file. Nhả luồng mỗi 100 file để trang không đứng.
+ * Đọc nhiều file (.xml / .zip / .rar) — chọn bằng `<input webkitdirectory>` hoặc chọn file. Nhả luồng mỗi 100 file để trang không đứng.
  * `onProgress(done, total)` theo số file người dùng chọn.
  */
 export async function readInvoiceFiles(files: File[], onProgress?: (done: number, total: number) => void): Promise<XmlReadResult> {
@@ -112,29 +110,17 @@ export async function readInvoiceFiles(files: File[], onProgress?: (done: number
       if (res.errors.length < 50) res.errors.push(`${path}: ${e?.message || e}`);
     }
   };
-  const walkZip = (data: Uint8Array, path: string, depth: number) => {
-    let entries: Record<string, Uint8Array>;
-    try {
-      entries = unzipSync(data, { filter: f => /\.(xml|zip)$/i.test(f.name) });
-    } catch (e: any) {
-      if (res.errors.length < 50) res.errors.push(`${path}: ZIP lỗi (${e?.message || e})`);
-      return;
-    }
-    for (const [name, bytes] of Object.entries(entries)) {
-      const p = `${path}/${name}`;
-      if (/\.zip$/i.test(name)) {
-        if (depth < MAX_ZIP_DEPTH) walkZip(bytes, p, depth + 1);
-      } else {
-        take(decoder.decode(bytes), p);
-      }
-    }
-  };
-  const list = files.filter(f => /\.(xml|zip)$/i.test(f.name));
+  const list = files.filter(f => /\.(xml|zip|rar)$/i.test(f.name));
   for (let i = 0; i < list.length; i++) {
     const f = list[i];
     const path = (f as any).webkitRelativePath || f.name;
-    if (/\.zip$/i.test(f.name)) walkZip(new Uint8Array(await f.arrayBuffer()), path, 1);
-    else take(await f.text(), path);
+    if (ARCHIVE_RE.test(f.name)) {
+      const ex = await expandArchives([f], n => /\.xml$/i.test(n));
+      for (const e of ex.errors) if (res.errors.length < 50) res.errors.push(e);
+      for (const x of ex.files) take(decoder.decode(new Uint8Array(await x.arrayBuffer())), (x as any).webkitRelativePath);
+    } else {
+      take(await f.text(), path);
+    }
     if (i % 100 === 99) {
       onProgress?.(i + 1, list.length);
       await new Promise(r => setTimeout(r));

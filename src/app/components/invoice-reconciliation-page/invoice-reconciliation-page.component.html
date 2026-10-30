@@ -14,14 +14,19 @@
 
 
     <div class="row">
-      <label class="btn btn-primary pick" [class.disabled]="running">
+      <label class="btn btn-primary pick" [class.disabled]="running || expanding">
         <i class="fa-solid fa-folder-open"></i> Chọn thư mục
-        <input type="file" webkitdirectory multiple (change)="onFolderSelected($event)" [disabled]="running" hidden>
+        <input type="file" webkitdirectory multiple (change)="onFolderSelected($event)" [disabled]="running || expanding" hidden>
+      </label>
+      <label class="btn pick" [class.disabled]="running || expanding" title="Chọn file .zip / .rar nén cả thư mục — giải nén ngay trên máy rồi gửi như chọn thư mục">
+        <i class="fa-solid" [ngClass]="expanding ? 'fa-spinner fa-spin' : 'fa-file-zipper'"></i>
+        {{ expanding ? ('Đang giải nén ' + expandProgress) : 'Chọn file ZIP / RAR' }}
+        <input type="file" accept=".zip,.rar" multiple (change)="onArchiveSelected($event)" [disabled]="running || expanding" hidden>
       </label>
       @if (scan) {
       <span class="folder"><i class="fa-regular fa-folder"></i> {{ scan.folderName || '(thư mục)' }}</span>
       } @else {
-      <span class="hint">Chọn thư mục gốc / thư mục MST / thư mục tháng — máy đọc mọi XML, ZIP bên trong.</span>
+      <span class="hint">Chọn thư mục gốc / thư mục MST / thư mục tháng (hoặc file ZIP / RAR nén thư mục đó) — máy đọc mọi XML, ZIP, RAR bên trong.</span>
       }
     </div>
     <div class="row catalog">

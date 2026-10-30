@@ -12,6 +12,7 @@ import {
   CatalogStatus, FolderScan, ReconciliationRun, ReconciliationService, RunTab
 } from '../../services/reconciliation.service';
 import { ServerTableComponent, ServerTableSource } from '../shared/server-table/server-table.component';
+import { expandArchives } from '../../utils/archive.util';
 
 const LOG = '[InvoiceReconciliation]';
 
@@ -64,6 +65,9 @@ export class InvoiceReconciliationPageComponent implements OnInit {
   catalogError = '';
 
   scan: FolderScan | null = null;
+  /** đang giải nén file ZIP / RAR người dùng chọn (30/10/2026) */
+  expanding = false;
+  expandProgress = '';
   periodMode: 'period' | 'auto' = 'period';
   /** mặc định = MST công ty (popup ở MainLayout), sửa tay được cho lần chạy này; để trống = máy chủ tự nhận */
   mst = '';
@@ -109,7 +113,7 @@ export class InvoiceReconciliationPageComponent implements OnInit {
   }
 
   get canStart(): boolean {
-    return !!this.scan && (this.scan.nXml + this.scan.nZip) > 0 && !this.running && !this.serverBusy;
+    return !!this.scan && (this.scan.nXml + this.scan.nZip) > 0 && !this.running && !this.serverBusy && !this.expanding;
   }
 
   get visibleTabs(): RunTab[] {
@@ -175,15 +179,54 @@ export class InvoiceReconciliationPageComponent implements OnInit {
 
   // ───────────────────────────── Chọn thư mục + chạy
 
-  onFolderSelected(event: Event): void {
+  async onFolderSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
-    if (!input.files?.length) {
+    const files = Array.from(input.files || []);
+    input.value = '';   // chọn lại đúng thư mục đó vẫn nhận
+    if (!files.length) {
       console.info(`${LOG} Không chọn thư mục nào`);
       return;
     }
+    // máy chủ không đọc được RAR → RAR trong thư mục giải nén trên máy; ZIP giữ nguyên gửi lên như trước
+    const rars = files.filter(f => /\.rar$/i.test(f.name));
+    await this.expandAndScan(files.filter(f => !rars.includes(f)), rars);
+  }
+
+  /** Chọn file ZIP / RAR (nén cả thư mục) → giải nén trên máy rồi quét như chọn thư mục (bảng lương / danh mục ở gốc file nén vẫn nhận) */
+  async onArchiveSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) {
+      console.info(`${LOG} Không chọn file nén nào`);
+      return;
+    }
+    await this.expandAndScan([], files);
+  }
+
+  private async expandAndScan(plain: File[], archives: File[]): Promise<void> {
     this.startError = '';
-    this.scan = this.service.scanFolder(input.files);
-    input.value = '';   // chọn lại đúng thư mục đó vẫn nhận
+    this.scan = null;
+    if (!archives.length) {
+      this.scan = this.service.scanFolder(plain);
+      return;
+    }
+    this.expanding = true;
+    this.expandProgress = '';
+    try {
+      const ex = await expandArchives(archives, () => true, (d, t) => this.expandProgress = `${d}/${t}`);
+      console.info(`${LOG} Giải nén ${archives.length} file nén → ${ex.files.length} file (${ex.nArchives} file nén kể cả lồng nhau), lỗi ${ex.errors.length}`);
+      if (ex.errors.length) {
+        this.startError = `Không giải nén được: ${ex.errors.slice(0, 3).join(' · ')}${ex.errors.length > 3 ? ` · … (${ex.errors.length} lỗi)` : ''}`;
+      }
+      const all = [...plain, ...ex.files];
+      if (all.length) this.scan = this.service.scanFolder(all);
+    } catch (e: any) {
+      console.error(`${LOG} Giải nén lỗi:`, e);
+      this.startError = `Không giải nén được: ${e?.message || e}`;
+    } finally {
+      this.expanding = false;
+    }
   }
 
   async start(): Promise<void> {

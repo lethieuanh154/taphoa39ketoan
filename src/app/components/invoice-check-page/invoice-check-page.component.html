@@ -114,7 +114,7 @@
             <table>
               <thead>
                 <tr><th>Mã HĐ</th><th>HĐĐT</th><th>Ngày</th><th>Hình thức thanh toán</th><th class="num">Chưa thuế</th><th class="num">Thuế</th>
-                  <th class="num">Tổng TT</th><th>Kết quả</th><th>Chi tiết</th></tr>
+                  <th class="num">Tổng TT</th><th>Kết quả</th><th title="PDF lúc bấm Phát hành so với dữ liệu HĐ">PDF</th><th>Chi tiết</th></tr>
               </thead>
               <tbody>
                 @for (b of pageBills; track b.id) {
@@ -130,6 +130,14 @@
                     <td class="num">{{ vnd(b.amount_vat) }}</td>
                     <td class="num">{{ vnd(b.total) }}</td>
                     <td><span class="level" [ngClass]="b.level">{{ levelLabel[b.level] }}</span></td>
+                    <td class="nowrap">
+                      @if (b.pdf) {
+                        <span class="level" [ngClass]="pdfLevel[b.pdf]" [title]="b.pdf_single ? 'Không khớp PDF gộp (phát hành nhiều HĐ) → máy đã đọc PDF riêng HĐ này' : ''">{{ pdfLabel[b.pdf] }}{{ b.pdf_single ? ' *' : '' }}</span>
+                      }
+                      <button type="button" class="link" (click)="openPdf(b)" [disabled]="pdfLoading === b.id" title="Xem PDF đúng như lúc bấm Phát hành (einvoice dựng mất ~5–8 giây)">
+                        @if (pdfLoading === b.id) { <i class="fa-solid fa-spinner fa-spin"></i> } @else { <i class="fa-regular fa-file-pdf"></i> }
+                      </button>
+                    </td>
                     <td class="issues">
                       @for (i of b.issues; track $index) {
                         <div class="issue" [ngClass]="i.level">
@@ -160,7 +168,7 @@
                     </td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="9" class="empty">{{ view === 'issues' ? 'Không có HĐ nào có lỗi / cần xem 🎉' : 'Không có HĐ.' }}</td></tr>
+                  <tr><td colspan="10" class="empty">{{ view === 'issues' ? 'Không có HĐ nào có lỗi / cần xem 🎉' : 'Không có HĐ.' }}</td></tr>
                 }
               </tbody>
             </table>

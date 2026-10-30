@@ -19,11 +19,15 @@
         {{ xmlReading ? ('Đang đọc ' + (xmlJob?.progress || '...')) : 'Chọn thư mục XML HĐ đầu vào' }}
         <input type="file" webkitdirectory multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
       </label>
+      <label class="btn btn-outline-primary pick" [class.disabled]="xmlReading" title="Chọn 1 hoặc nhiều file .zip / .rar (hoặc .xml) — giải nén ngay trên máy">
+        <i class="fa-solid fa-file-zipper"></i> Chọn file ZIP / RAR
+        <input type="file" accept=".zip,.rar,.xml" multiple (change)="onXmlSelected($event)" [disabled]="xmlReading" hidden>
+      </label>
       @if (xmlInfo) {
         <span><i class="fa-regular fa-folder"></i> <b>{{ xmlFolder }}</b>: {{ xmlInfo }}
           @if (xmlSavedAt) { <span class="hint">· đọc lúc {{ viTime(xmlSavedAt) }} (dùng chung với Kiểm tra số lượng HĐ đầu vào)</span> }</span>
       } @else if (!xmlReading) {
-        <span class="hint">Thư mục app FDI tải về (<code>…\purchase\xml</code>), nên chọn cả quý để ghép được tiền trả HĐ tháng trước. Có ZIP cũng được.</span>
+        <span class="hint">Thư mục app FDI tải về (<code>…\purchase\xml</code>), nên chọn cả quý để ghép được tiền trả HĐ tháng trước. Chọn file ZIP / RAR cũng được.</span>
       }
     </div>
     @if (mstWarning) { <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstWarning }}</div> }

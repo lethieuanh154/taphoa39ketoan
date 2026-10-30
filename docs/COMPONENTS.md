@@ -386,6 +386,8 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - (30/10/2026) **Kiểm PDF lúc phát hành**: máy chủ lấy PDF einvoice dựng khi bấm "Phát hành" (gộp 5 HĐ / lần như phát hành nhiều HĐ)
   rồi so với dữ liệu HĐ → lỗi loại `PDF: ...` hiện chung bảng lỗi (không cần UI riêng). Tóm tắt lần kiểm thêm dòng "Đã so PDF lúc phát
   hành của n HĐ" (`counts.pdf_checked`, `pdf_single`, `pdf_errors`). Chi tiết: `TapHoa39KeToanBackEnd/docs/TIEN-ICH-JOBS.md`.
+  Cột **PDF** mỗi HĐ: Khớp / Khác dữ liệu / Không đọc được (`*` = không khớp PDF gộp, máy đã đọc PDF riêng; lần kiểm cũ để trống) +
+  nút **Xem PDF** (`openPdf`: mở tab trống ngay lúc bấm rồi gán blob tải qua `billPdf` — tránh trình duyệt chặn popup sau await).
 
 ## ItemMappingPageComponent — Tiện ích "Ánh xạ hàng hóa" (23/10/2026)
 
