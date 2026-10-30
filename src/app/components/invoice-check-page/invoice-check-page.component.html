@@ -77,6 +77,10 @@
         @if (run.counts.kv_compared !== null && run.counts.kv_compared !== undefined) {
           <p class="hint"><i class="fa-solid fa-scale-balanced"></i> Đã so tổng tiền {{ run.counts.kv_compared | number }} HĐ với HĐ bán KiotViet cùng mã.</p>
         }
+        @if (run.counts.pdf_checked !== null && run.counts.pdf_checked !== undefined) {
+          <p class="hint"><i class="fa-solid fa-file-pdf"></i> Đã so PDF lúc phát hành của {{ run.counts.pdf_checked | number }} HĐ với dữ liệu HĐ
+            (gộp nhiều HĐ như nút Phát hành{{ run.counts.pdf_single ? '; ' + run.counts.pdf_single + ' HĐ phải đọc PDF riêng' : '' }}{{ run.counts.pdf_errors ? '; ' + run.counts.pdf_errors + ' HĐ không đọc được PDF' : '' }}).</p>
+        }
       }
       @for (w of run.warnings; track $index) { <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> {{ w }}</div> }
 

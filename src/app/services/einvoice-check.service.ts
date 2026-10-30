@@ -36,6 +36,8 @@ export interface CheckCounts {
   bills?: number; checked?: number; read_errors?: number; lines?: number; bills_error?: number; bills_warn?: number; bills_ok?: number;
   issues?: number; kinds?: { [kind: string]: number }; unknown_masters?: number; unmapped_codes?: number;
   catalog_refreshed?: boolean; rate_masters?: number; rate_manual?: number; kv_compared?: number | null;
+  /** Kiểm PDF lúc phát hành (30/10/2026): null = BE tắt; pdf_single = HĐ không khớp PDF gộp phải đọc riêng */
+  pdf_checked?: number | null; pdf_errors?: number; pdf_single?: number;
 }
 
 export interface CheckRun {

@@ -383,6 +383,9 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - (26/10/2026) Xóa lần kiểm: ô chọn từng dòng + chọn nhanh Tất cả / Lịch tự động / Người bấm → **Xóa đã chọn**; nút thùng rác
   từng dòng. Có hỏi xác nhận; lần đang chạy không chọn / xóa được. Xóa lần đang xem → mở lần mới nhất còn lại. Máy chủ vẫn tự
   giữ 60 lần gần nhất (`EINVOICE_CHECK_KEEP_RUNS`).
+- (30/10/2026) **Kiểm PDF lúc phát hành**: máy chủ lấy PDF einvoice dựng khi bấm "Phát hành" (gộp 5 HĐ / lần như phát hành nhiều HĐ)
+  rồi so với dữ liệu HĐ → lỗi loại `PDF: ...` hiện chung bảng lỗi (không cần UI riêng). Tóm tắt lần kiểm thêm dòng "Đã so PDF lúc phát
+  hành của n HĐ" (`counts.pdf_checked`, `pdf_single`, `pdf_errors`). Chi tiết: `TapHoa39KeToanBackEnd/docs/TIEN-ICH-JOBS.md`.
 
 ## ItemMappingPageComponent — Tiện ích "Ánh xạ hàng hóa" (23/10/2026)
 
