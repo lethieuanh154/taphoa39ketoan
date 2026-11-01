@@ -222,6 +222,8 @@ export function expandInvoiceItems(invoices: ReconInvoice[]): ReconItem[] {
 
 /**
  * Khớp theo số tiền, ghép cặp theo thời gian trong từng mệnh giá.
+ * Bước 0: HĐ "N lần" khớp trước theo CÙNG 1 người chuyển (trong khung giờ) — tránh lấy GD cùng số tiền
+ *         của khách khác chuyển sát giờ.
  * Bước 1: khung [HĐ − before, HĐ + after]. Các khung cùng độ dài nên duyệt HĐ theo giờ tăng dần
  *         và lấy GD sớm nhất còn trống trong khung là tối ưu (số cặp trong khung lớn nhất).
  * Bước 2: phần còn lại cùng số tiền ghép theo thứ tự thời gian → 'matched_late'.
@@ -242,13 +244,17 @@ export function reconcileByAmount(
     if (!g) { g = { inv: [], bank: [] }; groups.set(a, g); }
     return g;
   };
-  for (const item of items) group(item.amount).inv.push({ item, t: viStampToMinutes(item.invoice.time) });
   for (const txn of txns) group(txn.credit).bank.push({ txn, t: viStampToMinutes(txn.date), used: false });
+
+  const pairs: ReconPair[] = [];
+  const payerMatched = matchMultiTransferByPayer(items, groups, opt, pairs);
+  for (const item of items) {
+    if (!payerMatched.has(item)) group(item.amount).inv.push({ item, t: viStampToMinutes(item.invoice.time) });
+  }
 
   const pFrom = isoDateToMinutes(opt.periodFrom || '', false);
   const pTo = isoDateToMinutes(opt.periodTo || '', true);
   const byTime = (a: { t: number }, b: { t: number }) => (a.t || 0) - (b.t || 0);
-  const pairs: ReconPair[] = [];
 
   for (const [amount, g] of groups) {
     g.inv.sort(byTime);
@@ -297,6 +303,84 @@ export function reconcileByAmount(
     }
   }
   return pairs;
+}
+
+/**
+ * Tên người chuyển để so khớp: cột "Chủ TK đối ứng"; thiếu thì lấy từ diễn giải
+ * ("TPB;69586928888;NGUYEN VAN A chuyen tien", "IBFT NGUYEN VAN A chuyen tien"). '' nếu không đọc được.
+ */
+export function payerKey(txn: Pick<ReconBankTxn, 'counterparty' | 'desc'>): string {
+  const clean = (s: string) => normalizeVi(s).replace(/[^a-z0-9]+/g, ' ').trim();
+  const fromCol = clean(txn.counterparty || '');
+  if (fromCol) return fromCol;
+  const m = /^(?:.*;)?\s*(?:ibft\s+)?(.+?)\s+chuyen\s*(?:tien|khoan)\b/.exec(normalizeVi(txn.desc || ''));
+  return m ? clean(m[1]) : '';
+}
+
+type PayerTxn = { txn: ReconBankTxn; t: number; used: boolean };
+
+/**
+ * Bước 0 của reconcileByAmount: mỗi HĐ "N lần" (duyệt theo giờ HĐ) chọn 1 người chuyển có GD trống trong khung
+ * cho nhiều khoản nhất (≥ 2; hòa → tổng |lệch giờ| nhỏ nhất), mỗi khoản lấy GD gần giờ HĐ nhất của người đó.
+ * Khoản không phủ được để lại cho bước 1–3. Trả về các khoản đã khớp.
+ */
+function matchMultiTransferByPayer(
+  items: ReconItem[],
+  groups: Map<number, { bank: PayerTxn[] }>,
+  opt: ReconOptions,
+  pairs: ReconPair[]
+): Set<ReconItem> {
+  const matched = new Set<ReconItem>();
+  const byInvoice = new Map<ReconInvoice, ReconItem[]>();
+  for (const item of items) {
+    if (item.partCount < 2) continue;
+    const list = byInvoice.get(item.invoice) || [];
+    list.push(item);
+    byInvoice.set(item.invoice, list);
+  }
+  const invoices = [...byInvoice.entries()]
+    .map(([invoice, parts]) => ({ parts, t: viStampToMinutes(invoice.time) }))
+    .filter(x => Number.isFinite(x.t))
+    .sort((a, b) => a.t - b.t);
+
+  for (const { parts, t } of invoices) {
+    const inWindow = (b: PayerTxn) => !b.used && b.t >= t - opt.windowBeforeMin && b.t <= t + opt.windowAfterMin;
+    const payers = new Set<string>();
+    for (const part of parts) {
+      for (const b of groups.get(part.amount)?.bank || []) {
+        const key = inWindow(b) ? payerKey(b.txn) : '';
+        if (key) payers.add(key);
+      }
+    }
+
+    let best: { picks: [ReconItem, PayerTxn][]; cost: number } | null = null;
+    for (const key of payers) {
+      const taken = new Set<PayerTxn>();
+      const picks: [ReconItem, PayerTxn][] = [];
+      let cost = 0;
+      for (const part of parts) {
+        const hit = (groups.get(part.amount)?.bank || [])
+          .filter(b => inWindow(b) && !taken.has(b) && payerKey(b.txn) === key)
+          .sort((a, b) => Math.abs(a.t - t) - Math.abs(b.t - t))[0];
+        if (!hit) continue;
+        taken.add(hit);
+        picks.push([part, hit]);
+        cost += Math.abs(hit.t - t);
+      }
+      if (picks.length < 2) continue;
+      if (!best || picks.length > best.picks.length || (picks.length === best.picks.length && cost < best.cost)) {
+        best = { picks, cost };
+      }
+    }
+    if (!best) continue;
+    for (const [part, hit] of best.picks) {
+      hit.used = true;
+      matched.add(part);
+      pairs.push({ amount: part.amount, item: part, txn: hit.txn, kind: 'matched', deltaMinutes: hit.t - t, edgeHint: null });
+    }
+  }
+  if (matched.size > 0) console.debug(`[TransferReconcile] Khớp ${matched.size} khoản CK nhiều lần theo người chuyển`);
+  return matched;
 }
 
 // ===== Nhãn hiển thị / CSV =====

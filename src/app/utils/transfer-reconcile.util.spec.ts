@@ -1,6 +1,6 @@
 import {
   parseMultiTransferNote, parseExcessTransferNote, expandInvoiceItems, reconcileByAmount, buildReconCsv,
-  buildMultiTransferCsv, buildExcessTransferCsv, viStampToMinutes, readKvEInvoice, ReconInvoice, ReconBankTxn
+  buildMultiTransferCsv, buildExcessTransferCsv, viStampToMinutes, readKvEInvoice, payerKey, ReconInvoice, ReconBankTxn
 } from './transfer-reconcile.util';
 
 const inv = (code: string, total: number, time: string, note = 'chuyển khoản'): ReconInvoice =>
@@ -134,6 +134,31 @@ describe('transfer-reconcile.util', () => {
       ]);
       expect(pairs.every(p => p.kind === 'matched')).toBeTrue();
       expect(pairs.find(p => p.item?.invoice.code === 'HD1')!.txn!.code).toBe('T1');
+    });
+
+    it('CK nhiều lần: khớp theo cùng người chuyển, không lấy GD cùng số tiền của khách khác (mẫu thật 30/10)', () => {
+      const items = expandInvoiceItems([
+        inv('HD445222', 98000, '30/10/2026 21:09:48', 'chuyển khoản 2 lần 68 + 30'),
+        inv('HD_KHAC', 30000, '30/10/2026 17:35:00'),
+      ]);
+      const pairs = reconcileByAmount(items, [
+        txn('T_THINH', 30000, '30/10/2026 17:34:08', 'HO PHUOC THINH '),
+        txn('T_68', 68000, '30/10/2026 17:39:37', 'NGUYEN THI LE THANH'),
+        txn('T_30', 30000, '30/10/2026 17:43:51', 'NGUYEN THI LE THANH'),
+      ]);
+      const code = (c: string, part = 1) =>
+        pairs.find(p => p.item?.invoice.code === c && p.item.partIndex === part)!.txn!.code;
+      expect(code('HD445222', 1)).toBe('T_68');
+      expect(code('HD445222', 2)).toBe('T_30');
+      expect(code('HD_KHAC')).toBe('T_THINH');
+      expect(pairs.every(p => p.kind === 'matched')).toBeTrue();
+    });
+
+    it('payerKey: cột Chủ TK đối ứng, thiếu thì đọc từ diễn giải', () => {
+      expect(payerKey({ counterparty: 'HO PHUOC THINH ', desc: '' })).toBe('ho phuoc thinh');
+      expect(payerKey({ counterparty: '', desc: 'TPB;69586928888;NGUYEN THI LE THANH chuyen tien' })).toBe('nguyen thi le thanh');
+      expect(payerKey({ counterparty: '', desc: 'IBFT NGUYEN THI LE THANH chuyen tien' })).toBe('nguyen thi le thanh');
+      expect(payerKey({ counterparty: '', desc: 'Thanh toan QR' })).toBe('');
     });
 
     it('phần dư + gợi ý biên kỳ', () => {
