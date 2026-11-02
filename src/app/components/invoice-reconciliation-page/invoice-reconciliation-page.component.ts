@@ -9,7 +9,7 @@ import { httpErrorText } from '../../services/auth.service';
 import { PeriodService, formatVn } from '../../services/period.service';
 import { CompanyService } from '../../services/company.service';
 import {
-  CatalogStatus, FolderScan, HhCode, HhCodeStatus, ReconciliationRun, ReconciliationService
+  CatalogStatus, FolderScan, HhCode, HhCodeStatus, ReconciliationRun, ReconciliationService, ReviewItem
 } from '../../services/reconciliation.service';
 import { expandArchives } from '../../utils/archive.util';
 
@@ -52,7 +52,7 @@ export class InvoiceReconciliationPageComponent implements OnInit {
   /** đang giải nén file ZIP / RAR người dùng chọn (30/10/2026) */
   expanding = false;
   expandProgress = '';
-  periodMode: 'period' | 'auto' = 'period';
+  periodMode: 'all' | 'period' | 'auto' = 'all';
   /** mặc định = MST công ty (popup ở MainLayout), sửa tay được cho lần chạy này; để trống = máy chủ tự nhận */
   mst = '';
   private readonly mstSync = effect(() => {
@@ -72,6 +72,12 @@ export class InvoiceReconciliationPageComponent implements OnInit {
   run: ReconciliationRun | null = null;
   runError = '';
   showWarnings = false;
+
+  /** Bảng duy nhất: mặt hàng cần xem + lý do (02/11/2026) */
+  review: ReviewItem[] = [];
+  reviewRunId = '';
+  reviewLoading = false;
+  reviewError = '';
   downloading = '';
 
   private pollSub?: Subscription;
@@ -236,8 +242,8 @@ export class InvoiceReconciliationPageComponent implements OnInit {
     const p = this.period();
     const opts = this.periodMode === 'period'
       ? { mst: this.mst.trim(), tuNgay: p.from, denNgay: p.to }
-      : { mst: this.mst.trim(), tuNgay: '', denNgay: '' };
-    console.info(`${LOG} Bắt đầu đối soát "${scan.folderName}" — kỳ ${opts.tuNgay || 'tự nhận'} → ${opts.denNgay || ''}`);
+      : { mst: this.mst.trim(), tuNgay: '', denNgay: '', toanBo: this.periodMode === 'all' };
+    console.info(`${LOG} Bắt đầu đối soát "${scan.folderName}" — kỳ ${opts.toanBo ? 'toàn bộ HĐ' : opts.tuNgay || 'tự nhận'} → ${opts.denNgay || ''}`);
     this.startError = '';
     this.run = null;
     try {
@@ -285,6 +291,7 @@ export class InvoiceReconciliationPageComponent implements OnInit {
       next: run => {
         const wasRunning = this.run?.id === id && (this.run.status === 'queued' || this.run.status === 'running');
         this.run = run;
+        if (run.status === 'done' && this.reviewRunId !== run.id) this.loadReview(run.id);
         if (run.status === 'done' || run.status === 'error') {
           this.pollSub?.unsubscribe();
           if (wasRunning) {
@@ -299,6 +306,26 @@ export class InvoiceReconciliationPageComponent implements OnInit {
         this.runError = `Không mở được lần đối soát: ${httpErrorText(e)}`;
       }
     });
+  }
+
+  async loadReview(id: string): Promise<void> {
+    this.reviewRunId = id;
+    this.review = [];
+    this.reviewError = '';
+    this.reviewLoading = true;
+    try {
+      const items = await this.service.reviewItems(id);
+      if (this.reviewRunId === id) this.review = items;
+    } catch (e) {
+      console.warn(`${LOG} Lấy mặt hàng cần xem của ${id} lỗi: ${httpErrorText(e)}`);
+      if (this.reviewRunId === id) this.reviewError = `Không lấy được danh sách cần xem: ${httpErrorText(e)}`;
+    } finally {
+      if (this.reviewRunId === id) this.reviewLoading = false;
+    }
+  }
+
+  reasons(item: ReviewItem): string[] {
+    return (item.ly_do || '').split('; ').filter(Boolean);
   }
 
   view(run: ReconciliationRun): void {

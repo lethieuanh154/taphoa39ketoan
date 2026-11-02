@@ -304,6 +304,12 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
   mã HH (từ HH3212, không trùng) cho mã master mới; trang chỉ hiện 1 dòng số mã / mã tiếp theo. Danh sách mã lưu IndexedDB
   `hh-codes` (`ReconciliationService.hhCodes()` tải lại khi `version` máy chủ đổi). Bản sao XML chỉ ghi mã HH, ĐVT nhỏ nhất;
   `QUYDOI*.xlsx` trong thư mục không còn dùng. Không có nhập danh mục Vietda (user: mã Vietda kế toán tự gõ, không quy luật).
+- **Kỳ "Toàn bộ HĐ trong thư mục"** (mặc định, 02/11/2026): gửi `toan_bo=true` → BE lấy kỳ = ngày HĐ sớm nhất → muộn nhất.
+  Lý do: thư mục MuaVao (tháng 9–10) + BanRa (tháng 11) bị "tự nhận quý" chọn Q4 → bỏ 16/20 HĐ vào tháng 9.
+- **ZIP XML quy đổi tách hình thức thanh toán**: `Dau vao (quy doi)/Chuyen khoan|Tien mat/…`, `Dau ra (quy doi)/…` —
+  `<HTTToan>` đúng "Chuyển khoản" → Chuyen khoan, còn lại (Tiền mặt, TM/CK, biếu tặng, trống) → Tien mat.
+- **Bảng "Mặt hàng cần xem"** (02/11/2026) — bảng DUY NHẤT trên trang: `ReconciliationService.reviewItems(id)` →
+  `GET /runs/{id}/review`; cột Người bán, Hàng trên HĐ, ĐVT, SL, Máy gợi ý (mã master), Hệ số, Tin cậy, Lý do (mỗi lý do 1 dòng).
 
 ## BankReconciliationPageComponent — Tiện ích "Đối soát CK" (23/10/2026)
 

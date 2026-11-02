@@ -81,6 +81,10 @@
     <div class="row options">
       <span class="label">Kỳ tính thuế</span>
       <label class="radio">
+        <input type="radio" name="periodMode" value="all" [(ngModel)]="periodMode" [disabled]="running">
+        Toàn bộ HĐ trong thư mục
+      </label>
+      <label class="radio">
         <input type="radio" name="periodMode" value="period" [(ngModel)]="periodMode" [disabled]="running">
         Theo kỳ đang chọn: <b>{{ periodLabel() }}</b> ({{ formatDate(period().from) }} → {{ formatDate(period().to) }})
       </label>
@@ -156,7 +160,7 @@
         </a>
         @if (run.has_clone_zip !== false) {
         <button type="button" class="btn" (click)="downloadCloneZip()" [disabled]="downloading === 'clone'"
-          title="Bản sao XML đã quy đổi về ĐVT nhỏ nhất + mã HH Vietda (để nhập Vietda)">
+          title="Bản sao XML đã quy đổi về ĐVT nhỏ nhất + mã HH Vietda (để nhập Vietda) — mỗi thư mục vào / ra tách 'Chuyen khoan' (HTTToan ghi Chuyển khoản) và 'Tien mat' (còn lại)">
           <i class="fa-solid fa-file-zipper"></i> Tải XML quy đổi
         </button>
         }
@@ -180,6 +184,62 @@
     <ul class="hh-list">
       @for (p of xmlPlans; track p.plan) { <li>{{ p.plan }}: <b>{{ p.count | number }}</b></li> }
     </ul>
+    }
+
+    @if (run.summary.n_review || review.length || reviewError) {
+    <h3 class="review-title">Mặt hàng cần xem ({{ review.length | number }})</h3>
+    <p class="hint">Máy chưa chắc về Mã master / Hệ số của các mặt hàng này → dòng tương ứng trong XML quy đổi <b>giữ nguyên</b>
+      cho tới khi sửa / đánh x "Đã kiểm" ở <a [routerLink]="['/item-mapping-page']" [queryParams]="{ run: run.id }">Sửa ánh xạ
+      hàng hóa</a> rồi chạy lại.</p>
+    @if (reviewError) {
+    <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ reviewError }}</div>
+    } @else if (reviewLoading) {
+    <div class="hint">Đang tải...</div>
+    } @else {
+    <div class="runs-wrap review-frame">
+      <table class="runs review">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Chiều</th>
+            <th>Người bán</th>
+            <th>Hàng trên HĐ</th>
+            <th>ĐVT</th>
+            <th class="num">SL</th>
+            <th>Máy gợi ý (mã master)</th>
+            <th class="num">Hệ số</th>
+            <th class="num">Tin cậy</th>
+            <th>Lý do cần xem</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (it of review; track $index) {
+          <tr>
+            <td class="num">{{ $index + 1 }}</td>
+            <td>{{ it.chieu }}</td>
+            <td class="wrap">{{ it.ncc }}</td>
+            <td class="wrap">@if (it.ma) { <small>{{ it.ma }}</small><br> }{{ it.ten }}</td>
+            <td>{{ it.dvt }}</td>
+            <td class="num">{{ it.sl | number:'1.0-3' }}</td>
+            <td class="wrap">
+              @if (it.master) { <b>{{ it.master }}</b> {{ it.ten_master }} <small>({{ it.dvt_master }})</small> }
+              @else { <span class="warn">Chưa ghép</span> }
+              @if (it.cach_ghep) { <br><small>{{ it.cach_ghep }}</small> }
+            </td>
+            <td class="num">{{ it.he_so != null ? (it.he_so | number:'1.0-6') : '—' }}</td>
+            <td class="num">{{ it.do_tin_cay != null ? (it.do_tin_cay * 100 | number:'1.0-0') + '%' : '' }}</td>
+            <td class="wrap reasons">
+              <ul>@for (r of reasons(it); track $index) { <li>{{ r }}</li> }</ul>
+              @if (!it.master && it.goi_y_khac) { <small title="Mặt hàng KiotViet gần giống nhất">Gần nhất: {{ it.goi_y_khac }}</small> }
+            </td>
+          </tr>
+          } @empty {
+          <tr><td colspan="10" class="empty">Không có mặt hàng cần xem</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
     }
 
     @if (run.warnings && run.warnings.length) {

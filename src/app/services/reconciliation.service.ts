@@ -40,7 +40,7 @@ export interface ReconciliationRun {
   mapping_tabs?: RunTab[]; has_clone_zip?: boolean; source_run?: string;
   /** Tab Số liệu khai thuế (bảng kê, PL142) + file bảng kê Excel — bước 5 */
   tax_tabs?: RunTab[]; has_bang_ke?: boolean;
-  options?: { mst: string; tu_ngay: string; den_ngay: string; file_count: number };
+  options?: { mst: string; tu_ngay: string; den_ngay: string; file_count: number; toan_bo?: boolean };
   upload_bytes?: number;
 }
 
@@ -107,7 +107,14 @@ export interface FolderScan {
   suspicious: string[];
 }
 
-export interface StartOptions { mst: string; tuNgay: string; denNgay: string; }
+/** Mặt hàng có cột "Cần xem" (GET /runs/{id}/review, 02/11/2026) */
+export interface ReviewItem {
+  chieu: string; ncc: string; ma: string; ten: string; dvt: string; so_dong: number; sl: number;
+  master: string; ten_master: string; dvt_master: string; he_so: number | null; cach_ghep: string;
+  do_tin_cay: number | null; ly_do: string; goi_y_khac: string;
+}
+
+export interface StartOptions { mst: string; tuNgay: string; denNgay: string; toanBo?: boolean; }
 
 @Injectable({ providedIn: 'root' })
 export class ReconciliationService {
@@ -197,6 +204,7 @@ export class ReconciliationService {
     form.append('mst', opts.mst || '');
     form.append('tu_ngay', opts.tuNgay || '');
     form.append('den_ngay', opts.denNgay || '');
+    form.append('toan_bo', opts.toanBo ? 'true' : 'false');
     form.append('file_count', String(scan.files.length));
     form.append('folder_name', scan.folderName);
     return new Promise<string>((resolve, reject) => {
@@ -256,6 +264,13 @@ export class ReconciliationService {
     await this.cache.set(HH_CACHE_KEY, data);
     console.info(`${LOG} Bảng mã HH: tải ${data.items.length} mã (version ${data.version}) → lưu IndexedDB`);
     return data.items;
+  }
+
+  async reviewItems(id: string): Promise<ReviewItem[]> {
+    const r = await firstValueFrom(this.http.get<any>(`${BASE}/runs/${id}/review`));
+    const items = (r.items || []) as ReviewItem[];
+    console.info(`${LOG} Lần chạy ${id}: ${items.length} mặt hàng cần xem`);
+    return items;
   }
 
   getRun(id: string): Observable<ReconciliationRun> {

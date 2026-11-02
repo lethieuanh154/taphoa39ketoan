@@ -385,3 +385,41 @@ a.btn {
     margin-left: 0;
   }
 }
+
+.review-title {
+  margin: 1rem 0 0.2rem;
+  font-size: 0.95rem;
+}
+
+.runs.review td {
+  vertical-align: top;
+}
+
+.runs.review td.wrap {
+  white-space: normal;
+  min-width: 10rem;
+}
+
+.runs.review td.reasons {
+  min-width: 18rem;
+}
+
+.runs.review td.reasons ul {
+  margin: 0;
+  padding-left: 1rem;
+}
+
+
+.review-frame {
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.review-frame thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f9fafb;
+}
