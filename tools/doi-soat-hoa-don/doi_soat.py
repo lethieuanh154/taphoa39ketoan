@@ -676,6 +676,7 @@ MAP_HEADERS = ["Chiều", "MST người bán", "Tên người bán", "Mã hàng 
 XML_PLAN_KEEP = "Giữ nguyên — kiểm rồi đánh x"
 XML_PLAN_NO_VD_FACTOR = "Giữ nguyên — thiếu Hệ số Vietda"
 XML_PLAN_VD_UNIT = "Giữ nguyên — ĐVT Vietda khác ĐVT HĐ, chờ xác nhận Mã master"
+XML_PLAN_NO_HH = "Giữ nguyên — Mã master chưa có mã HH"
 COL = {h: i for i, h in enumerate(MAP_HEADERS)}
 EDITABLE = ("Mã master", "Hệ số quy đổi", "Mã Vietda", "Hệ số Vietda", "Đã kiểm (x)")
 HIDDEN = ("Máy gợi ý mã", "Máy gợi ý hệ số", "Máy gợi ý Vietda", "Máy gợi ý hệ số Vietda")
@@ -684,9 +685,31 @@ HIDDEN = ("Máy gợi ý mã", "Máy gợi ý hệ số", "Máy gợi ý Vietda"
 class VietdaCatalog:
     """Danh mục vật tư - hàng hóa xuất từ Vietda (file QUYDOI*.xlsx): Mã hàng (kế toán tự đặt), Tên, ĐVT."""
 
-    def __init__(self, path):
+    def __init__(self, path, rows=None):
+        """rows (KeToanBackEnd — bảng mã HH theo mã master, 02/11/2026): [{"ma", "ten", "dvt", "master"}] thay file xlsx,
+        path chỉ là nhãn. Chế độ này (master_mode): Mã Vietda = mã HH của Mã master, không ghép theo tên."""
         self.path = path
+        self.master_mode = rows is not None
         self.rows, self.by_code, self.by_name, self.by_base = [], {}, defaultdict(list), defaultdict(list)
+        self.by_master = {}
+        for r in (self._read_xlsx(path) if rows is None else rows):
+            self.rows.append(r)
+            self.by_code[norm_code(r["ma"])] = r
+            self.by_name[norm_text(r["ten"])].append(r)
+            self.by_base[base_name(norm_text(r["ten"]))].append(r)
+            if r.get("master"):
+                self.by_master[norm_code(r["master"])] = r
+        df = Counter(t for r in self.rows for t in set(base_name(norm_text(r["ten"])).split()))
+        n = max(1, len(self.rows))
+        self.idf = {t: math.log(1 + n / c) for t, c in df.items()}
+        self.inverted = defaultdict(set)
+        for i, r in enumerate(self.rows):
+            for t in set(base_name(norm_text(r["ten"])).split()):
+                self.inverted[t].add(i)
+
+    @staticmethod
+    def _read_xlsx(path):
+        out = []
         wb = load_workbook(path, data_only=True, read_only=True)
         try:
             all_rows = list(wb.worksheets[0].iter_rows(values_only=True))
@@ -706,21 +729,11 @@ class VietdaCatalog:
                 continue
             if len(ma.strip()) == 1 and len(ten.strip()) == 1:
                 continue  # dòng ký hiệu cột "A | B | C" ngay dưới tiêu đề
-            r = {"ma": ma.strip(), "ten": " ".join(ten.split()),
-                 "dvt": str(vals[cols["dvt"]] or "").strip() if cols["dvt"] is not None else ""}
-            self.rows.append(r)
-            self.by_code[norm_code(r["ma"])] = r
-            self.by_name[norm_text(r["ten"])].append(r)
-            self.by_base[base_name(norm_text(r["ten"]))].append(r)
+            out.append({"ma": ma.strip(), "ten": " ".join(ten.split()),
+                        "dvt": str(vals[cols["dvt"]] or "").strip() if cols["dvt"] is not None else ""})
         if cols is None:
             raise ValueError("không thấy dòng tiêu đề có 'Mã hàng' và 'Tên hàng'")
-        df = Counter(t for r in self.rows for t in set(base_name(norm_text(r["ten"])).split()))
-        n = max(1, len(self.rows))
-        self.idf = {t: math.log(1 + n / c) for t, c in df.items()}
-        self.inverted = defaultdict(set)
-        for i, r in enumerate(self.rows):
-            for t in set(base_name(norm_text(r["ten"])).split()):
-                self.inverted[t].add(i)
+        return out
 
     def search(self, base, top=3):
         """Tên gần giống (trọng số IDF, giống Catalog.by_name) → [(điểm, dòng Vietda)]."""
@@ -744,6 +757,13 @@ class VietdaCatalog:
 def suggest_vietda(it, master_code, master_unit, vd, master_vd, threshold):
     """Mã Vietda cho 1 mặt hàng → (dòng Vietda | None, cách ghép, [cờ])."""
     flags = []
+    if vd.master_mode:
+        hit = vd.by_master.get(norm_code(master_code)) if master_code else None
+        if hit:
+            return hit, "Theo mã master", flags
+        if master_code:
+            flags.append(f"Mã master {master_code} chưa có mã HH — bấm 'Cập nhật bảng quy đổi'")
+        return None, "", flags
     units = {norm_unit(it["dvt"]), norm_unit(master_unit)}
     hits = vd.by_name.get(norm_text(it["ten"]))
     if hits:
@@ -912,6 +932,8 @@ def build_mapping(items, existing, cat, threshold, vd=None):
         if unit_ok:
             if vd_ok.get(k) and not vd_f > 0:
                 plan = XML_PLAN_NO_VD_FACTOR
+            elif vd is not None and vd.master_mode and not vd_ok.get(k):
+                plan = XML_PLAN_NO_HH
             else:
                 plan = "Đổi ĐVT + " + ("mã Vietda" if vd_ok.get(k) else "mã master")
         elif vd_ok.get(k):
@@ -929,14 +951,14 @@ def _apply_vietda(items, result, olds, vd, cat, threshold, master_ok):
     """Lượt 2 của build_mapping: điền Mã Vietda (tên HĐ = tên Vietda → theo mã master → tên gần giống); giữ mã kế toán sửa.
     → {khóa: True nếu mã Vietda CHẮC CHẮN}. Chỉ dòng có Mã master chắc chắn mới được 'bầu' mã Vietda cho mã master đó."""
     votes = defaultdict(Counter)   # mã master → mã Vietda của các dòng có tên trùng đúng tên Vietda
-    for k, it in items.items():
+    for k, it in ({} if vd.master_mode else items).items():
         hits = vd.by_name.get(norm_text(it["ten"]))
         mk = result[k][COL["Mã master"]]
         if hits and len(hits) == 1 and mk and master_ok[k]:
             votes[norm_code(mk)][hits[0]["ma"]] += it["lines"]
     master_vd = {mk: c.most_common(1)[0][0] for mk, c in votes.items()}
     for mk, g in cat.masters.items():   # chưa có phiếu bầu: tên KiotViet của mã master trùng tên Vietda
-        if mk not in master_vd:
+        if mk not in master_vd and not vd.master_mode:
             hit = next((vd.by_base[nm][0] for nm in g["names"] if vd.by_base.get(nm)), None)
             if hit:
                 master_vd[mk] = hit["ma"]
@@ -944,6 +966,8 @@ def _apply_vietda(items, result, olds, vd, cat, threshold, master_ok):
     for k, it in items.items():
         row = result[k]
         old, checked = olds[k]
+        if vd.master_mode:
+            old = None   # mã HH đi theo Mã master → bỏ Mã / Hệ số Vietda kế toán sửa tay trước đây
         pick, method, flags = suggest_vietda(it, row[COL["Mã master"]], row[COL["ĐVT master"]], vd, master_vd, threshold)
         row[COL["Máy gợi ý Vietda"]] = pick["ma"] if pick else ""
         vd_edited = bool(old) and not _same(old[COL["Mã Vietda"]], old[COL["Máy gợi ý Vietda"]])
@@ -1359,6 +1383,7 @@ def _convert_xml_bytes(data, src, company, mapping, doi_ma, doi_ten, stamp, stri
         do_vd = bool(vd_code) and (not strict or "mã Vietda" in plan)
         if not do_unit and not do_vd:
             why = ("Chưa có Mã master / Hệ số / Mã Vietda trong anh_xa_hang_hoa.xlsx" if not (mk and factor > 0) and not vd_code
+                   else "Mã master chưa có mã HH" if plan == XML_PLAN_NO_HH
                    else "Ánh xạ chưa chắc chắn — kiểm ở anh_xa_hang_hoa.xlsx rồi đánh x")
             rows.append((*ref, ln["ma"], "", ln["ten"], "", ln["dvt"], "", sl, None, dg, None, None, why + " → giữ nguyên dòng này"))
             continue

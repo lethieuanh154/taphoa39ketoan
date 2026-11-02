@@ -14,6 +14,7 @@ import { IndexedDBService } from './indexed-db.service';
  * - `ck-range:<from>:<to>`    HĐ CK của khoảng ngày đã chốt (kết thúc trước hôm nay > 8 ngày — máy chủ không tự lấy lại nữa)
  * - `check-run:<id>`           kết quả 1 lần Kiểm tra HĐ đã xong
  * - `figures:<id>`             số liệu khai thuế của 1 lần đối soát
+ * - `hh-codes`                 bảng mã HH Vietda theo mã master `{version, items}` — tải lại khi version máy chủ đổi (02/11/2026)
  * Mục lưu quá MAX_AGE_DAYS ngày tự xóa (lần mở DB đầu tiên mỗi phiên).
  */
 const LOG = '[TienIchCache]';

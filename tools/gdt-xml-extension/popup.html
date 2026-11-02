@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<style>
+  body { width: 320px; margin: 0; padding: 12px; font: 13px/1.4 system-ui, sans-serif; color: #1f2937; }
+  h1 { font-size: 15px; margin: 0 0 8px; }
+  ol { margin: 0 0 8px; padding-left: 18px; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  .row label { flex: 1; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 4px; }
+  #stop { width: 100%; background: #b42318; color: #fff; border: 0; border-radius: 6px; padding: 8px; font-weight: 600; cursor: pointer; }
+  #stop:disabled { background: #9ca3af; cursor: default; }
+  #page { padding: 6px 8px; border-radius: 6px; margin-bottom: 8px; background: #fee2e2; }
+  #status { margin-top: 8px; padding: 6px 8px; background: #f3f4f6; border-radius: 6px; white-space: pre-line; min-height: 18px; }
+  small { color: #6b7280; }
+</style>
+</head>
+<body>
+  <h1>Tải XML hóa đơn điện tử</h1>
+  <ol>
+    <li>Trên trang GDT chọn tab (mua vào / bán ra, HĐ điện tử / máy tính tiền) và ngày.</li>
+    <li>Bấm <b>Tìm kiếm</b>, nhập captcha.</li>
+    <li>Extension tự tải XML mọi HĐ trong kết quả (mọi trang).</li>
+  </ol>
+  <div id="page" hidden></div>
+
+  <div class="row"><label><input type="checkbox" id="enabled"> Tự tải khi bấm Tìm kiếm</label></div>
+  <div class="row"><label><input type="checkbox" id="force"> Tải lại cả HĐ đã tải</label></div>
+  <div class="row"><label>Thư mục trong Downloads<input type="text" id="rootFolder"></label></div>
+  <small>File lưu: Downloads/&lt;thư mục&gt;/MuaVao|BanRa/YYYY-MM/ngày_MST_kýhiệu_số.xml</small>
+
+  <div class="row"><button id="stop" disabled>Dừng</button></div>
+  <div id="status"></div>
+
+  <script src="common.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

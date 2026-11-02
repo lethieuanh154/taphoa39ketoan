@@ -199,6 +199,17 @@ a.btn {
   font-size: 0.8rem;
 }
 
+.msg.ok {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.hh-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.78rem;
+}
+
 .msg.error {
   background: #fef2f2;
   color: #b91c1c;
@@ -264,8 +275,7 @@ a.btn {
   color: #4b5563;
 }
 
-.warnings,
-.guide {
+.warnings {
   font-size: 0.78rem;
   border-radius: 8px;
   padding: 0.45rem 0.75rem;
@@ -281,28 +291,6 @@ a.btn {
   padding-left: 1.2rem;
 }
 
-.guide {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-}
-
-.guide dl {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 0.25rem 0.75rem;
-  margin: 0.45rem 0 0.2rem;
-}
-
-.guide dt {
-  font-weight: 600;
-  color: #1e3a5f;
-}
-
-.guide dd {
-  margin: 0;
-  white-space: pre-line;
-}
-
 .link {
   border: none;
   background: none;
@@ -314,51 +302,6 @@ a.btn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-}
-
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 0.4rem;
-}
-
-.tab {
-  border: 1px solid transparent;
-  background: #f3f4f6;
-  color: #374151;
-  border-radius: 6px;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.tab:hover {
-  background: #e5e7eb;
-}
-
-.tab.active {
-  background: #2c5282;
-  color: #ffffff;
-}
-
-.count {
-  font-size: 0.65rem;
-  padding: 0 0.35rem;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.tab.active .count {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.count.zero {
-  opacity: 0.55;
 }
 
 .runs-wrap {

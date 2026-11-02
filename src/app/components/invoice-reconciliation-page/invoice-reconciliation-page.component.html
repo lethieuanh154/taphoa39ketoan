@@ -2,9 +2,9 @@
   <header class="page-head">
     <div>
       <h1><i class="fa-solid fa-file-code"></i> Đối soát hóa đơn XML</h1>
-      <p class="sub">Chọn thư mục hóa đơn XML đầu vào / đầu ra (tải từ app FDI) → bấm <b>Đối soát</b> → xem các bảng như
-        file Excel của
-        script đối soát. File XML gốc không bị sửa; máy chủ xóa XML ngay sau khi phân tích.</p>
+      <p class="sub">Chọn thư mục hóa đơn XML đầu vào / đầu ra (tải từ app FDI) → bấm <b>Đối soát</b> → máy ghép hàng HĐ vào
+        ⇄ HĐ ra theo mã master KiotViet, quy đổi về ĐVT nhỏ nhất, mã hàng = mã HH Vietda → <b>Tải XML quy đổi</b> để nhập
+        Vietda. File XML gốc không bị sửa; máy chủ xóa XML ngay sau khi phân tích.</p>
     </div>
   </header>
 
@@ -45,6 +45,12 @@
         <i class="fa-solid fa-download"></i> Tải JSON
       </button>
     </div>
+    <div class="hint indent">Mỗi mã master KiotViet (ĐVT nhỏ nhất) được máy tự cấp 1 mã HH cố định, không trùng
+      @if (hhStatus) { ({{ hhStatus.count | number }} mã, mã mới tiếp theo {{ hhStatus.next_code }}) }. Bản sao XML quy đổi chỉ ghi mã HH —
+      không dùng mã KiotViet; dòng chưa có mã HH giữ nguyên.</div>
+    @if (catalogInfo) {
+    <div class="msg ok"><i class="fa-solid fa-circle-check"></i> {{ catalogInfo }}</div>
+    }
     @if (catalogError) {
     <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ catalogError }}</div>
     }
@@ -56,7 +62,6 @@
         @if (scan.nSkipped) { <span class="hint">· bỏ qua {{ scan.nSkipped | number }} file khác</span> }
       </div>
       <div>Bảng lương: {{ scan.payroll.join(', ') || 'không có (bỏ qua tờ khai TNCN)' }}</div>
-      <div>Danh mục Vietda: {{ scan.vietda.join(', ') || 'không có (bản sao XML dùng mã master)' }}</div>
       @if (scan.mapping.length) { <div>Ánh xạ đã sửa: {{ scan.mapping.join(', ') }}</div> }
       @if (scan.catalogs.length) { <div>Bảng quy đổi dự phòng: {{ scan.catalogs.join(', ') }}</div> }
       @if (!(scan.nXml + scan.nZip)) {
@@ -151,7 +156,7 @@
         </a>
         @if (run.has_clone_zip !== false) {
         <button type="button" class="btn" (click)="downloadCloneZip()" [disabled]="downloading === 'clone'"
-          title="Bản sao XML đã quy đổi ĐVT về ĐVT master (để nhập Vietda — tạm thời)">
+          title="Bản sao XML đã quy đổi về ĐVT nhỏ nhất + mã HH Vietda (để nhập Vietda)">
           <i class="fa-solid fa-file-zipper"></i> Tải XML quy đổi
         </button>
         }
@@ -164,10 +169,18 @@
       <div class="stat"><span>Mặt hàng</span><b>{{ run.summary.n_items | number }}</b>
         @if (run.summary.n_review) { <small class="warn">{{ run.summary.n_review | number }} cần xem</small> }
       </div>
-      <div class="stat high"><span>Ngoại lệ cao</span><b>{{ run.summary.exceptions['Cao'] | number }}</b></div>
-      <div class="stat mid"><span>Trung bình</span><b>{{ run.summary.exceptions['Trung bình'] | number }}</b></div>
-      <div class="stat low"><span>Thấp</span><b>{{ run.summary.exceptions['Thấp'] | number }}</b></div>
+      @if (run.summary.clone; as c) {
+      <div class="stat low"><span>Dòng đã quy đổi</span><b>{{ c.dong_sua | number }}</b></div>
+      <div class="stat mid"><span>Dòng giữ nguyên</span><b>{{ c.dong_chua_anh_xa | number }}</b></div>
+      <div class="stat"><span>File XML sửa / giữ / lỗi</span><b>{{ c.sua | number }} / {{ c.giu | number }} / {{ c.loi | number }}</b></div>
+      }
     </div>
+    @if (run.summary.hh_codes !== undefined) {
+    <div class="hint">Quy đổi theo bảng mã HH: {{ run.summary.hh_codes | number }} mã. Mặt hàng theo cách quy đổi:</div>
+    <ul class="hh-list">
+      @for (p of xmlPlans; track p.plan) { <li>{{ p.plan }}: <b>{{ p.count | number }}</b></li> }
+    </ul>
+    }
 
     @if (run.warnings && run.warnings.length) {
     <div class="warnings">
@@ -182,35 +195,6 @@
       }
     </div>
     }
-
-    <nav class="tabs">
-      @for (tab of visibleTabs; track tab.key) {
-      <button type="button" class="tab" [class.active]="tab.key === activeTab" (click)="selectTab(tab.key)">
-        {{ tabLabel(tab) }} <span class="count" [class.zero]="!tab.count">{{ tab.count | number }}</span>
-      </button>
-      }
-    </nav>
-
-    @if (activeGuide; as g) {
-    <div class="guide">
-      <button type="button" class="link" (click)="showGuide = !showGuide">
-        <i class="fa-regular fa-circle-question"></i> Hướng dẫn đọc tab này
-        <i class="fa-solid" [class.fa-chevron-down]="!showGuide" [class.fa-chevron-up]="showGuide"></i>
-      </button>
-      @if (showGuide) {
-      <dl>
-        <dt>Mục đích</dt>
-        <dd>{{ g.purpose }}</dd>
-        <dt>Cách đọc</dt>
-        <dd>{{ g.howToRead }}</dd>
-        <dt>Khi nào cần làm gì</dt>
-        <dd>{{ g.action }}</dd>
-      </dl>
-      }
-    </div>
-    }
-
-    <app-server-table [source]="tableSource"></app-server-table>
   </section>
   }
 
@@ -234,7 +218,7 @@
             <th>Trạng thái</th>
             <th class="num">HĐ vào</th>
             <th class="num">HĐ ra</th>
-            <th class="num">Ngoại lệ cao</th>
+            <th class="num">Dòng quy đổi</th>
             <th>Người chạy</th>
             <th></th>
           </tr>
@@ -254,7 +238,7 @@
             </td>
             <td class="num">{{ r.summary?.n_invoices_in | number }}</td>
             <td class="num">{{ r.summary?.n_invoices_out | number }}</td>
-            <td class="num">{{ r.summary?.exceptions?.['Cao'] | number }}</td>
+            <td class="num">{{ r.summary?.clone?.dong_sua | number }}</td>
             <td>{{ r.created_by }}</td>
             <td class="actions">
               <button type="button" class="btn small" (click)="view(r)">Xem</button>

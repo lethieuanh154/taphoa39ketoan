@@ -296,6 +296,14 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - Kết quả: thẻ số liệu (HĐ vào / ra, mặt hàng cần xem, ngoại lệ Cao / TB / Thấp), lưu ý của script, 15 tab (bỏ "Huong dan" —
   nội dung thành khung "Hướng dẫn đọc tab này"), tải Excel đầy đủ / ZIP XML quy đổi. Bảng = `app-server-table`.
 - "Các lần đối soát gần đây" (lưu 7 ngày trên máy chủ): Xem / Xóa. Lần đang xem nằm trên URL `?run=<id>`.
+- **02/11/2026 — thu gọn thành QUY ĐỔI**: bỏ 15 tab / bảng + thẻ ngoại lệ; kết quả chỉ còn thẻ HĐ vào / ra / mặt hàng + dòng đã
+  quy đổi / giữ nguyên / file sửa-giữ-lỗi, số mặt hàng theo cột 'Bản sao XML', nút Tải Excel / Sửa ánh xạ / Tải XML quy đổi.
+  Bảng "gần đây": cột "Dòng quy đổi" thay "Ngoại lệ cao"; `listRuns` thêm `?_=<giờ>` + BE `no-store` (máy 1 không thấy lần
+  chạy từ máy 2).
+- **Mã HH tự cấp** (BE `TapHoa39KeToanBackEnd/docs/RECONCILIATION.md`): "Cập nhật bảng quy đổi" = lấy lại KiotViet + máy tự cấp
+  mã HH (từ HH3212, không trùng) cho mã master mới; trang chỉ hiện 1 dòng số mã / mã tiếp theo. Danh sách mã lưu IndexedDB
+  `hh-codes` (`ReconciliationService.hhCodes()` tải lại khi `version` máy chủ đổi). Bản sao XML chỉ ghi mã HH, ĐVT nhỏ nhất;
+  `QUYDOI*.xlsx` trong thư mục không còn dùng. Không có nhập danh mục Vietda (user: mã Vietda kế toán tự gõ, không quy luật).
 
 ## BankReconciliationPageComponent — Tiện ích "Đối soát CK" (23/10/2026)
 

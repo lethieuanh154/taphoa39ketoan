@@ -9,43 +9,22 @@ import { httpErrorText } from '../../services/auth.service';
 import { PeriodService, formatVn } from '../../services/period.service';
 import { CompanyService } from '../../services/company.service';
 import {
-  CatalogStatus, FolderScan, ReconciliationRun, ReconciliationService, RunTab
+  CatalogStatus, FolderScan, HhCode, HhCodeStatus, ReconciliationRun, ReconciliationService
 } from '../../services/reconciliation.service';
-import { ServerTableComponent, ServerTableSource } from '../shared/server-table/server-table.component';
 import { expandArchives } from '../../utils/archive.util';
 
 const LOG = '[InvoiceReconciliation]';
 
-/** Tên tab tiếng Việt có dấu (tên sheet của script không dấu) */
-const TAB_LABELS: { [key: string]: string } = {
-  'tong-quan': 'Tổng quan',
-  'danh-sach-san-pham': 'Danh sách sản phẩm',
-  'doi-soat-theo-master': 'Đối soát theo master',
-  'ngoai-le': 'Ngoại lệ',
-  'hd-thay-the-dieu-chinh': 'HĐ thay thế - điều chỉnh',
-  'dong-hang-quy-doi': 'Dòng hàng quy đổi',
-  'xml-quy-doi': 'XML quy đổi',
-  'ban-duoi-gia-von': 'Bán dưới giá vốn',
-  'thieu-hd-vao': 'Thiếu HĐ vào',
-  'lech-so-hoc-hd': 'Lệch số học HĐ',
-  'thue-theo-thue-suat': 'Thuế theo thuế suất',
-  'hd-dau-vao': 'HĐ đầu vào',
-  'hd-dau-ra': 'HĐ đầu ra',
-  'hd-bo-qua': 'HĐ bỏ qua',
-  'file-loi': 'File lỗi',
-};
-const GUIDE_KEY = 'huong-dan';
-
-interface GuideRow { purpose: string; howToRead: string; action: string; }
-
 /**
  * TIỆN ÍCH — ĐỐI SOÁT HÓA ĐƠN XML (plan-doi-soat-web.md, Pha 1 bước 3)
- * Chọn thư mục XML (app FDI) → nén ZIP + upload → KeToanBackEnd chạy doi_soat.py → các tab như file Excel của script.
+ * Chọn thư mục XML (app FDI) → nén ZIP + upload → KeToanBackEnd chạy doi_soat.py.
+ * 02/11/2026: trang chỉ còn chức năng QUY ĐỔI — ghép hàng HĐ vào ⇄ HĐ ra theo mã master KiotViet, về ĐVT nhỏ nhất, mã hàng =
+ * mã HH máy tự cấp (lưu Firestore + IndexedDB) → tải XML quy đổi nhập Vietda. Bỏ các tab Tổng quan / Danh sách SP...
  */
 @Component({
   selector: 'app-invoice-reconciliation-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ServerTableComponent],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './invoice-reconciliation-page.component.html',
   styleUrl: './invoice-reconciliation-page.component.css',
 })
@@ -63,6 +42,11 @@ export class InvoiceReconciliationPageComponent implements OnInit {
   catalog: CatalogStatus | null = null;
   catalogBusy = false;
   catalogError = '';
+  catalogInfo = '';
+
+  /** Mã HH máy tự cấp theo mã master (02/11/2026) — bản IndexedDB */
+  hhStatus: HhCodeStatus | null = null;
+  hhCodes: HhCode[] = [];
 
   scan: FolderScan | null = null;
   /** đang giải nén file ZIP / RAR người dùng chọn (30/10/2026) */
@@ -87,10 +71,6 @@ export class InvoiceReconciliationPageComponent implements OnInit {
 
   run: ReconciliationRun | null = null;
   runError = '';
-  activeTab = '';
-  tableSource: ServerTableSource | null = null;
-  guide: { [title: string]: GuideRow } = {};
-  showGuide = true;
   showWarnings = false;
   downloading = '';
 
@@ -116,13 +96,11 @@ export class InvoiceReconciliationPageComponent implements OnInit {
     return !!this.scan && (this.scan.nXml + this.scan.nZip) > 0 && !this.running && !this.serverBusy && !this.expanding;
   }
 
-  get visibleTabs(): RunTab[] {
-    return (this.run?.tabs || []).filter(t => t.key !== GUIDE_KEY);
-  }
-
-  get activeGuide(): GuideRow | null {
-    const tab = this.run?.tabs?.find(t => t.key === this.activeTab);
-    return tab ? this.guide[tab.title] || null : null;
+  /** Số mặt hàng theo cách quy đổi (cột 'Bản sao XML'), nhiều nhất lên đầu */
+  get xmlPlans(): { plan: string; count: number }[] {
+    return Object.entries(this.run?.summary?.xml_plans || {})
+      .map(([plan, count]) => ({ plan: plan || '(trống)', count }))
+      .sort((a, b) => b.count - a.count);
   }
 
   get progressPercent(): number {
@@ -135,10 +113,6 @@ export class InvoiceReconciliationPageComponent implements OnInit {
     if (!p) return '';
     if (this.run?.status === 'queued') return 'Đang chờ máy chủ...';
     return p.total ? `${p.label}: ${p.done.toLocaleString('vi-VN')} / ${p.total.toLocaleString('vi-VN')}` : `${p.label}...`;
-  }
-
-  tabLabel(tab: RunTab): string {
-    return TAB_LABELS[tab.key] || tab.title;
   }
 
   formatDate(iso: string): string {
@@ -156,19 +130,46 @@ export class InvoiceReconciliationPageComponent implements OnInit {
       next: st => this.catalog = st,
       error: e => this.catalogError = `Không lấy được trạng thái bảng quy đổi: ${httpErrorText(e)}`
     });
+    this.loadHh();
+  }
+
+  /** Trạng thái bảng mã HH → danh sách mã (IndexedDB nếu cùng version) */
+  loadHh(status?: HhCodeStatus): void {
+    const apply = async (st: HhCodeStatus) => {
+      this.hhStatus = st;
+      try {
+        this.hhCodes = st.count ? await this.service.hhCodes(st) : [];
+      } catch (e: any) {
+        console.warn(`${LOG} Không tải được bảng mã HH: ${httpErrorText(e)}`);
+        this.catalogError = `Không tải được bảng mã HH: ${httpErrorText(e)}`;
+      }
+    };
+    if (status) {
+      void apply(status);
+      return;
+    }
+    this.service.hhStatus().subscribe({
+      next: st => void apply(st),
+      error: e => this.catalogError = `Không lấy được trạng thái bảng mã HH: ${httpErrorText(e)}`
+    });
   }
 
   refreshCatalog(): void {
     this.catalogBusy = true;
     this.catalogError = '';
+    this.catalogInfo = '';
     this.service.refreshCatalog().subscribe({
       next: st => {
         this.catalog = st;
         this.catalogBusy = false;
+        if (st.codes) {
+          this.catalogInfo = `Tự cấp thêm ${st.codes.added.toLocaleString('vi-VN')} mã HH cho mã master mới.`;
+          this.loadHh(st.codes.status);
+        }
       },
       error: e => {
         this.catalogBusy = false;
-        this.catalogError = `Không cập nhật được từ KiotViet: ${httpErrorText(e)}`;
+        this.catalogError = `Không cập nhật được bảng quy đổi: ${httpErrorText(e)}`;
       }
     });
   }
@@ -239,7 +240,6 @@ export class InvoiceReconciliationPageComponent implements OnInit {
     console.info(`${LOG} Bắt đầu đối soát "${scan.folderName}" — kỳ ${opts.tuNgay || 'tự nhận'} → ${opts.denNgay || ''}`);
     this.startError = '';
     this.run = null;
-    this.tableSource = null;
     try {
       this.clientStage = 'zipping';
       this.clientLabel = 'Đang nén file trên máy...';
@@ -281,8 +281,6 @@ export class InvoiceReconciliationPageComponent implements OnInit {
     console.info(`${LOG} Mở lần chạy ${id}`);
     this.pollSub?.unsubscribe();
     this.runError = '';
-    this.tableSource = null;
-    this.guide = {};
     this.pollSub = timer(0, 1000).pipe(switchMap(() => this.service.getRun(id))).subscribe({
       next: run => {
         const wasRunning = this.run?.id === id && (this.run.status === 'queued' || this.run.status === 'running');
@@ -292,10 +290,7 @@ export class InvoiceReconciliationPageComponent implements OnInit {
           if (wasRunning) {
             console.info(`${LOG} Lần chạy ${id}: ${run.status}${run.error ? ' — ' + run.error : ''}`);
             this.loadRuns();
-          }
-          if (run.status === 'done') {
-            this.loadGuide(run);
-            this.selectTab(this.activeTab && run.tabs?.some(t => t.key === this.activeTab) ? this.activeTab : 'tong-quan');
+            if (run.status === 'done') this.loadHh();   // lần chạy có thể đã cấp mã HH cho mã master mới
           }
         }
       },
@@ -318,25 +313,12 @@ export class InvoiceReconciliationPageComponent implements OnInit {
       next: () => {
         if (this.run?.id === run.id) {
           this.run = null;
-          this.tableSource = null;
           this.router.navigate([], { relativeTo: this.route, queryParams: { run: null }, queryParamsHandling: 'merge' });
         }
         this.loadRuns();
       },
       error: e => this.runsError = `Không xóa được: ${httpErrorText(e)}`
     });
-  }
-
-  selectTab(key: string): void {
-    const run = this.run;
-    const tab = run?.tabs?.find(t => t.key === key);
-    if (!run || !tab) return;
-    this.activeTab = key;
-    this.tableSource = {
-      id: `${run.id}/${key}`,
-      load: query => this.service.getTab(run.id, key, query),
-      export: (format, query) => this.service.exportTab(run.id, key, tab.title, format, query),
-    };
   }
 
   async downloadReport(): Promise<void> {
@@ -358,16 +340,5 @@ export class InvoiceReconciliationPageComponent implements OnInit {
     } finally {
       this.downloading = '';
     }
-  }
-
-  /** Tab "Huong dan" của script → khung trợ giúp của từng tab */
-  private loadGuide(run: ReconciliationRun): void {
-    if (!run.tabs?.some(t => t.key === GUIDE_KEY)) return;
-    this.service.getTab(run.id, GUIDE_KEY, { page: 1, pageSize: 100, q: '', sort: null, desc: false, filters: {} }).subscribe({
-      next: page => {
-        this.guide = Object.fromEntries(page.rows.map(r => [r[0], { purpose: r[1] || '', howToRead: r[2] || '', action: r[3] || '' }]));
-      },
-      error: () => console.warn(`${LOG} Không tải được hướng dẫn các tab — bỏ qua khung trợ giúp`)
-    });
   }
 }

@@ -25,6 +25,9 @@ export interface RunSummary {
   company: string; period: string; from: string; to: string; n_files: number;
   n_invoices_in: number; n_invoices_out: number; n_items: number; n_review: number; n_saved_mappings?: number;
   exceptions: { [severity: string]: number }; catalog: string; has_tncn: boolean;
+  /** 02/11/2026: số mã HH dùng khi quy đổi, số mặt hàng theo cột 'Bản sao XML', thống kê bản sao XML (null khi chạy lại) */
+  hh_codes?: number; xml_plans?: { [plan: string]: number };
+  clone?: { sua: number; giu: number; loi: number; dong_sua: number; dong_chua_anh_xa: number } | null;
 }
 
 export interface RunTab { key: string; title: string; count: number; }
@@ -50,7 +53,18 @@ export interface TabPage {
   widths: number[]; wrap: boolean; total: number; count: number; page: number; page_size: number; rows: any[][];
 }
 
-export interface CatalogStatus { exists: boolean; exportedAt?: string; count?: number; ageHours?: number | null; }
+export interface CatalogStatus {
+  exists: boolean; exportedAt?: string; count?: number; ageHours?: number | null;
+  /** refresh: mã HH cấp thêm cho mã master mới */
+  codes?: { added: number; status: HhCodeStatus };
+}
+
+/** Bảng mã HH Vietda theo mã master KiotViet (02/11/2026) — /api/vietda-codes */
+export interface HhCodeStatus { version: number; count: number; next_code: string; updated_at: string; }
+export interface HhCode { hh: string; master_code: string; name: string; unit: string; }
+
+const HH_BASE = `${environment.ketoanBackendUrl}/api/vietda-codes`;
+const HH_CACHE_KEY = 'hh-codes';
 
 /** Kết quả tìm mã master trong bảng quy đổi KiotViet */
 export interface CatalogItem { code: string; name: string; unit: string; score: number; units: { unit: string; conversion: number }[]; }
@@ -211,10 +225,37 @@ export class ReconciliationService {
   }
 
   listRuns(): Observable<{ busy: boolean; runs: ReconciliationRun[] }> {
-    return this.http.get<any>(`${BASE}/runs`).pipe(
+    // _ = giờ hiện tại: không bao giờ dùng bản danh sách cũ trình duyệt giữ (lần chạy mới từ máy khác — 02/11/2026)
+    return this.http.get<any>(`${BASE}/runs`, { params: { _: Date.now() } }).pipe(
       map(r => ({ busy: !!r.busy, runs: r.runs as ReconciliationRun[] })),
-      tap({ error: e => console.warn(`${LOG} Lấy danh sách lần chạy lỗi: ${httpErrorText(e)}`) })
+      tap({
+        next: r => console.info(`${LOG} Danh sách lần chạy: ${r.runs.length}${r.busy ? ' (máy chủ đang chạy)' : ''}`),
+        error: e => console.warn(`${LOG} Lấy danh sách lần chạy lỗi: ${httpErrorText(e)}`)
+      })
     );
+  }
+
+  // ===== Bảng mã HH Vietda (02/11/2026)
+
+  hhStatus(): Observable<HhCodeStatus> {
+    return this.http.get<any>(`${HH_BASE}/status`, { params: { _: Date.now() } }).pipe(
+      map(r => r as HhCodeStatus),
+      tap({ error: e => console.warn(`${LOG} Trạng thái bảng mã HH lỗi: ${httpErrorText(e)}`) })
+    );
+  }
+
+  /** Bảng mã HH: dùng bản IndexedDB nếu cùng version máy chủ, không thì tải lại + lưu */
+  async hhCodes(status: HhCodeStatus): Promise<HhCode[]> {
+    const hit = await this.cache.get<{ version: number; items: HhCode[] }>(HH_CACHE_KEY);
+    if (hit && hit.data.version === status.version) {
+      console.log(`${LOG} Bảng mã HH: dùng bản lưu trên máy (version ${status.version}, ${hit.data.items.length} mã)`);
+      return hit.data.items;
+    }
+    const r = await firstValueFrom(this.http.get<any>(HH_BASE, { params: { _: Date.now() } }));
+    const data = { version: r.version as number, items: r.items as HhCode[] };
+    await this.cache.set(HH_CACHE_KEY, data);
+    console.info(`${LOG} Bảng mã HH: tải ${data.items.length} mã (version ${data.version}) → lưu IndexedDB`);
+    return data.items;
   }
 
   getRun(id: string): Observable<ReconciliationRun> {
@@ -299,7 +340,7 @@ export class ReconciliationService {
     return this.http.post<any>(`${environment.ketoanBackendUrl}/api/kiotviet/unit-conversion/refresh`, {}).pipe(
       map(r => r as CatalogStatus),
       tap({
-        next: st => console.info(`${LOG} Bảng quy đổi: ${st.count} dòng ĐVT (${st.exportedAt})`),
+        next: st => console.info(`${LOG} Bảng quy đổi: ${st.count} dòng ĐVT (${st.exportedAt}), cấp thêm ${st.codes?.added ?? 0} mã HH`),
         error: e => console.warn(`${LOG} Cập nhật bảng quy đổi lỗi: ${httpErrorText(e)}`)
       })
     );
