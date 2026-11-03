@@ -1,0 +1,23 @@
+<div class="page">
+  <header class="page-head">
+    <h1><i class="fa-solid fa-download"></i> Tải công cụ</h1>
+    <p class="sub">Công cụ chạy trên <b>máy kế toán</b> (không chạy trên web). Tải file zip, giải nén rồi làm theo hướng dẫn — trong zip có
+      <b>README.md</b> hướng dẫn đầy đủ.</p>
+  </header>
+
+  @for (t of tools; track t.file) {
+    <section class="card">
+      <div class="tool-head">
+        <h3><i [class]="t.icon"></i> {{ t.title }}</h3>
+        <a class="btn btn-primary" [href]="'tools/' + t.file" [attr.download]="t.file">
+          <i class="fa-solid fa-download"></i> {{ t.file }}
+        </a>
+      </div>
+      <p class="summary">{{ t.summary }}</p>
+      <p class="hint"><i class="fa-solid fa-circle-info"></i> Cần: {{ t.requires }}</p>
+      <ol class="steps">
+        @for (s of t.steps; track $index) { <li>{{ s }}</li> }
+      </ol>
+    </section>
+  }
+</div>

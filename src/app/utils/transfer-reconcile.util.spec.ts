@@ -1,6 +1,7 @@
 import {
   parseMultiTransferNote, parseExcessTransferNote, expandInvoiceItems, reconcileByAmount, buildReconCsv,
-  buildMultiTransferCsv, buildExcessTransferCsv, viStampToMinutes, readKvEInvoice, payerKey, ReconInvoice, ReconBankTxn
+  buildMultiTransferCsv, buildExcessTransferCsv, viStampToMinutes, readKvEInvoice, payerKey, ReconInvoice, ReconBankTxn,
+  readEInvoiceBills, reconcileWithFallback, reconPairHint, EInvoiceBill, EINVOICE_AMOUNT_TOLERANCE
 } from './transfer-reconcile.util';
 
 const inv = (code: string, total: number, time: string, note = 'chuyển khoản'): ReconInvoice =>
@@ -24,6 +25,13 @@ describe('transfer-reconcile.util', () => {
       expect(parseMultiTransferNote('Chuyen khoan 3 lan 10.000 + 20.000 + 5', 35000))
         .toEqual({ times: 3, parts: [10000, 20000, 5000], status: 'ok' });
       expect(parseMultiTransferNote('chuyển khoản 2 lần 1.270 + 30', 1300000)?.parts).toEqual([1270000, 30000]);
+    });
+
+    it('số lẻ nghìn "16.2" / "16,2" (mẫu thật HD445766 03/11)', () => {
+      expect(parseMultiTransferNote('chuyển khoản 2 lần 16.2 + 146.8', 163000))
+        .toEqual({ times: 2, parts: [16200, 146800], status: 'ok' });
+      expect(parseMultiTransferNote('chuyển khoản 2 lần 16,2 + 146,8', 163000)?.parts).toEqual([16200, 146800]);
+      expect(parseMultiTransferNote('ck 2 lan 16.25k + 3.', 19250)?.parts).toEqual([16250, 3000]);
     });
 
     it('báo lệch / không tách được', () => {
@@ -181,6 +189,67 @@ describe('transfer-reconcile.util', () => {
   it('viStampToMinutes: so sánh được giữa giờ KiotViet và giờ ngân hàng', () => {
     expect(viStampToMinutes('17/10/2026 10:00:00') - viStampToMinutes('16/10/2026 10:00:00')).toBe(1440);
     expect(viStampToMinutes('sai')).toBeNaN();
+  });
+
+  describe('HĐĐT einvoice (03/11/2026)', () => {
+    const bill = (o: Partial<EInvoiceBill>): EInvoiceBill => ({
+      id: 'B1', invoice_code: 'HD1', bill_series: 'C26MSM', bill_number: 27852, bill_date: '2026-09-30 23:59:58.623',
+      total_payment: 44000, payment_method_code: 'CK', status: 'DA_TIEP_NHAN', adjustment_type: 1, origin_id: null,
+      note: 'chuyển khoản', ...o
+    });
+
+    it('readEInvoiceBills: tách CK / TM, TM ghi chú "chuyển khoản" vẫn là CK, bỏ HĐ bị thay thế', () => {
+      const { primary, fallback } = readEInvoiceBills([
+        bill({}),
+        bill({ id: 'B2', invoice_code: null, bill_number: 1400, payment_method_code: 'TM', note: '' }),
+        bill({ id: 'B3', payment_method_code: 'TM', note: 'chuyển khoản 2 lần 30 + 14' }),
+        bill({ id: 'OLD', adjustment_type: 2 }),
+        bill({ id: 'NEW', invoice_code: null, adjustment_type: 3, origin_id: 'OLD' }),
+        bill({ id: 'B4', status: 'GHI_TAM', total_payment: 0 }),
+      ]);
+      expect(primary.map(i => i.id)).toEqual(['B1', 'B3', 'NEW']);
+      expect(fallback.map(i => i.code)).toEqual(['HĐĐT 1400']);
+      expect(primary[0]).toEqual({ id: 'B1', code: 'HD1', total: 44000, time: '30/09/2026 23:59:58', note: 'chuyển khoản',
+        einvoiceSerial: 'C26MSM', einvoiceNumber: '27852', einvoiceStatus: 'CQT chấp nhận', paymentMethod: 'CK' });
+    });
+
+    it('readEInvoiceBills: nháp → không điền số HĐĐT', () => {
+      const [r] = readEInvoiceBills([bill({ status: 'GHI_TAM' })]).primary;
+      expect(r.einvoiceNumber).toBe('');
+      expect(r.einvoiceStatus).toBe('Nháp (chưa phát hành)');
+    });
+
+    it('amountTolerance: HĐ lập tay lệch 1 ₫ vẫn khớp trong khung giờ (mẫu thật 31/03/2026)', () => {
+      const items = expandInvoiceItems([inv('HĐĐT 1400', 450999, '31/03/2026 21:36:09', '')]);
+      const t = [txn('T1', 451000, '31/03/2026 20:32:08')];
+      expect(reconcileByAmount(items, t).map(p => p.kind).sort()).toEqual(['bank_only', 'invoice_only']);
+      const pairs = reconcileByAmount(items, t, { amountTolerance: EINVOICE_AMOUNT_TOLERANCE });
+      expect(pairs.length).toBe(1);
+      expect(pairs[0]).toEqual(jasmine.objectContaining({ kind: 'matched', amountDiff: -1, deltaMinutes: -64 }));
+      expect(reconPairHint(pairs[0])).toBe('lệch tiền lẻ −1 ₫');
+      // ngoài khung giờ → không ghép
+      const far = reconcileByAmount(items, [txn('T2', 451000, '29/03/2026 20:00:00')], { amountTolerance: 10 });
+      expect(far.some(p => p.kind === 'matched')).toBeFalse();
+    });
+
+    it('reconcileWithFallback: GD dư khớp HĐĐT ghi TM trong khung giờ; HĐ TM không khớp thì bỏ', () => {
+      const ck = expandInvoiceItems([inv('HD1', 44000, '17/10/2026 10:00:00')]);
+      const tm = expandInvoiceItems([
+        { ...inv('HD2', 62000, '17/10/2026 11:00:00', ''), paymentMethod: 'TM' },
+        { ...inv('HD3', 99000, '17/10/2026 12:00:00', ''), paymentMethod: 'TM' },
+        { ...inv('HD4', 15000, '20/10/2026 12:00:00', ''), paymentMethod: 'TM' },
+      ]);
+      const pairs = reconcileWithFallback(ck, tm, [
+        txn('T1', 44000, '17/10/2026 09:55:00'), txn('T2', 62000, '17/10/2026 10:50:00'), txn('T3', 15000, '17/10/2026 09:00:00'),
+      ]);
+      const by = (code: string) => pairs.find(p => p.txn?.code === code)!;
+      expect(by('T1').item?.invoice.code).toBe('HD1');
+      expect(by('T2').item?.invoice.code).toBe('HD2');
+      expect(reconPairHint(by('T2'))).toBe('HĐĐT ghi Tiền mặt');
+      expect(by('T3').kind).toBe('bank_only');   // HD4 cùng tiền nhưng ngoài khung giờ → không nhận
+      expect(pairs.some(p => p.item?.invoice.code === 'HD3')).toBeFalse();
+      expect(pairs.length).toBe(3);
+    });
   });
 
   describe('readKvEInvoice', () => {

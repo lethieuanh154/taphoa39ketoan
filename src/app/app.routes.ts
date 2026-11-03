@@ -76,6 +76,13 @@ export const routes: Routes = [
           .then(m => m.InvoiceCheckPageComponent),
         data: { noPeriodBar: true }
       },
+      // Tải công cụ (02/11/2026) — zip các thư mục tools/ (scripts/pack-tools.mjs → public/tools/) để chạy trên máy kế toán
+      {
+        path: 'tools-download-page',
+        loadComponent: () => import('./components/tools-download-page/tools-download-page.component')
+          .then(m => m.ToolsDownloadPageComponent),
+        data: { noPeriodBar: true }
+      },
       // Đối soát CK (bước 2, 23/10/2026) — HĐ CK KiotViet (qua KeToanBackEnd) ⇄ sao kê TPBank; khoảng ngày theo thanh chọn kỳ
       {
         path: 'bank-reconciliation-page',

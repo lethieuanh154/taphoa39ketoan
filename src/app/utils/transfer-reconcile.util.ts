@@ -1,5 +1,6 @@
 /**
- * Đối soát chuyển khoản THEO SỐ TIỀN: hóa đơn KiotViet ⇄ giao dịch Ghi có TPBank.
+ * Đối soát chuyển khoản THEO SỐ TIỀN: hóa đơn ⇄ giao dịch Ghi có TPBank.
+ * Nguồn HĐ từ 03/11/2026 = HĐĐT einvoiceapp (readEInvoiceBills), trước đó = HĐ CK KiotViet bán hàng.
  *
  * TS thuần (không import Angular) — sẽ copy nguyên file sang TapHoa39KeToan.
  * Sửa ở đây thì PHẢI sửa bản bên kia (không share package).
@@ -13,10 +14,13 @@
  *   Khách thường chuyển trước, HĐ xuất sau (thiếu hàng Original → xuất cuối ngày / trong 24h).
  *   Cặp cùng số tiền ngoài khung vẫn tính là KHỚP, chỉ đánh dấu "lệch giờ".
  * - Phần dư sát đầu/cuối kỳ được gợi ý "có thể thuộc kỳ trước/sau" thay vì coi là sai.
+ * - HĐĐT (03/11/2026): khớp HĐ CK trước; GD còn dư mới thử HĐĐT ghi Tiền mặt (reconcileWithFallback, chỉ trong khung giờ)
+ *   và HĐ lệch tiền lẻ ≤ EINVOICE_AMOUNT_TOLERANCE (HĐ kế toán lập tay, làm tròn thuế: HĐ 353.001 ↔ GD 353.000).
+ *   Đo thử: 09/2026 HĐ CK KiotViet 96,1% → HĐĐT 97,9% GD; 03/2026 (KiotViet trả 0 HĐ CK) HĐĐT 90,4%.
  */
 
 export interface ReconInvoice {
-  id: number;
+  id: number | string;      // HĐ KiotViet: Id số; HĐĐT: id GUID
   code: string;
   total: number;  // TotalPayment — số tiền khách thực trả
   time: string;   // 'dd/mm/yyyy HH:mm:ss' giờ VN (giữ nguyên wall-clock)
@@ -24,6 +28,7 @@ export interface ReconInvoice {
   einvoiceSerial?: string;  // Ký hiệu HĐĐT (vd "C26MSM") — chỉ khi CQT đã chấp nhận
   einvoiceNumber?: string;  // Số HĐĐT (bill_number) — chỉ khi CQT đã chấp nhận
   einvoiceStatus?: string;  // Nhãn trạng thái HĐĐT (xem readKvEInvoice)
+  paymentMethod?: string;   // HĐĐT: 'CK' | 'TM' | 'TMCK'
 }
 
 export interface ReconEInvoiceInfo {
@@ -54,6 +59,62 @@ export function readKvEInvoice(row: { InvoiceExtraData?: any; EInvoices?: any[] 
     return { einvoiceSerial: '', einvoiceNumber: '', einvoiceStatus: 'Nháp (chưa phát hành)' };
   }
   return { einvoiceSerial: '', einvoiceNumber: '', einvoiceStatus: 'Chưa chuyển HĐĐT' };
+}
+
+/**
+ * 1 dòng HĐĐT einvoice `/v3/bills` đã rút gọn ở BE (KeToanBackEnd transfer_invoice_service.BILL_FIELDS
+ * = TapHoa39BackEnd FromKiotViet/get_einvoice_bills.BILL_FIELDS). Không có thông tin người mua.
+ */
+export interface EInvoiceBill {
+  id: string;
+  invoice_code: string | null;          // mã HĐ KiotViet; null = HĐ kế toán lập tay / HĐ thay thế
+  bill_series: string | null;
+  bill_number: number | string | null;
+  bill_date: string;                    // 'YYYY-MM-DD HH:mm:ss.SSS' giờ VN
+  total_payment: number | null;
+  payment_method_code: string | null;   // 'CK' | 'TM' | 'TMCK'
+  status: string | null;                // 'DA_TIEP_NHAN' = CQT chấp nhận, 'GHI_TAM' = nháp
+  adjustment_type: number | null;       // 1 = gốc, 2 = đã bị thay thế, 3 = HĐ thay thế (origin_id = HĐ bị thay) — mẫu 23–24/10/2026
+  origin_id: string | null;
+  note: string | null;                  // = Description HĐ KiotViet
+}
+
+/** Dung sai tiền lẻ khi khớp HĐĐT (HĐ lập tay lệch 1–2 ₫ do làm tròn thuế, mẫu 03/2026) */
+export const EINVOICE_AMOUNT_TOLERANCE = 10;
+
+const EINVOICE_STATUS_LABEL: Record<string, string> = { DA_TIEP_NHAN: 'CQT chấp nhận', GHI_TAM: 'Nháp (chưa phát hành)' };
+
+/**
+ * HĐĐT → HĐ đối soát. `primary` = HĐ CK / TMCK, hoặc ghi chú có "chuyển khoản"/"ck" (ghi nhầm TM); `fallback` = HĐ còn lại
+ * (Tiền mặt) — chỉ dùng khớp GD còn dư (reconcileWithFallback). Bỏ HĐ đã bị thay thế (có HĐ adjustment_type 3 trỏ origin_id
+ * tới nó, cùng số tiền → không bỏ thì dư 1 HĐ) và HĐ tổng tiền ≤ 0. Số HĐĐT chỉ điền khi CQT đã chấp nhận (như readKvEInvoice).
+ */
+export function readEInvoiceBills(bills: EInvoiceBill[]): { primary: ReconInvoice[]; fallback: ReconInvoice[] } {
+  const replaced = new Set(bills.filter(b => Number(b.adjustment_type) === 3 && b.origin_id).map(b => b.origin_id));
+  const primary: ReconInvoice[] = [];
+  const fallback: ReconInvoice[] = [];
+  let skipped = 0;
+  for (const b of bills) {
+    if (replaced.has(b.id) || !(Number(b.total_payment) > 0)) { skipped++; continue; }
+    const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}:\d{2}:\d{2})/.exec(b.bill_date || '');
+    const accepted = b.status === 'DA_TIEP_NHAN';
+    const note = b.note || '';
+    const inv: ReconInvoice = {
+      id: b.id,
+      code: b.invoice_code || `HĐĐT ${b.bill_number ?? ''}`.trim(),
+      total: Number(b.total_payment),
+      time: m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : '',
+      note,
+      einvoiceSerial: accepted ? String(b.bill_series || '') : '',
+      einvoiceNumber: accepted && b.bill_number ? String(b.bill_number) : '',
+      einvoiceStatus: EINVOICE_STATUS_LABEL[b.status || ''] || b.status || '',
+      paymentMethod: b.payment_method_code || '',
+    };
+    const saysTransfer = /chuyen\s*khoan|\bck\b/.test(normalizeVi(note));
+    (b.payment_method_code !== 'TM' || saysTransfer ? primary : fallback).push(inv);
+  }
+  console.debug(`[TransferReconcile] HĐĐT ${bills.length}: CK ${primary.length}, TM dự phòng ${fallback.length}, bỏ ${skipped} (bị thay thế / tiền ≤ 0)`);
+  return { primary, fallback };
 }
 
 export interface ReconBankTxn {
@@ -96,6 +157,7 @@ export interface ReconPair {
   kind: ReconKind;
   deltaMinutes: number | null;    // giờ GD − giờ HĐ (âm = khách chuyển trước)
   edgeHint: 'prev' | 'next' | null;
+  amountDiff?: number;            // HĐ − GD khi khớp lệch tiền lẻ (amountTolerance)
 }
 
 export interface ReconOptions {
@@ -103,9 +165,10 @@ export interface ReconOptions {
   windowAfterMin: number;   // GD được phép muộn hơn HĐ tối đa (mặc định 30')
   periodFrom?: string;      // 'yyyy-mm-dd' — kỳ đối soát, để gợi ý phần dư sát biên kỳ
   periodTo?: string;
+  amountTolerance?: number; // > 0: phần dư lệch ≤ X ₫ trong khung giờ vẫn ghép cặp (HĐĐT: EINVOICE_AMOUNT_TOLERANCE)
 }
 
-export const DEFAULT_RECON_OPTIONS: ReconOptions = { windowBeforeMin: 24 * 60, windowAfterMin: 30 };
+export const DEFAULT_RECON_OPTIONS: ReconOptions = { windowBeforeMin: 24 * 60, windowAfterMin: 30, amountTolerance: 0 };
 
 // ===== Thời gian =====
 
@@ -130,23 +193,32 @@ function normalizeVi(s: string): string {
   return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
 }
 
-/** "45" | "45k" | "45.000" | "1.270.000" → { value, hasK } (bỏ dấu phân cách . ,) */
-function readNumber(segment: string): { value: number; hasK: boolean } | null {
+/**
+ * "45" | "45k" | "45.000" | "1.270.000" → { value, hasK } (bỏ dấu phân cách . ,).
+ * "16.2" | "146,8" (1–2 chữ số sau dấu) = số lẻ NGHÌN → { value: 16200, vnd: true }.
+ */
+function readNumber(segment: string): NoteNumber | null {
   const m = /(\d[\d.,]*)\s*(k|nghin|ngan)?/.exec(segment);
   if (!m) return null;
-  const value = Number(m[1].replace(/[.,]/g, ''));
+  const raw = m[1].replace(/[.,]+$/, '');
+  const dec = /^(\d+)[.,](\d{1,2})$/.exec(raw);
+  if (dec) {
+    const value = Number(dec[1]) * 1000 + Number(dec[2].padEnd(3, '0'));
+    return value > 0 ? { value, hasK: true, vnd: true } : null;
+  }
+  const value = Number(raw.replace(/[.,]/g, ''));
   return Number.isFinite(value) && value > 0 ? { value, hasK: !!m[2] } : null;
 }
 
-type NoteNumber = { value: number; hasK: boolean };
+type NoteNumber = { value: number; hasK: boolean; vnd?: boolean };
 // Số < 1000 (hoặc có "k") = nghìn đồng
-const asThousand = (n: NoteNumber) => n.hasK || n.value < 1000 ? n.value * 1000 : n.value;
+const asThousand = (n: NoteNumber) => n.vnd ? n.value : n.hasK || n.value < 1000 ? n.value * 1000 : n.value;
 // Dự phòng khi tổng lệch: coi mọi số < 100.000 là nghìn (vd "1.270" → 1.270.000)
-const allThousand = (n: NoteNumber) => n.value < 100000 ? n.value * 1000 : n.value;
+const allThousand = (n: NoteNumber) => n.vnd ? n.value : n.value < 100000 ? n.value * 1000 : n.value;
 
 /**
  * Tách ghi chú dạng "chuyển khoản 2 lần 45 + 12" (hoặc "ck 2 lan 45k+12k").
- * Số < 1000 hiểu là nghìn đồng (45 → 45.000). Nếu tổng vẫn lệch, thử coi MỌI số là nghìn
+ * Số < 1000 hiểu là nghìn đồng (45 → 45.000); số lẻ "16.2"/"16,2" → 16.200. Nếu tổng vẫn lệch, thử coi MỌI số là nghìn
  * (vd "1.270" → 1.270.000) và chọn cách khớp với tổng hóa đơn.
  * Trả null nếu ghi chú không phải dạng nhiều lần.
  */
@@ -228,6 +300,7 @@ export function expandInvoiceItems(invoices: ReconInvoice[]): ReconItem[] {
  *         và lấy GD sớm nhất còn trống trong khung là tối ưu (số cặp trong khung lớn nhất).
  * Bước 2: phần còn lại cùng số tiền ghép theo thứ tự thời gian → 'matched_late'.
  * Bước 3: phần dư → 'invoice_only' / 'bank_only', kèm gợi ý biên kỳ.
+ * Bước 4 (amountTolerance > 0): phần dư lệch tiền lẻ trong khung giờ → 'matched' kèm amountDiff.
  */
 export function reconcileByAmount(
   items: ReconItem[],
@@ -302,7 +375,54 @@ export function reconcileByAmount(
       pairs.push({ amount, item: null, txn: b.txn, kind: 'bank_only', deltaMinutes: null, edgeHint });
     }
   }
-  return pairs;
+  return (opt.amountTolerance || 0) > 0 ? matchSmallAmountDiff(pairs, opt) : pairs;
+}
+
+/** Bước 4 của reconcileByAmount: HĐ dư (theo giờ HĐ) lấy GD dư lệch ≤ amountTolerance, trong khung giờ, gần giờ HĐ nhất. */
+function matchSmallAmountDiff(pairs: ReconPair[], opt: ReconOptions): ReconPair[] {
+  const tol = opt.amountTolerance || 0;
+  const bank = pairs.filter(p => p.kind === 'bank_only').map(p => ({ p, t: viStampToMinutes(p.txn!.date) }));
+  const inv = pairs.filter(p => p.kind === 'invoice_only')
+    .map(p => ({ p, t: viStampToMinutes(p.item!.invoice.time) }))
+    .filter(x => Number.isFinite(x.t))
+    .sort((a, b) => a.t - b.t);
+  const taken = new Set<ReconPair>();
+  for (const x of inv) {
+    let best: { p: ReconPair; t: number } | null = null;
+    for (const b of bank) {
+      const d = b.t - x.t;
+      if (taken.has(b.p) || Math.abs(b.p.amount - x.p.amount) > tol || d < -opt.windowBeforeMin || d > opt.windowAfterMin) continue;
+      if (!best || Math.abs(d) < Math.abs(best.t - x.t)) best = b;
+    }
+    if (!best) continue;
+    taken.add(best.p);
+    x.p.txn = best.p.txn;
+    x.p.kind = 'matched';
+    x.p.deltaMinutes = best.t - x.t;
+    x.p.edgeHint = null;
+    x.p.amountDiff = x.p.amount - best.p.amount;
+  }
+  if (taken.size > 0) console.debug(`[TransferReconcile] Khớp ${taken.size} cặp lệch tiền lẻ (≤ ${tol} ₫)`);
+  return taken.size > 0 ? pairs.filter(p => !taken.has(p)) : pairs;
+}
+
+/**
+ * Khớp `items` (HĐ CK) trước; GD còn dư mới khớp với `fallbackItems` (HĐĐT ghi Tiền mặt) — CHỈ nhận cặp trong khung giờ
+ * ('matched'). HĐ dự phòng không khớp thì bỏ (HĐ tiền mặt không cần có GD) → không hiện ở "HĐ thiếu GD".
+ */
+export function reconcileWithFallback(
+  items: ReconItem[],
+  fallbackItems: ReconItem[],
+  txns: ReconBankTxn[],
+  options: Partial<ReconOptions> = {}
+): ReconPair[] {
+  const pairs = reconcileByAmount(items, txns, options);
+  const left = pairs.filter(p => p.kind === 'bank_only').map(p => p.txn!);
+  if (fallbackItems.length === 0 || left.length === 0) return pairs;
+  const extra = reconcileByAmount(fallbackItems, left, options).filter(p => p.kind === 'matched');
+  const used = new Set(extra.map(p => p.txn));
+  console.debug(`[TransferReconcile] GD dư ${left.length} → khớp thêm ${extra.length} với HĐĐT ghi Tiền mặt`);
+  return [...pairs.filter(p => !(p.kind === 'bank_only' && used.has(p.txn))), ...extra];
 }
 
 /**
@@ -403,6 +523,23 @@ export function edgeHintLabel(hint: 'prev' | 'next' | null): string {
   return hint === 'prev' ? 'Có thể thuộc kỳ trước hoặc chuyển khoản dư' : hint === 'next' ? 'Có thể thuộc kỳ sau hoặc chuyển khoản dư' : '';
 }
 
+/** Ghi chú thêm của cặp: khớp lệch tiền lẻ, khớp với HĐĐT ghi Tiền mặt. */
+export function pairFlags(p: ReconPair): string[] {
+  const flags: string[] = [];
+  if (p.amountDiff) flags.push(`lệch tiền lẻ ${p.amountDiff > 0 ? '+' : '−'}${Math.abs(p.amountDiff).toLocaleString('vi-VN')} ₫`);
+  if (p.txn && p.item?.invoice.paymentMethod === 'TM') flags.push('HĐĐT ghi Tiền mặt');
+  return flags;
+}
+
+/** Ghi chú hiển thị 1 cặp: lệch giờ / gợi ý biên kỳ + pairFlags. */
+export function reconPairHint(p: ReconPair): string {
+  const time = p.kind === 'matched_late' ? `lệch giờ ${formatDeltaMinutes(p.deltaMinutes)}` : edgeHintLabel(p.edgeHint);
+  return [time, ...pairFlags(p)].filter(Boolean).join(' · ');
+}
+
+// CSV có cột "Lệch giờ (phút)" riêng → Gợi ý chỉ gồm biên kỳ + pairFlags
+const csvHint = (p: ReconPair) => [edgeHintLabel(p.edgeHint), ...pairFlags(p)].filter(Boolean).join(' · ');
+
 /** "1d 2h 05'" từ số phút (dấu − = khách chuyển trước HĐ) */
 export function formatDeltaMinutes(min: number | null): string {
   if (min === null) return '';
@@ -454,7 +591,7 @@ export function buildReconCsv(pairs: ReconPair[]): string {
     { header: 'Diễn giải', value: p => p.txn?.desc ?? '', text: true },
     { header: 'Mã GD', value: p => p.txn?.code ?? '', text: true },
     { header: 'Lệch giờ (phút)', value: p => p.deltaMinutes },
-    { header: 'Gợi ý', value: p => edgeHintLabel(p.edgeHint), text: true },
+    { header: 'Gợi ý', value: csvHint, text: true },
   ], pairs);
 }
 
@@ -465,7 +602,7 @@ const bankMatchColumns = (withBank: boolean): CsvColumn<ReconPair>[] => withBank
   { header: 'Giờ GD', value: p => p.txn?.date ?? '', text: true },
   { header: 'Người chuyển', value: p => p.txn?.counterparty ?? '', text: true },
   { header: 'Mã GD', value: p => p.txn?.code ?? '', text: true },
-  { header: 'Gợi ý', value: p => edgeHintLabel(p.edgeHint), text: true },
+  { header: 'Gợi ý', value: csvHint, text: true },
 ] : [];
 
 /** CSV HĐ chuyển khoản nhiều lần — mỗi khoản 1 dòng, kèm GD đã khớp. */

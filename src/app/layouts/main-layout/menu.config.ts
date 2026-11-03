@@ -40,6 +40,8 @@ export const MENU_SECTIONS: MenuSection[] = [
       { label: 'Đối soát hóa đơn XML', icon: 'fa-file-code', route: '/invoice-reconciliation-page' },
       { label: 'Kiểm tra HĐ tự động', icon: 'fa-rotate', route: '/invoice-check-page' },
       { label: 'Ánh xạ hàng hóa', icon: 'fa-link', route: '/item-mapping-page' },
+      // 02/11/2026: tải zip công cụ chạy trên máy kế toán (extension GDT, nạp XML vào VietDA)
+      { label: 'Tải công cụ', icon: 'fa-download', route: '/tools-download-page' },
     ],
     groups: [
       {

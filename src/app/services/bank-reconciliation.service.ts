@@ -3,16 +3,17 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { TienIchCacheService } from './tien-ich-cache.service';
+import { EInvoiceBill } from '../utils/transfer-reconcile.util';
 
 /**
- * ĐỐI SOÁT CK (Tiện ích) — nguồn HĐ chuyển khoản KiotViet qua KeToanBackEnd /api/bank-reconciliation/*
- * (phương án C: BE lấy HĐ CK từ KiotViet → Firestore theo ngày; KeToan FE không gọi KiotViet / Flask).
- * HĐ giữ tên trường KiotViet (Id, Code, TotalPayment, PurchaseDate, Description, InvoiceExtraData, EInvoices) để dùng y
- * logic BanHang (utils/transfer-reconcile.util.ts — vùng mirror).
+ * ĐỐI SOÁT CK (Tiện ích) — nguồn HĐ = HĐĐT einvoiceapp (mọi trạng thái, mọi PTTT) qua KeToanBackEnd /api/bank-reconciliation/*
+ * (BE lấy từ einvoice → Firestore theo ngày HĐ; KeToan FE không gọi einvoice / Flask). 03/11/2026: trước đó là HĐ CK KiotViet
+ * bán hàng — KiotViet chỉ ghi PTTT chuyển khoản từ ~04/2026 nên tháng 3 trở về trước không đối soát được.
+ * HĐ giữ tên trường einvoice (EInvoiceBill) → FE đọc bằng readEInvoiceBills (utils/transfer-reconcile.util.ts — vùng mirror).
  */
 const LOG = '[BankRecon]';
 const BASE = `${environment.ketoanBackendUrl}/api/bank-reconciliation`;
-/** Mỗi lần nhờ BE lấy từ KiotViet tối đa 7 ngày (như BanHang chia tuần) */
+/** Mỗi lần nhờ BE lấy từ einvoice tối đa 7 ngày (BE cho ≤ 31 ngày / lần) */
 const CHUNK_DAYS = 7;
 /**
  * Máy chủ tự lấy lại 7 ngày gần nhất mỗi đêm (TRANSFER_SYNC_DAYS) → khoảng ngày kết thúc trước hôm nay > 8 ngày, đã đủ mọi ngày,
@@ -20,16 +21,10 @@ const CHUNK_DAYS = 7;
  */
 const STABLE_AFTER_DAYS = 8;
 
-export interface TransferInvoice {
-  Id: number; Code: string; Total: number | null; TotalPayment: number | null; PurchaseDate: string; Description: string;
-  InvoiceExtraData?: { EInvoiceRegistedDatePartner4?: string | null } | null;
-  EInvoices?: { Serial?: string; EInvoiceNumber?: string; TaxStatus?: number; ErrorCode?: number; TaxErrors?: string; PublishedDate?: string }[];
-}
-
 export interface TransferDay { date: string; count: number; synced_at: string; complete: boolean; }
 
 export interface TransferRange {
-  from: string; to: string; invoices: TransferInvoice[]; days: TransferDay[];
+  from: string; to: string; invoices: EInvoiceBill[]; days: TransferDay[];
   /** chưa lấy lần nào */
   missing: string[];
   /** lấy khi chưa hết ngày → có thể thiếu HĐ */
@@ -59,7 +54,8 @@ export class BankReconciliationService {
    * theo từng đoạn ≤ 7 ngày liền nhau, rồi đọc lại. `onProgress(i, n)` = đoạn đang lấy.
    */
   async load(from: string, to: string, force: boolean, onProgress?: (i: number, n: number) => void): Promise<LoadResult> {
-    const cacheKey = `ck-range:${from}:${to}`;
+    // 'hddt-range' (03/11/2026): bản 'ck-range' cũ là HĐ KiotViet, khác dạng → không đọc lại
+    const cacheKey = `hddt-range:${from}:${to}`;
     const stable = to <= this.addDays(this.today(), -STABLE_AFTER_DAYS);
     if (stable && !force) {
       const hit = await this.cache.get<TransferRange>(cacheKey);
@@ -76,7 +72,7 @@ export class BankReconciliationService {
       return { data, syncedDays: 0 };
     }
     const chunks = this.chunks(need);
-    console.log(`${LOG} ${from}→${to}: lấy từ KiotViet ${need.length} ngày (${force ? 'lấy lại tất cả' : `chưa lấy ${data.missing.length}, chưa đủ ${data.incomplete.length}`}) — ${chunks.length} lần`);
+    console.log(`${LOG} ${from}→${to}: lấy từ einvoice ${need.length} ngày (${force ? 'lấy lại tất cả' : `chưa lấy ${data.missing.length}, chưa đủ ${data.incomplete.length}`}) — ${chunks.length} lần`);
     for (let i = 0; i < chunks.length; i++) {
       onProgress?.(i + 1, chunks.length);
       const r = await this.sync(chunks[i][0], chunks[i][1]);

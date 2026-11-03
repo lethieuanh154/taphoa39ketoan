@@ -69,46 +69,6 @@
 .warn { color: #e65100; }
 .ok { color: #2e7d32; }
 
-/* Bảng canh hàng 2 cột */
-.compare-grid { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #fff; }
-.compare-head { display: grid; grid-template-columns: 1fr 1fr; }
-.col-head {
-  padding: 10px 14px; font-weight: 600; color: #fff; font-size: 13px;
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-}
-.col-head.kv { background: #2c5282; }
-.col-head.bank { background: #1d7d3f; }
-.col-head > span { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.sort-btn {
-  border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.15);
-  color: #fff; padding: 4px 9px; border-radius: 6px; cursor: pointer;
-  font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
-}
-.sort-btn:hover { background: rgba(255, 255, 255, 0.3); }
-
-.aligned-rows { max-height: 65vh; overflow: auto; }
-.aligned-row { display: grid; grid-template-columns: 1fr 1fr; }
-.cell {
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 14px; border-bottom: 1px solid #f0f0f0; border-right: 1px solid #f0f0f0;
-  font-size: 13px; min-height: 48px; box-sizing: border-box; min-width: 0;
-}
-.cell.bank-cell { border-right: none; }
-.row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.row-main .code { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-main .sub { font-size: 11px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-main .code .part { font-weight: 500; color: #6a1b9a; }
-.amount { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
-.mark { width: 16px; text-align: center; }
-.cell .mark.fa-check { color: #43a047; }
-.cell .mark.fa-xmark { color: #e53935; }
-.cell.matched { background: #f4fbf5; }
-.cell.unmatched { background: #ffebee; }
-.cell.unmatched .code, .cell.unmatched .amount { color: #c62828; }
-.cell.late { background: #fff8e1; }
-.cell.late .sub { color: #a1740b; }
-.cell.blank { background: repeating-linear-gradient(45deg, #fafafa, #fafafa 6px, #f2f2f2 6px, #f2f2f2 12px); }
-
 .empty { padding: 18px; text-align: center; color: #999; font-size: 13px; }
 .hint { color: #666; font-size: 13px; line-height: 1.6; margin-top: 12px; }
 
@@ -140,6 +100,7 @@
   border: 1px solid #d0d7de; background: #fff; color: #555; padding: 4px 12px; border-radius: 14px; cursor: pointer; font-size: 12px;
 }
 .filter-chips button.active { background: #2c5282; border-color: #2c5282; color: #fff; }
+.filter-chips .sort-chip { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
 
 /* Tab CK nhiều lần / CK dư */
 .multi-summary { font-size: 13px; color: #555; margin-bottom: 10px; }
@@ -153,6 +114,12 @@
 .multi-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .multi-table td.code { font-weight: 600; white-space: nowrap; }
 .multi-table td.txn { color: #37474f; }
+/* Tab Đối soát: tô màu dòng như lưới 2 cột cũ — khớp xanh, lệch giờ vàng, dư 1 bên đỏ */
+.multi-table tr.row-matched td { background: #f4fbf5; }
+.multi-table tr.row-matched_late td { background: #fff8e1; }
+.multi-table tr.row-invoice_only td, .multi-table tr.row-bank_only td { background: #ffebee; }
+.multi-table tr.row-invoice_only td.code, .multi-table tr.row-invoice_only td.num,
+.multi-table tr.row-bank_only td.code, .multi-table tr.row-bank_only td.num { color: #c62828; }
 .note-status { display: inline-block; margin-left: 6px; font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #e8f5e9; color: #2e7d32; }
 .note-status.bad { background: #ffebee; color: #c62828; }
 .kind { font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -165,7 +132,6 @@
   .recon-page { padding: 0.75rem; }
   .summary-bar { grid-template-columns: 1fr; }
   .btn-primary { margin-left: 0; }
-  .aligned-row, .compare-head { grid-template-columns: 1fr; }
 }
 
 /* vòng xoay đang tải (app-table-loading overlay) */

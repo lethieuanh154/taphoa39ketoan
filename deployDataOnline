@@ -6,7 +6,7 @@ Backend phải chạy trước: container taphoa39ketoanbackend ở 127.0.0.1:80
 🚀 BƯỚC 1 — Build Angular trên máy local
 
 cd TapHoa39KeToan
-ng build --configuration production
+npm run build -- --configuration production   # prebuild tự nén tools/ → public/tools/*.zip
 
 Output nằm ở: dist/taphoa39ketoan/browser/
 
@@ -25,6 +25,7 @@ mkdir -p /apps/taphoa39ketoan
 Trên máy local:
 
 scp -r dist/taphoa39ketoan/browser/* root@180.93.165.213:/apps/taphoa39ketoan/
+ssh root@180.93.165.213 "find /apps/taphoa39ketoan -type d -exec chmod 755 {} + && find /apps/taphoa39ketoan -type f -exec chmod 644 {} +"   # scp từ Windows tạo thư mục con quyền chặt → nginx không đọc được unrar/, tools/ (trả index.html)
 
 🚀 BƯỚC 4 — Cấu hình Nginx (làm 1 lần — giống BƯỚC 12 bên TapHoa39KeToanBackEnd/deployDataOnline)
 
@@ -110,8 +111,9 @@ Sau khi cài SSL, kiểm tra: https://ketoan.songminhcr.com
 
 Trên máy local:
 
-ng build --configuration production
+npm run build -- --configuration production   # prebuild tự nén tools/ → public/tools/*.zip
 scp -r dist/taphoa39ketoan/browser/* root@180.93.165.213:/apps/taphoa39ketoan/
+ssh root@180.93.165.213 "find /apps/taphoa39ketoan -type d -exec chmod 755 {} + && find /apps/taphoa39ketoan -type f -exec chmod 644 {} +"   # scp từ Windows tạo thư mục con quyền chặt → nginx không đọc được unrar/, tools/ (trả index.html)
 
 Không cần restart nginx (chỉ là static files).
 Trình duyệt vẫn hiện bản cũ → Ctrl+F5.

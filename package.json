@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "pack-tools": "node scripts/pack-tools.mjs",
+    "prestart": "npm run pack-tools",
     "start": "ng serve",
+    "prebuild": "npm run pack-tools",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"

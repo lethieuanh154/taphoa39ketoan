@@ -67,6 +67,7 @@ Thêm / bớt trang trong menu → sửa `menu.config.ts`, không sửa HTML. Nh
 | Mục | Path | Component | Ghi chú |
 |-----|------|-----------|---------|
 | Tiện ích | `/invoice-check-page` | InvoiceCheckPageComponent (`loadComponent`) | Kiểm tra HĐ tự động (23/10/2026). `?run=<id>` = mở 1 lần kiểm. `noPeriodBar` |
+| Tiện ích (cuối nhóm link thẳng) | `/tools-download-page` | ToolsDownloadPageComponent (`loadComponent`) | Tải công cụ (02/11/2026): zip các thư mục `tools/` để chạy trên máy kế toán. `noPeriodBar` |
 | Tiện ích | nhóm **Đối soát CK** → `/bank-reconciliation-page` | BankReconciliationPageComponent (`loadComponent`) | "Chuyển khoản HĐ đầu ra" (23/10/2026) — khoảng ngày theo thanh chọn kỳ / theo sao kê |
 | Tiện ích | nhóm **Đối soát CK** → `/bank-reconciliation-in-page` | BankReconciliationInPageComponent (lazy) | "Chuyển khoản HĐ đầu vào" (23/10/2026): HĐ mua (thư mục XML / Gmail) ⇄ tiền ra trên sao kê TPBank |
 | Tiện ích | `/invoice-reconciliation-page` | InvoiceReconciliationPageComponent (`loadComponent`, tải riêng) | Đối soát hóa đơn XML (23/10/2026). `?run=<id>` = mở 1 lần đối soát |

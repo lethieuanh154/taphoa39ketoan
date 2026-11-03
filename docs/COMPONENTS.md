@@ -317,8 +317,11 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 
 - Chọn 1 / nhiều file Bảng kê TPBank (.xlsx, `utils/tpbank-statement.util.ts`) → khoảng ngày = ngày GD thực tế trong file;
   chưa import → theo thanh chọn kỳ (`PeriodService`). "Bỏ sao kê" → về theo kỳ.
-- **Lấy hóa đơn KiotViet** → `BankReconciliationService.load()`: đọc HĐ CK đã lưu trên máy chủ; ngày chưa lấy / chưa hết ngày →
-  máy chủ lấy từ KiotViet (≤ 7 ngày / lần, có tiến trình). **Lấy lại từ KiotViet** = mọi ngày (cập nhật trạng thái HĐĐT).
+- **Lấy HĐĐT** (03/11/2026, trước là "Lấy hóa đơn KiotViet") → `BankReconciliationService.load()`: đọc HĐĐT einvoice đã lưu trên
+  máy chủ (`einvoice_bill_days`, mọi PTTT); ngày chưa lấy / chưa hết ngày → máy chủ lấy từ einvoice (≤ 7 ngày / lần, có tiến trình).
+  **Lấy lại từ einvoice** = mọi ngày. Cache IndexedDB key `hddt-range:` (bản `ck-range:` cũ là HĐ KiotViet, bỏ).
+- Khớp: `readEInvoiceBills` → `reconcileWithFallback` (HĐ CK trước, GD dư thử HĐĐT ghi TM trong khung giờ) + dung sai tiền lẻ
+  `EINVOICE_AMOUNT_TOLERANCE`. Ô Tổng tiền vào hiện "khớp X%" (mục tiêu > 90%; đo 09/2026 98,3%, 03/2026 90,6%).
 - Khớp theo số tiền + 3 tab Đối soát / CK nhiều lần / CK dư + Xuất CSV: y BanHang (`utils/transfer-reconcile.util.ts`).
   Khác BanHang: bảng 2 cột **phân trang** (100–1000 dòng / trang, KeToan chưa có `@angular/cdk`), bỏ nút "Đánh sao HĐ thiếu".
 - (23/10/2026) Tab CK nhiều lần + CK dư có cột **Số HĐ** (số HĐĐT CQT đã chấp nhận, `readKvEInvoice`; chưa có → trống, rê chuột xem
@@ -408,6 +411,17 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
   hành của n HĐ" (`counts.pdf_checked`, `pdf_single`, `pdf_errors`). Chi tiết: `TapHoa39KeToanBackEnd/docs/TIEN-ICH-JOBS.md`.
   Cột **PDF** mỗi HĐ: Khớp / Khác dữ liệu / Không đọc được (`*` = không khớp PDF gộp, máy đã đọc PDF riêng; lần kiểm cũ để trống) +
   nút **Xem PDF** (`openPdf`: mở tab trống ngay lúc bấm rồi gán blob tải qua `billPdf` — tránh trình duyệt chặn popup sau await).
+
+## ToolsDownloadPageComponent — Tiện ích "Tải công cụ" (02/11/2026)
+
+**Path**: `components/tools-download-page/` — route `/tools-download-page` (lazy, không thanh chọn kỳ).
+
+- Danh sách công cụ chạy trên máy kế toán (mảng `tools` trong component: tên, mô tả, yêu cầu, các bước), mỗi công cụ 1 nút tải
+  `tools/<thư mục>.zip` (link tĩnh, không qua BE).
+- Zip do `scripts/pack-tools.mjs` sinh vào `public/tools/` (gitignore) — chạy tự động ở `prebuild` / `prestart`, nên deploy phải
+  build bằng `npm run build -- --configuration production` (không gọi thẳng `ng build`). Mỗi thư mục con của `tools/` = 1 zip, gốc zip
+  là tên thư mục; bỏ `__pycache__`, `*.pyc`, file `_vietda-*` (log / sổ đã nạp của tool VietDA).
+- Thêm công cụ mới: tạo thư mục `tools/<tên>/` (kèm README.md) + thêm 1 phần tử vào `tools` của component (`file: '<tên>.zip'`).
 
 ## ItemMappingPageComponent — Tiện ích "Ánh xạ hàng hóa" (23/10/2026)
 
