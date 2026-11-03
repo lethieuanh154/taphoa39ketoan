@@ -110,10 +110,17 @@ Sau khi cài SSL, kiểm tra: https://ketoan.songminhcr.com
 🚀 CẬP NHẬT SAU NÀY — Khi có thay đổi code
 
 Trên máy local:
+cmd (copy từng dòng lệnh, KHÔNG copy dòng ghi chú "→" — cmd không hiểu "#" là chú thích, tiếng Việt dán vào thành "?" và bị gửi làm tham số):
 
-npm run build -- --configuration production   # prebuild tự nén tools/ → public/tools/*.zip
+chcp 65001
+npm run build -- --configuration production
 scp -r dist/taphoa39ketoan/browser/* root@180.93.165.213:/apps/taphoa39ketoan/
-ssh root@180.93.165.213 "find /apps/taphoa39ketoan -type d -exec chmod 755 {} + && find /apps/taphoa39ketoan -type f -exec chmod 644 {} +"   # scp từ Windows tạo thư mục con quyền chặt → nginx không đọc được unrar/, tools/ (trả index.html)
+ssh root@180.93.165.213 "find /apps/taphoa39ketoan -type d -exec chmod 755 {} + && find /apps/taphoa39ketoan -type f -exec chmod 644 {} +"
+
+→ chcp 65001: cmd hiện đúng tiếng Việt trong log build (pack-tools).
+→ npm run build (KHÔNG dùng ng build): prebuild tự nén tools/ → public/tools/*.zip; ng build bỏ qua bước này → trang Tải công cụ phát zip cũ.
+→ Chạy trong PowerShell thì "--" bị nuốt → lỗi project "production"; dùng cmd.
+→ ssh chmod: scp từ Windows tạo thư mục con quyền chặt → nginx không đọc được unrar/, tools/ (trả index.html).
 
 Không cần restart nginx (chỉ là static files).
 Trình duyệt vẫn hiện bản cũ → Ctrl+F5.

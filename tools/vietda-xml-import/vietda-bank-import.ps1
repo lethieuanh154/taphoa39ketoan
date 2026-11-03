@@ -40,6 +40,32 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms, System.IO.Compression
 
+# cmd mặc định font raster (Terminal) chỉ có ký tự bảng mã 437 → tiếng Việt thành "?" dù đã chcp 65001; đổi font cửa sổ này sang Consolas
+if (-not ('ConFont' -as [type])) {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class ConFont {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct INFO { public uint cbSize; public uint nFont; public short X; public short Y; public uint Family; public uint Weight;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string Face; }
+    [DllImport("kernel32.dll")] static extern IntPtr GetStdHandle(int n);
+    [DllImport("kernel32.dll")] static extern bool GetCurrentConsoleFontEx(IntPtr h, bool max, ref INFO i);
+    [DllImport("kernel32.dll")] static extern bool SetCurrentConsoleFontEx(IntPtr h, bool max, ref INFO i);
+    public static string UseTrueType(string face) {
+        IntPtr h = GetStdHandle(-11);
+        INFO i = new INFO(); i.cbSize = (uint)Marshal.SizeOf(i);
+        if (!GetCurrentConsoleFontEx(h, false, ref i)) return "không đọc được font console";
+        if ((i.Family & 4) != 0) return null;
+        string old = i.Face;
+        i.nFont = 0; i.X = 0; i.Y = (short)(i.Y < 14 ? 16 : i.Y); i.Family = 54; i.Weight = 400; i.Face = face;
+        return SetCurrentConsoleFontEx(h, false, ref i) ? null : "không đổi được font console " + old + " → " + face;
+    }
+}
+"@
+}
+try { $fontNote = [ConFont]::UseTrueType('Consolas') } catch { $fontNote = "đổi font console lỗi: $($_.Exception.Message)" }
+
 if (-not ('Vdb' -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
@@ -743,6 +769,7 @@ function Invoke-Voucher($Item) {
 
 # ================= main =================
 Write-Log INFO "===== Bắt đầu$(if ($DryRun) { ' (DRY RUN)' })"
+if ($fontNote) { Write-Log WARN "$fontNote — tiếng Việt có thể hiện thành '?' (chuột phải thanh tiêu đề → Properties → Font → Consolas); file log vẫn đúng." }
 
 $script:vda = Find-Vietda
 if (-not $script:vda) { Fail 'Không thấy VietDA đã đăng nhập (Menu.exe) — mở VietDA, đăng nhập rồi chạy lại.' }
