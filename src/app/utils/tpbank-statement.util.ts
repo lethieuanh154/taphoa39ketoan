@@ -16,6 +16,7 @@ export interface BankTransaction {
   desc: string;        // Diễn giải (cột C)
   credit: number;      // Ghi có (cột E) - tiền vào
   counterparty: string;// Chủ TK đối ứng (cột H)
+  account: string;     // TK đối ứng (cột G) — định danh người chuyển (transfer-reconcile payerKey)
   code: string;        // Mã giao dịch (cột I)
 }
 
@@ -143,6 +144,7 @@ export async function parseTpBankStatement(file: File): Promise<BankStatementRes
         desc: String(cells['C'] || '').trim(),
         credit,
         counterparty: String(cells['H'] || '').trim(),
+        account: String(cells['G'] ?? '').trim(),
         code: String(cells['I'] || '').trim(),
       });
     }

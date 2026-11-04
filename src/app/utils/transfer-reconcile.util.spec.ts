@@ -1,7 +1,7 @@
 import {
   parseMultiTransferNote, parseExcessTransferNote, expandInvoiceItems, reconcileByAmount, buildReconCsv,
   buildMultiTransferCsv, buildExcessTransferCsv, viStampToMinutes, readKvEInvoice, payerKey, ReconInvoice, ReconBankTxn,
-  readEInvoiceBills, reconcileWithFallback, reconPairHint, EInvoiceBill, EINVOICE_AMOUNT_TOLERANCE
+  readEInvoiceBills, reconcileWithFallback, reconPairHint, EInvoiceBill, EINVOICE_AMOUNT_TOLERANCE, payerNameFromDesc, payerLabel
 } from './transfer-reconcile.util';
 
 const inv = (code: string, total: number, time: string, note = 'chuyển khoản'): ReconInvoice =>
@@ -162,11 +162,43 @@ describe('transfer-reconcile.util', () => {
       expect(pairs.every(p => p.kind === 'matched')).toBeTrue();
     });
 
-    it('payerKey: cột Chủ TK đối ứng, thiếu thì đọc từ diễn giải', () => {
+    it('payerKey: TK đối ứng + tên trong diễn giải, thiếu tên mới dùng cột Chủ TK đối ứng', () => {
       expect(payerKey({ counterparty: 'HO PHUOC THINH ', desc: '' })).toBe('ho phuoc thinh');
       expect(payerKey({ counterparty: '', desc: 'TPB;69586928888;NGUYEN THI LE THANH chuyen tien' })).toBe('nguyen thi le thanh');
       expect(payerKey({ counterparty: '', desc: 'IBFT NGUYEN THI LE THANH chuyen tien' })).toBe('nguyen thi le thanh');
       expect(payerKey({ counterparty: '', desc: 'Thanh toan QR' })).toBe('');
+      expect(payerKey({ counterparty: 'MBBANK IBFT', desc: 'LE MINH TOAN chuyen tien', account: '0775369559' })).toBe('0775369559|le minh toan');
+      // ví MoMo: cùng TK + cùng cột H, khác người
+      const momo = (desc: string) => payerKey({ counterparty: 'CT CP DICH VU DI DONG TRUC TUYEN', desc, account: '1770260769' });
+      expect(momo('149353799186 0983010909 HUA THI MY DUYEN chuyen tien qua MoMo'))
+        .not.toBe(momo('149345183125 0376856267 NGUYEN VAN HAN chuyen tien qua MoMo'));
+    });
+
+    it('payerNameFromDesc / payerLabel: mẫu thật TPBank', () => {
+      expect(payerNameFromDesc('QR - MAI THI THU chuyen tien')).toBe('mai thi thu');
+      expect(payerNameFromDesc('MBVCB.16852679028.6307BFTVGLFAWUNQ.HOANG THI LAN chuyen tien.CT tu 1047861770 HOANG THI LAN toi'))
+        .toBe('hoang thi lan');
+      expect(payerNameFromDesc('154935256047 0347137106 LUONG THI DIEU NGA chuyen tien qua MoMo')).toBe('luong thi dieu nga');
+      expect(payerNameFromDesc('123398917566-0377202260-NGUYEN PHI LONG chuyen tien qua MoMo')).toBe('nguyen phi long');
+      expect(payerNameFromDesc('MAI THI LINH CHUYEN KHOAN-031126-17:12:04 6307ASCB02K9JJUM')).toBe('mai thi linh');
+      expect(payerNameFromDesc('NGUYEN NGOC TU chuyen tien FT26307007125629')).toBe('nguyen ngoc tu');
+      expect(payerNameFromDesc('FT26307740128947')).toBe('');
+      expect(payerLabel({ counterparty: 'MBBANK IBFT', desc: 'LE MINH TOAN chuyen tien' })).toBe('LE MINH TOAN');
+      expect(payerLabel({ counterparty: 'VND-TGTT-TRAN THI QUE HUONG', desc: 'FT26307740128947' })).toBe('VND-TGTT-TRAN THI QUE HUONG');
+    });
+
+    it('CK nhiều lần: cột H chung "MBBANK IBFT" không gộp 2 khách khác nhau (mẫu thật HD445796 03/11)', () => {
+      const mb = (code: string, credit: number, date: string, name: string, account: string): ReconBankTxn =>
+        ({ code, credit, date, counterparty: 'MBBANK IBFT', desc: `${name} chuyen tien`, account });
+      const items = expandInvoiceItems([inv('HD445796', 45000, '03/11/2026 20:07:33', 'chuyển khoản 2 lần 30 + 15')]);
+      const pairs = reconcileByAmount(items, [
+        mb('T_KHAC', 30000, '03/11/2026 18:57:05', 'NGUYEN VAN B', '0905111222'),
+        mb('T_15', 15000, '03/11/2026 17:38:07', 'LE MINH TOAN', '0775369559'),
+        mb('T_30', 30000, '03/11/2026 17:14:00', 'LE MINH TOAN', '0775369559'),
+      ]);
+      const part = (i: number) => pairs.find(p => p.item?.partIndex === i)!.txn!.code;
+      expect(part(1)).toBe('T_30');
+      expect(part(2)).toBe('T_15');
     });
 
     it('phần dư + gợi ý biên kỳ', () => {

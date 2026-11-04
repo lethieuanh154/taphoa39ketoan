@@ -123,6 +123,7 @@ export interface ReconBankTxn {
   credit: number;
   counterparty: string;
   code: string;   // Mã giao dịch (cột I)
+  account?: string;  // TK đối ứng (cột G) — định danh người chuyển cùng tên trong diễn giải (payerKey)
 }
 
 export type NoteStatus = 'ok' | 'count_mismatch' | 'sum_mismatch' | 'unparsed';
@@ -426,15 +427,36 @@ export function reconcileWithFallback(
 }
 
 /**
- * Tên người chuyển để so khớp: cột "Chủ TK đối ứng"; thiếu thì lấy từ diễn giải
- * ("TPB;69586928888;NGUYEN VAN A chuyen tien", "IBFT NGUYEN VAN A chuyen tien"). '' nếu không đọc được.
+ * Tên người chuyển đọc từ diễn giải (không dấu, chữ thường) — phần trước "chuyen tien/khoan", bỏ tiền tố ngân hàng / mã / SĐT:
+ * "LE MINH TOAN chuyen tien", "QR - MAI THI THU chuyen tien", "TPB;69586928888;LE TAN PHUONG chuyen tien",
+ * "MBVCB.168526...6307BFTV....HOANG THI LAN chuyen tien.CT tu ...", "154935256047 0347137106 LUONG THI DIEU NGA chuyen tien qua MoMo",
+ * "IBFT NGUYEN VAN A chuyen tien". '' nếu không đọc được (vd "FT26307740128947").
  */
-export function payerKey(txn: Pick<ReconBankTxn, 'counterparty' | 'desc'>): string {
-  const clean = (s: string) => normalizeVi(s).replace(/[^a-z0-9]+/g, ' ').trim();
-  const fromCol = clean(txn.counterparty || '');
-  if (fromCol) return fromCol;
-  const m = /^(?:.*;)?\s*(?:ibft\s+)?(.+?)\s+chuyen\s*(?:tien|khoan)\b/.exec(normalizeVi(txn.desc || ''));
-  return m ? clean(m[1]) : '';
+export function payerNameFromDesc(desc: string): string {
+  const m = /^(.*?)\s*chuyen\s*(?:tien|khoan)\b/.exec(normalizeVi(desc || ''));
+  if (!m) return '';
+  const words = (m[1].split(/[.;\-]/).pop() || '').replace(/[^a-z0-9]+/g, ' ').trim().split(' ')
+    .filter(w => w && !/\d/.test(w));
+  while (words.length && (words[0] === 'qr' || words[0] === 'ibft')) words.shift();
+  return words.join(' ');
+}
+
+/**
+ * Định danh người chuyển để khớp HĐ "N lần": TK đối ứng (cột G) + tên trong diễn giải; diễn giải không có tên mới dùng cột
+ * "Chủ TK đối ứng". KHÔNG dùng cột H trước (04/11/2026): GD liên ngân hàng ghi chung "MBBANK IBFT", ví MoMo ghi tên công ty
+ * (09/2026: 139 + 147 GD) → 2 khách khác nhau bị coi là 1 người (HD445796: lấy nhầm GD 30.000 18:57:05 của người khác thay vì
+ * 17:14:00 của LE MINH TOAN). TK ví MoMo dùng chung → phải ghép thêm tên. '' nếu không đọc được.
+ */
+export function payerKey(txn: Pick<ReconBankTxn, 'counterparty' | 'desc'> & { account?: string }): string {
+  const name = payerNameFromDesc(txn.desc) || normalizeVi(txn.counterparty || '').replace(/[^a-z0-9]+/g, ' ').trim();
+  if (!name) return '';
+  const account = String(txn.account || '').replace(/\D/g, '');
+  return account ? `${account}|${name}` : name;
+}
+
+/** Tên người chuyển để hiển thị: tên trong diễn giải (cột H có thể chỉ là "MBBANK IBFT"), thiếu thì cột H / diễn giải. */
+export function payerLabel(txn: Pick<ReconBankTxn, 'counterparty' | 'desc'>): string {
+  return payerNameFromDesc(txn.desc).toUpperCase() || txn.counterparty || txn.desc;
 }
 
 type PayerTxn = { txn: ReconBankTxn; t: number; used: boolean };

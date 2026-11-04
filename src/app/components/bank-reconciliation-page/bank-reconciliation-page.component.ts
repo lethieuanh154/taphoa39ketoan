@@ -8,7 +8,7 @@ import { PeriodService } from '../../services/period.service';
 import { parseTpBankStatement, BankStatementResult } from '../../utils/tpbank-statement.util';
 import {
   ReconInvoice, ReconPair, ReconKind, expandInvoiceItems, reconcileWithFallback, multiTransferPairs, excessTransferPairs,
-  buildReconCsv, buildMultiTransferCsv, buildExcessTransferCsv, reconPairHint, NOTE_STATUS_LABEL,
+  buildReconCsv, buildMultiTransferCsv, buildExcessTransferCsv, reconPairHint, payerLabel, NOTE_STATUS_LABEL,
   RECON_KIND_LABEL, readEInvoiceBills, EINVOICE_AMOUNT_TOLERANCE
 } from '../../utils/transfer-reconcile.util';
 
@@ -311,7 +311,7 @@ export class BankReconciliationPageComponent {
         note: it?.invoice.note ?? '',
         part: !it ? '' : it.partCount > 1 ? `${it.partIndex}/${it.partCount}`
           : it.excess?.refund ? `CK dư, trả lại ${this.formatVnd(it.excess.refund)}` : '—',
-        txnText: p.txn ? [p.txn.counterparty || p.txn.desc, p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
+        txnText: p.txn ? [payerLabel(p.txn), p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
         hint: reconPairHint(p)
       };
     });
@@ -362,7 +362,7 @@ export class BankReconciliationPageComponent {
         amount: it.partCount > 1 ? it.amount : null,
         kind: p.kind,
         kindLabel: RECON_KIND_LABEL[p.kind],
-        txnText: p.txn ? [p.txn.counterparty || p.txn.desc, p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
+        txnText: p.txn ? [payerLabel(p.txn), p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
         hint: reconPairHint(p)
       };
     });
@@ -385,7 +385,7 @@ export class BankReconciliationPageComponent {
         refund: ex.refund,
         kind: p.kind,
         kindLabel: RECON_KIND_LABEL[p.kind],
-        txnText: p.txn ? [p.txn.counterparty || p.txn.desc, p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
+        txnText: p.txn ? [payerLabel(p.txn), p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
         hint: reconPairHint(p)
       };
     });
