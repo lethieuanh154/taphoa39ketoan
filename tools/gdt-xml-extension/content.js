@@ -83,7 +83,7 @@ function activeContext() {
   const tabs = $$('.ant-tabs-tab-active').map((t) => t.textContent.trim().toLowerCase());
   const dir = tabs.some((t) => t.includes('bán ra')) ? 'out' : tabs.some((t) => t.includes('mua vào')) ? 'in' : null;
   const mtt = tabs.some((t) => t.includes('máy tính tiền'));
-  return { dir, label: `${dir === 'out' ? 'Bán ra' : 'Mua vào'}${mtt ? ' MTT' : ''}` };
+  return { dir, mtt, label: `${dir === 'out' ? 'Bán ra' : 'Mua vào'}${mtt ? ' MTT' : ''}` };
 }
 
 const currentRows = () => $$('tr.ant-table-row[data-row-key]');
@@ -103,11 +103,15 @@ function invoiceKey(dir, inv) {
   return inv.shdon ? `${dir}|${inv.nbmst}|${inv.khmshdon}${inv.khhdon}|${inv.shdon}` : `${dir}|${inv.rowKey}`;
 }
 
+function dirFolder(settings, dir) {
+  const root = settings.rootFolder.replace(/[\\/:*?"<>|]/g, '').trim() || DEFAULT_SETTINGS.rootFolder;
+  return `${root}/${dir === 'in' ? 'MuaVao' : 'BanRa'}`;
+}
+
 function invoiceBase(settings, dir, inv) {
   const safe = (s) => String(s ?? '').replace(/[^\w-]/g, '');
-  const root = settings.rootFolder.replace(/[\\/:*?"<>|]/g, '').trim() || DEFAULT_SETTINGS.rootFolder;
   const name = inv.shdon ? `${safe(inv.nbmst)}_${safe(inv.khmshdon)}${safe(inv.khhdon)}_${safe(inv.shdon)}` : safe(inv.rowKey);
-  return `${root}/${dir === 'in' ? 'MuaVao' : 'BanRa'}/${inv.ymd.slice(0, 7)}/${inv.ymd}_${name}`;
+  return `${dirFolder(settings, dir)}/${inv.ymd.slice(0, 7)}/${inv.ymd}_${name}`;
 }
 
 // Nút icon trên thanh công cụ của bảng: Xem / In / Xuất hóa đơn / Xuất XML
@@ -127,28 +131,60 @@ async function tooltipOf(btn) {
   return text;
 }
 
-const xmlBtnIndex = {};
+const btnIndex = {};
 
-// Tìm nút tải XML theo tooltip (không có title trong DOM), nhớ vị trí cho các dòng sau.
-// Nút XML là nút cuối → thử nút cuối trước, chỉ dò các nút khác khi GDT đổi thứ tự.
-async function xmlButton(dir) {
+// Tìm nút trên thanh công cụ theo tooltip (không có title trong DOM), nhớ vị trí cho lần sau.
+// Thứ tự: Xem / In / Xuất hóa đơn / Xuất XML → dò từ cuối lên, nút đang khóa thì bỏ qua không rê chuột.
+async function toolbarButton(cacheKey, name, test) {
   const btns = toolbarButtons();
-  if (xmlBtnIndex[dir] != null && btns[xmlBtnIndex[dir]]) return btns[xmlBtnIndex[dir]];
-  const order = btns.map((_, i) => i).reverse();
+  if (btnIndex[cacheKey] != null && btns[btnIndex[cacheKey]]) return btns[btnIndex[cacheKey]];
   const tips = [];
-  for (const i of order) {
+  for (const i of btns.map((_, idx) => idx).reverse()) {
     const b = btns[i];
     if (b.disabled) { tips.push(`#${i + 1}: (khóa)`); continue; }
     const t = await tooltipOf(b);
     tips.push(`#${i + 1}: ${t || '(không tooltip)'}`);
-    if (/xml/i.test(t)) {
-      xmlBtnIndex[dir] = i;
-      console.info(LOG, `Nút tải XML = nút thứ ${i + 1} (${t})`);
+    if (test.test(t)) {
+      btnIndex[cacheKey] = i;
+      console.info(LOG, `Nút ${name} = nút thứ ${i + 1} (${t})`);
       return b;
     }
   }
-  console.warn(LOG, 'Các nút công cụ:', tips.join(' | '));
-  throw new UiError(`Không tìm thấy nút tải XML — ${tips.join(' | ')}`, true);
+  console.warn(LOG, `Tìm nút ${name} — các nút công cụ:`, tips.join(' | '));
+  throw new UiError(`Không tìm thấy nút ${name} — ${tips.join(' | ')}`, true);
+}
+
+// Bấm nút tải → GDT có thể hỏi captcha (hiện chậm, vd. Xuất hóa đơn tab MTT) → chờ captcha hoặc file;
+// chỉ bắt đầu đếm giờ chờ file sau khi đã qua captcha
+async function clickAndWaitDownload(btn, got, what) {
+  let info = null;
+  got.then((v) => { info = v; });
+  btn.click();
+  await waitUntil(() => info || captchaModal(), 5000);
+  await passCaptcha();
+  info ||= await Promise.race([got, pause(DOWNLOAD_TIMEOUT).then(() => null)]);
+  if (!info) throw new UiError(`Không thấy file ${what} tải về sau ${DOWNLOAD_TIMEOUT / 1000} giây`);
+  return info;
+}
+
+const xmlButton = (dir) => toolbarButton(`xml-${dir}`, 'tải XML', /xml/i);
+const excelButton = (dir) => toolbarButton(`excel-${dir}`, 'Xuất hóa đơn', /xuất hóa đơn|kết xuất|excel/i);
+
+// Excel danh sách HĐ theo lần tìm kiếm hiện tại → <thư mục>/MuaVao|BanRa/DanhSach/[MTT_]<từ>_<đến>.xlsx
+async function downloadExcel(ctx, settings) {
+  const ymd = (v) => (v || '').split('/').reverse().join('-');
+  const [fromInput, toInput] = $$('input.ant-calendar-picker-input');
+  const base = `${dirFolder(settings, ctx.dir)}/DanhSach/${ctx.mtt ? 'MTT_' : ''}${ymd(fromInput?.value)}_${ymd(toInput?.value)}`;
+  const btn = await excelButton(ctx.dir);
+  await chrome.runtime.sendMessage({ type: 'expectDownload', base });
+  const got = new Promise((resolve) => { downloadWaiter = resolve; });
+  try {
+    const info = await clickAndWaitDownload(btn, got, 'Excel');
+    console.info(LOG, `Đã lưu Excel ${info.filename} (GDT đặt tên ${info.original})`);
+    return info.filename;
+  } finally {
+    downloadWaiter = null;
+  }
 }
 
 // ==================== ZIP → XML ====================
@@ -241,11 +277,7 @@ async function downloadRow(dir, tr, base) {
   const gotBlob = new Promise((resolve) => { blobWaiter = resolve; });
   armBlob(CAPTCHA_TIMEOUT + DOWNLOAD_TIMEOUT);
   try {
-    btn.click();
-    await pause(800);
-    await passCaptcha();
-    const info = await Promise.race([got, pause(DOWNLOAD_TIMEOUT).then(() => null)]);
-    if (!info) throw new UiError(`Không thấy file tải về sau ${DOWNLOAD_TIMEOUT / 1000} giây`);
+    const info = await clickAndWaitDownload(btn, got, 'XML');
     const blob = await Promise.race([gotBlob, pause(2000).then(() => null)]);
     const saved = await keepXmlOnly(blob, base, info);
     console.info(LOG, `Đã lưu ${saved} (GDT đặt tên ${info.original})`);
@@ -372,6 +404,19 @@ async function onSearch() {
     await waitUntil(() => captchaModal() || spinning(), 3000);
     await passCaptcha();
     ctx = activeContext();
+    // Excel "Xuất hóa đơn" chứa toàn bộ kết quả theo bộ lọc → tải trước, không phụ thuộc số dòng/trang
+    if (settings.excel && currentRows().length) {
+      await report('running', `${ctx.label}: tải Excel danh sách (Xuất hóa đơn)…`, { stats });
+      try {
+        await downloadExcel(ctx, settings);
+        stats.excel = 'đã tải';
+      } catch (e) {
+        if (e instanceof StopError) throw e;
+        stats.excel = 'lỗi';
+        stats.lastError ||= `Excel: ${e.message}`;
+        console.error(LOG, `Tải Excel lỗi: ${e.message}`);
+      }
+    }
     const next = $$('button').find((b) => b.querySelector('.anticon-right'));
     if (next && !next.disabled) {
       await report('running', `${ctx.label}: đổi sang số dòng/trang lớn nhất…`, { stats });
@@ -379,8 +424,9 @@ async function onSearch() {
     }
     await processPages(ctx, settings, downloaded, stats);
 
-    const ok = stats.failed === 0;
+    const ok = stats.failed === 0 && stats.excel !== 'lỗi';
     const text = `${ctx.label}: tải mới ${stats.saved}, đã có ${stats.skipped}, lỗi ${stats.failed} / ${stats.found} HĐ`
+      + (stats.excel ? ` — Excel ${stats.excel}` : '')
       + (stats.lastError ? `\nLỗi đầu tiên: ${stats.lastError}` : '');
     console.info(LOG, 'Xong:', text);
     await report(ok ? 'done' : 'error', text, { stats });

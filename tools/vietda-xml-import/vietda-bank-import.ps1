@@ -64,7 +64,8 @@ public static class ConFont {
 }
 "@
 }
-try { $fontNote = [ConFont]::UseTrueType('Consolas') } catch { $fontNote = "đổi font console lỗi: $($_.Exception.Message)" }
+$fontNote = $null
+if (-not [Console]::IsOutputRedirected) { try { $fontNote = [ConFont]::UseTrueType('Consolas') } catch { $fontNote = "đổi font console lỗi: $($_.Exception.Message)" } }
 
 if (-not ('Vdb' -as [type])) {
     Add-Type -TypeDefinition @"
@@ -233,6 +234,12 @@ public static class Vdb {
     public static int ListMsg(IntPtr lb, uint msg, int w) { IntPtr r; SendMessageTimeout(lb, msg, (IntPtr)w, IntPtr.Zero, SMTO_ABORTIFHUNG, 2000, out r); return r.ToInt32(); }
     // Vùng client của list trên màn hình: x, y, w, h
     public static int[] ClientScreen(IntPtr h) { RECT r; GetClientRect(h, out r); POINT p = new POINT(); ClientToScreen(h, ref p); return new int[] { p.X, p.Y, r.R, r.B }; }
+
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr dc);
+    [DllImport("gdi32.dll")] static extern int GetDeviceCaps(IntPtr dc, int i);
+    // Windows Scale 125%/150%: tọa độ của tool (DPI-unaware) đã thu nhỏ, còn ảnh chụp màn hình là pixel thật → hệ số = DESKTOPHORZRES / HORZRES
+    public static double ScreenScale() { IntPtr dc = GetDC(IntPtr.Zero); int l = GetDeviceCaps(dc, 8), p = GetDeviceCaps(dc, 118); ReleaseDC(IntPtr.Zero, dc); return l > 0 && p > 0 ? (double)p / l : 1; }
 }
 "@
 }
@@ -253,12 +260,16 @@ function Init-Ocr {
 function Await-WinRt($Op, [Type]$T) { $task = $script:asTask.MakeGenericMethod($T).Invoke($null, @($Op)); [void]$task.Wait(-1); $task.Result }
 
 # Chụp vùng màn hình, phóng to $Scale lần rồi OCR → các dòng { Text, X, Y } (tọa độ màn hình, tâm dòng)
-function Ocr-Screen([int]$X, [int]$Y, [int]$W, [int]$H, [int]$Scale = 3) {
+# X/Y/W/H và kết quả theo tọa độ của tool; chụp theo pixel thật (× $script:screenScale) để đúng khi Windows Scale ≠ 100%
+$script:screenScale = [Vdb]::ScreenScale()
+function Ocr-Screen([int]$X, [int]$Y, [int]$W, [int]$H, [int]$Scale = 3, [string]$SaveTo = '') {
     Init-Ocr
-    $bmp = New-Object Drawing.Bitmap $W, $H
-    $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($X, $Y, 0, 0, $bmp.Size); $g.Dispose()
+    $s = $script:screenScale
+    $bmp = New-Object Drawing.Bitmap ([Math]::Max(1, [int][Math]::Round($W * $s))), ([Math]::Max(1, [int][Math]::Round($H * $s)))
+    $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen([int][Math]::Round($X * $s), [int][Math]::Round($Y * $s), 0, 0, $bmp.Size); $g.Dispose()
     $big = New-Object Drawing.Bitmap ($W * $Scale), ($H * $Scale)
     $g = [Drawing.Graphics]::FromImage($big); $g.InterpolationMode = 'HighQualityBicubic'; $g.DrawImage($bmp, 0, 0, $big.Width, $big.Height); $g.Dispose(); $bmp.Dispose()
+    if ($SaveTo) { try { $big.Save($SaveTo, [Drawing.Imaging.ImageFormat]::Png) } catch { Write-Log WARN "không lưu được ảnh chẩn đoán $SaveTo`: $($_.Exception.Message)" } }
     $ms = New-Object IO.MemoryStream
     $big.Save($ms, [Drawing.Imaging.ImageFormat]::Png); $big.Dispose()
     $ras = New-Object Windows.Storage.Streams.InMemoryRandomAccessStream
@@ -502,15 +513,23 @@ function Open-Form([string]$Kind) {
     $v = Find-Vietda
     if ($v -and $v.Kind -eq $Kind) { return $v }
     if (-not [Vdb]::Activate($script:vda.Main)) { throw 'không đưa được VietDA lên trước (foreground)' }
-    $bar = @([Vdb]::Descendants($script:vda.Main) | Where-Object { [Vdb]::GetParent($_) -eq $script:vda.Main -and [Vdb]::IsWindowVisible($_) } |
-        ForEach-Object { $r = [Vdb]::Rect($_); [pscustomobject]@{ H = $_; L = $r.L; T = $r.T; W = $r.R - $r.L; Ht = $r.B - $r.T } } |
-        Where-Object { $_.Ht -ge 15 -and $_.Ht -le 40 } | Sort-Object T) | Select-Object -First 1
+    $kids = @([Vdb]::Descendants($script:vda.Main) | Where-Object { [Vdb]::GetParent($_) -eq $script:vda.Main -and [Vdb]::IsWindowVisible($_) } |
+        ForEach-Object { $r = [Vdb]::Rect($_); [pscustomobject]@{ H = $_; L = $r.L; T = $r.T; W = $r.R - $r.L; Ht = $r.B - $r.T; Name = [Vdb]::TextOf($_) } })
+    # control thanh menu VietDA tên 'mainMenu'; không có thì lấy dải con cao 15–40 px trên cùng
+    $bar = @($kids | Where-Object { $_.Name -eq 'mainMenu' -and $_.Ht -gt 0 }) | Select-Object -First 1
+    if (-not $bar) { $bar = @($kids | Where-Object { $_.Ht -ge 15 -and $_.Ht -le 40 } | Sort-Object T) | Select-Object -First 1 }
     if (-not $bar) { throw 'không thấy thanh menu VietDA' }
-    $line = @(Ocr-Screen $bar.L $bar.T ([Math]::Min($bar.W, 900)) $bar.Ht 3)
+    $diag = Join-Path $PSScriptRoot '_vietda-menu.png'
+    $line = @(Ocr-Screen $bar.L $bar.T ([Math]::Min($bar.W, 900)) $bar.Ht 3 $diag)
     $words = @($line | ForEach-Object { $_.Words })
     $hit = $null
-    for ($i = 0; $i -lt $words.Count - 1; $i++) { if ($words[$i].Text -match '^Thu$' -and $words[$i + 1].Text -match '^chi') { $hit = $words[$i]; break } }
-    if (-not $hit) { throw "OCR không thấy menu 'Thu chi' (đọc được: $(($line | ForEach-Object { $_.Text }) -join ' / '))" }
+    for ($i = 0; $i -lt $words.Count -and -not $hit; $i++) {
+        if ($words[$i].Text -match '(?i)^Th[uưúùủũụ]-?ch[iíìỉĩị]') { $hit = $words[$i]; $hit.X -= 10 }
+        elseif ($i -lt $words.Count - 1 -and $words[$i].Text -match '(?i)^Th[uưúùủũụ]$' -and $words[$i + 1].Text -match '(?i)^ch[iíìỉĩị]') { $hit = $words[$i] }
+    }
+    if (-not $hit) { throw "OCR không thấy menu 'Thu chi' (đọc được: '$(($line | ForEach-Object { $_.Text }) -join ' / ')'; thanh menu $($bar.L),$($bar.T) $($bar.W)x$($bar.Ht), Scale màn hình $([Math]::Round($script:screenScale * 100))%) — ảnh vùng đã đọc: $diag" }
+    Remove-Item -LiteralPath $diag -ErrorAction SilentlyContinue
+    Write-Log INFO "Menu 'Thu chi' ở $($hit.X),$($hit.Y) (Scale màn hình $([Math]::Round($script:screenScale * 100))%)"
 
     $before = @{}
     foreach ($t in [Vdb]::Tops($script:vda.Pid)) { $before[$t.ToInt64()] = $true }

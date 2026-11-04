@@ -13,6 +13,7 @@ async function saveSettings() {
   const settings = {
     enabled: $('enabled').checked,
     force: $('force').checked,
+    excel: $('excel').checked,
     rootFolder: $('rootFolder').value.trim() || DEFAULT_SETTINGS.rootFolder,
   };
   await chrome.storage.local.set({ settings });
@@ -23,6 +24,7 @@ async function init() {
   const settings = await loadSettings();
   $('enabled').checked = settings.enabled;
   $('force').checked = settings.force;
+  $('excel').checked = settings.excel;
   $('rootFolder').value = settings.rootFolder;
 
   const [tab] = await chrome.tabs.query({ url: 'https://hoadondientu.gdt.gov.vn/*' });
@@ -38,7 +40,7 @@ async function init() {
   $('stop').disabled = !ping?.running;
 }
 
-for (const id of ['enabled', 'force']) $(id).onchange = saveSettings;
+for (const id of ['enabled', 'force', 'excel']) $(id).onchange = saveSettings;
 $('rootFolder').onchange = saveSettings;
 
 $('stop').onclick = () => {

@@ -4,6 +4,7 @@ const LOG = '[GDT-XML]';
 const DEFAULT_SETTINGS = {
   enabled: true,        // tự tải khi kế toán bấm Tìm kiếm
   force: false,         // tải lại cả HĐ đã tải
+  excel: true,          // tải file Excel danh sách (nút "Xuất hóa đơn") mỗi lần Tìm kiếm
   rootFolder: 'HoaDonXML',
 };
 

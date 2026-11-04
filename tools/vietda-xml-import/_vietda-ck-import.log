@@ -352,3 +352,10 @@
 2026-11-03 22:02:53 [ERROR] Không thấy file: X:\khong-co.xlsx
 2026-11-03 22:03:09 [INFO] ===== Bắt đầu
 2026-11-03 22:03:09 [ERROR] Không thấy file: X:\khong-co.xlsx
+2026-11-04 15:39:09 [INFO] ===== Bắt đầu (DRY RUN)
+2026-11-04 15:39:09 [WARN] không đọc được font console — tiếng Việt có thể hiện thành '?' (chuột phải thanh tiêu đề → Properties → Font → Consolas); file log vẫn đúng.
+2026-11-04 15:39:09 [INFO] Sao kê TPBANK_HISTORY69586928888_30102026_211213745.xlsx: 162 GD, Ghi có 159, Ghi nợ 3.
+2026-11-04 15:39:09 [INFO] Thư mục XML C:\Users\Hello\Downloads\HoaDonXML\MuaVao: 20 hóa đơn.
+2026-11-04 15:39:09 [INFO] Mở phiếu + đọc danh mục Đối tượng — KHÔNG đụng chuột/bàn phím...
+2026-11-04 15:39:09 [INFO] Menu 'Thu chi' ở 160,34 (Scale màn hình 100%)
+2026-11-04 15:39:17 [ERROR] list Đối tượng trống (VietDA không nạp danh mục?)

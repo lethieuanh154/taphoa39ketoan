@@ -29,6 +29,7 @@ HĐ đã tải sẽ tự bỏ qua (nhớ theo khóa HĐ). Trong popup có:
 `Downloads/HoaDonXML/MuaVao|BanRa/YYYY-MM/<ngày lập>_<MST người bán>_<mẫu số+ký hiệu>_<số HĐ>.xml`
 - GDT trả về ZIP (`invoice.xml` + file phụ). Extension giải nén, chỉ lưu `.xml`, rồi xóa ZIP và xóa khỏi lịch sử tải.
 - Cách lấy dữ liệu: `page-hook.js` (MAIN world) bọc `URL.createObjectURL`. Khi content script "arm" ngay trước lúc bấm nút tải, Blob kế tiếp trang tạo ra (chính là file ZIP) được gửi bản sao sang `content.js` để giải nén (`DecompressionStream('deflate-raw')`, không cần thư viện). Hành vi trang không đổi.
+- Excel danh sách (nút **Xuất hóa đơn**, bật/tắt trong popup): mỗi lần Tìm kiếm có kết quả, extension tải 1 lần, đầu tiên, trước cả bước đổi số dòng/trang (file chứa toàn bộ kết quả theo bộ lọc). Tab MTT có thể hỏi captcha thì chờ nhập. Lưu vào `HoaDonXML/MuaVao|BanRa/DanhSach/[MTT_]<từ ngày>_<đến ngày>.xlsx`. Tìm lại cùng khoảng ngày thì file được ghi đè. Tải Excel lỗi thì vẫn tải XML tiếp.
 - Không lấy được dữ liệu / giải nén lỗi / lưu XML lỗi → **giữ nguyên ZIP** (`.zip` cùng tên) để không mất file. Xem Console.
 
 ## Cách bấm (`content.js`)

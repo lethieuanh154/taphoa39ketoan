@@ -42,6 +42,7 @@ export class ToolsDownloadPageComponent {
         'Double-click Nhap-SaoKe-vao-VietDA.bat → chọn sao kê .xlsx, CSV Đối soát CK, thư mục XML đầu vào → xem danh sách → gõ Y + Enter.',
         'Trong lúc chạy: KHÔNG đụng chuột/bàn phím (tool gõ phím vào VietDA, mất focus là tự dừng).',
         'Lần đầu nên chạy thêm -Limit 1 để kiểm 1 phiếu trước.',
+        'Báo "OCR không thấy menu Thu chi"? Mở VietDA ở màn hình chính, double-click Chan-Doan-OCR-VietDA.bat → gửi lại file VietDA-chan-doan-….zip trên Desktop.',
       ],
     },
   ];

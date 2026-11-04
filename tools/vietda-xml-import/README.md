@@ -52,3 +52,11 @@ Thứ tự khớp: `_vietda-map-mst.csv` (tự ghi tay, mỗi dòng `MST;Mã`) �
 - Ghi nợ không có "HD <số>" → thử khớp XML cùng số tiền trong 120 ngày trước (phải duy nhất). Tổng HĐ ≠ số tiền CK → vẫn tạo, log ghi `LỆCH`.
 - Sổ `_vietda-ck-da-nhap.txt` (cạnh script, khóa `Thu|Chi + Mã GD`) chỉ ghi sau khi Lưu xong → chạy lại không tạo trùng. Log: `_vietda-ck-import.log`.
 - Exit code: `0` xong, `1` lỗi đầu vào, `2` dừng giữa chừng.
+
+## Lỗi OCR ("không thấy menu 'Thu chi'", không đọc được mục menu / MST) — 04/11/2026
+
+- Tool chụp màn hình theo **Scale của Windows** (125%/150%…): tọa độ của tool × `DESKTOPHORZRES/HORZRES`. Thanh menu tìm theo control tên `mainMenu`. Không thấy menu → lưu ảnh vùng đã đọc `_vietda-menu.png` cạnh script + ghi Scale vào lỗi.
+- Vẫn lỗi trên máy nào → chạy **`Chan-Doan-OCR-VietDA.bat`** trên máy đó (VietDA đã đăng nhập, ở màn hình chính). Script `chan-doan-ocr.ps1`:
+  - Bước 1 chỉ đọc: Scale/DPI, gói ngôn ngữ OCR, cây cửa sổ VietDA (+ DPI awareness), chụp + OCR thanh menu và dải trên cùng theo 2 cách (`moi` = theo Scale, `cu` = như tool cũ) × phóng x2/x3/x4 × mọi engine OCR đã cài.
+  - Bước 2 (chỉ khi gõ Y): bấm "Thu chi" 1 lần, chụp + OCR menu xổ, rồi Esc.
+  - Ra `VietDA-chan-doan-<máy>-<giờ>.zip` trên Desktop (`bao-cao.txt` + ảnh + 150 dòng log cuối của tool) → gửi lại.
