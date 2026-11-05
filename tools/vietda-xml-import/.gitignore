@@ -1,0 +1,4 @@
+# du lieu ke toan (sao ke ngan hang, ket qua) - khong commit, khong dong goi zip
+Input/*
+!Input/HUONG-DAN.txt
+Output/

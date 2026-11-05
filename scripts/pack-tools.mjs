@@ -10,14 +10,18 @@ const toolsDir = join(root, 'tools');
 const outDir = join(root, 'public', 'tools');
 
 // rác build + file tool tự ghi khi chạy thử (log, sổ đã nạp, danh mục đối tượng của vietda-xml-import)
-const EXCLUDE = [/^__pycache__$/, /\.pyc$/, /^\.DS_Store$/, /^Thumbs\.db$/i, /^_vietda-/];
+const EXCLUDE = [/^__pycache__$/, /\.pyc$/, /^\.DS_Store$/, /^Thumbs\.db$/i, /^_vietda-/, /^Output$/];
+// Input/ = sao kê ngân hàng + CSV đối soát kế toán tự bỏ vào → chỉ đóng gói file hướng dẫn, KHÔNG lộ dữ liệu lên trang tải công khai
+const DATA_DIR = /^Input$/;
+const DATA_DIR_KEEP = /^HUONG-DAN\.txt$/i;
 
-function collect(dir, prefix, files) {
+function collect(dir, prefix, files, dataDir = false) {
   for (const name of readdirSync(dir)) {
     if (EXCLUDE.some(re => re.test(name))) continue;
+    if (dataDir && !DATA_DIR_KEEP.test(name)) continue;
     const full = join(dir, name);
     const st = statSync(full);
-    if (st.isDirectory()) collect(full, `${prefix}${name}/`, files);
+    if (st.isDirectory()) collect(full, `${prefix}${name}/`, files, DATA_DIR.test(name));
     else files[`${prefix}${name}`] = [readFileSync(full), { mtime: st.mtime }];
   }
 }

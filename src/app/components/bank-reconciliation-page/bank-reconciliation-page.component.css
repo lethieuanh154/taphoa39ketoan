@@ -117,7 +117,8 @@
 /* Tab Đối soát: tô màu dòng như lưới 2 cột cũ — khớp xanh, lệch giờ vàng, dư 1 bên đỏ */
 .multi-table tr.row-matched td { background: #f4fbf5; }
 .multi-table tr.row-matched_late td { background: #fff8e1; }
-.multi-table tr.row-invoice_only td, .multi-table tr.row-bank_only td { background: #ffebee; }
+.multi-table tr.row-invoice_only td, .multi-table tr.row-bank_only td, .multi-table tr.row-issue td { background: #ffebee; }
+.multi-table tr.row-issue .kind, .multi-table tr.row-issue .hint-inline { color: #c62828; }
 .multi-table tr.row-invoice_only td.code, .multi-table tr.row-invoice_only td.num,
 .multi-table tr.row-bank_only td.code, .multi-table tr.row-bank_only td.num { color: #c62828; }
 .note-status { display: inline-block; margin-left: 6px; font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #e8f5e9; color: #2e7d32; }

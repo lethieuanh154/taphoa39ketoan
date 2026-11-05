@@ -8,7 +8,7 @@ import { PeriodService } from '../../services/period.service';
 import { parseTpBankStatement, BankStatementResult } from '../../utils/tpbank-statement.util';
 import {
   ReconInvoice, ReconPair, ReconKind, expandInvoiceItems, reconcileWithFallback, multiTransferPairs, excessTransferPairs,
-  buildReconCsv, buildMultiTransferCsv, buildExcessTransferCsv, reconPairHint, payerLabel, NOTE_STATUS_LABEL,
+  buildReconCsv, buildMultiTransferCsv, buildExcessTransferCsv, reconPairHint, payerLabel, isEInvoiceIssuePair, NOTE_STATUS_LABEL,
   RECON_KIND_LABEL, readEInvoiceBills, EINVOICE_AMOUNT_TOLERANCE
 } from '../../utils/transfer-reconcile.util';
 
@@ -32,6 +32,7 @@ interface AlignedRow {
   total: number | null;     // tổng HĐ; null = dòng chỉ có GD
   note: string;
   part: string;             // "1/2" | "CK dư, trả lại …" | "—"
+  issue: boolean;           // đã ghép GD nhưng HĐĐT nháp / phát hành trễ ngày → tô đỏ, tính vào "Lệch"
   txnText: string;          // "NGUYEN VAN A · 17/10/2026 09:10:00 · 371ITC..."
   hint: string;
 }
@@ -311,6 +312,7 @@ export class BankReconciliationPageComponent {
         note: it?.invoice.note ?? '',
         part: !it ? '' : it.partCount > 1 ? `${it.partIndex}/${it.partCount}`
           : it.excess?.refund ? `CK dư, trả lại ${this.formatVnd(it.excess.refund)}` : '—',
+        issue: isEInvoiceIssuePair(p),
         txnText: p.txn ? [payerLabel(p.txn), p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
         hint: reconPairHint(p)
       };
@@ -318,13 +320,14 @@ export class BankReconciliationPageComponent {
 
     const rank: Record<ReconKind, number> = { invoice_only: 0, bank_only: 0, matched_late: 1, matched: 2 };
     if (this.sortMode === 'unmatched') {
-      rows.sort((a, b) => (rank[a.kind] - rank[b.kind]) || (b.amount - a.amount));
+      const r = (x: AlignedRow) => x.issue ? 0 : rank[x.kind];
+      rows.sort((a, b) => (r(a) - r(b)) || (b.amount - a.amount));
     } else {
       const dir = this.sortMode === 'amountAsc' ? 1 : -1;
       rows.sort((a, b) => (a.amount - b.amount) * dir);
     }
     this.alignedRows = this.viewFilter === 'all' ? rows
-      : rows.filter(r => this.viewFilter === 'late' ? r.kind === 'matched_late' : rank[r.kind] === 0);
+      : rows.filter(r => this.viewFilter === 'late' ? r.kind === 'matched_late' : r.issue || rank[r.kind] === 0);
     this.page = 1;
   }
 
@@ -424,7 +427,7 @@ export class BankReconciliationPageComponent {
     console.group(`${LOG} Kết quả đối soát`);
     console.log(`HĐĐT CK: ${this.invoices.length} HĐ (${this.itemCount} khoản, gồm ${this.fallbackMatched} HĐ ghi TM khớp GD), tổng ${this.kvTotal.toLocaleString('vi-VN')} ₫`);
     console.log(`GD TPBank (Ghi có): ${this.bankCount} GD, tổng ${this.bankTotal.toLocaleString('vi-VN')} ₫ · khớp ${this.matchRate}%`);
-    console.log(`Khớp lệch giờ: ${this.lateCount} | HĐ dư: ${this.invoiceUnmatched} | GD dư: ${this.bankUnmatched}`);
+    console.log(`Khớp lệch giờ: ${this.lateCount} | HĐ dư: ${this.invoiceUnmatched} | GD dư: ${this.bankUnmatched} | HĐĐT nháp / phát hành trễ: ${this.einvoiceIssueCount}`);
     if (table.length > 0) console.table(table.slice(0, 50));
     console.groupEnd();
   }
@@ -473,6 +476,7 @@ export class BankReconciliationPageComponent {
   fallbackMatched = 0;    // HĐĐT ghi Tiền mặt đã khớp GD (tính như HĐ CK)
   lateCount = 0;
   invoiceUnmatched = 0;
+  einvoiceIssueCount = 0;   // cặp đã khớp GD nhưng HĐĐT nháp / phát hành trễ ngày
   bankUnmatched = 0;
   multiInvoiceCount = 0;
   multiIssueCount = 0;
@@ -483,7 +487,7 @@ export class BankReconciliationPageComponent {
 
   private computeStats(): void {
     this.kvTotal = this.invoices.reduce((s, r) => s + r.total, 0);
-    this.itemCount = this.lateCount = this.invoiceUnmatched = this.bankUnmatched = this.excessExtraTotal = this.fallbackMatched = 0;
+    this.itemCount = this.lateCount = this.invoiceUnmatched = this.bankUnmatched = this.excessExtraTotal = this.fallbackMatched = this.einvoiceIssueCount = 0;
     const fallback = new Set(this.fallbackInvoices);
     for (const p of this.pairs) {
       if (p.item) this.itemCount++;
@@ -494,6 +498,7 @@ export class BankReconciliationPageComponent {
       if (p.item?.excess) this.excessExtraTotal += p.item.amount - p.item.invoice.total;
       if (p.kind === 'matched_late') this.lateCount++;
       else if (p.kind === 'invoice_only') this.invoiceUnmatched++;
+      if (isEInvoiceIssuePair(p)) this.einvoiceIssueCount++;
       else if (p.kind === 'bank_only') this.bankUnmatched++;
     }
     this.multiInvoiceCount = this.multiRows.filter(r => r.first).length;
@@ -506,7 +511,9 @@ export class BankReconciliationPageComponent {
   // Trừ phần CK dư đã trả lại khách: GD NH lớn hơn HĐ nhưng không phải chênh lệch thật
   get difference(): number { return this.bankTotal - this.kvTotal - this.excessExtraTotal; }
   get canCompare(): boolean { return !!this.bank && this.kvLoaded; }
-  get isBalanced(): boolean { return this.canCompare && this.invoiceUnmatched === 0 && this.bankUnmatched === 0; }
+  get isBalanced(): boolean {
+    return this.canCompare && this.invoiceUnmatched === 0 && this.bankUnmatched === 0 && this.einvoiceIssueCount === 0;
+  }
   /** % GD ghi có đã khớp HĐĐT (mục tiêu > 90%) */
   get matchRate(): string {
     return this.bankCount ? ((100 * (this.bankCount - this.bankUnmatched)) / this.bankCount).toFixed(1) : '0';

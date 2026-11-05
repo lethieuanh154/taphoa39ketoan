@@ -262,7 +262,7 @@ try {
 # log của tool (nếu cùng thư mục) — 150 dòng cuối
 $toolLog = Join-Path $PSScriptRoot '_vietda-ck-import.log'
 if (Test-Path -LiteralPath $toolLog) { Get-Content -LiteralPath $toolLog -Encoding UTF8 -Tail 150 | Set-Content -LiteralPath (Join-Path $out 'tool-log-cuoi.txt') -Encoding UTF8 }
-foreach ($f in @('_vietda-menu.png', '_vietda-doi-tuong.csv')) {
+foreach ($f in @('_vietda-menu.png')) {
     $src = Join-Path $PSScriptRoot $f
     if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination $out }
 }

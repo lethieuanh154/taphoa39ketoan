@@ -4,7 +4,7 @@
 
 | Sao kê | Phiếu VietDA | Đối tượng | Lý do |
 |---|---|---|---|
-| Ghi có | Phiếu thu tiền gửi (báo có) | `SMMM` (Song Minh, đổi bằng `-ReceiptObject`) | `Thu tiền bán hàng theo HD <số HĐĐT>` — số HĐĐT lấy từ CSV **Đối soát CK** (`doi-soat-ck_*.csv`) theo Mã GD |
+| Ghi có | Phiếu thu tiền gửi (báo có) | người mua trong **XML HĐ bán ra** cùng Số HĐĐT: không có MST → **`KH010` "Bán cho người tiêu dùng"** (`-RetailObject`); có MST → mã theo danh mục | `Thu tiền bán hàng theo HD <số HĐĐT>` — số HĐĐT lấy từ CSV **Đối soát CK** (`doi-soat-ck_*.csv`) theo Mã GD |
 | Ghi nợ | Phiếu chi tiền gửi (báo nợ) | người bán trong XML HĐ đầu vào | `Chuyển trả tiền hàng theo HD <số HĐ>` — số lấy từ "HD <số>" trong diễn giải sao kê, khớp với XML |
 
 Ngày phiếu = ngày giao dịch. Số tiền = số tiền sao kê (VietDA tự điền Diễn giải + TK 1121/131, 331/1121).
@@ -12,8 +12,9 @@ Ngày phiếu = ngày giao dịch. Số tiền = số tiền sao kê (VietDA t�
 ## Cách dùng
 
 1. Mở VietDA, đăng nhập đúng file dữ liệu. Không để hộp thoại nào mở. Tool **tự mở** menu Thu chi > Phiếu thu/chi tiền gửi.
-2. Double-click `Nhap-SaoKe-vao-VietDA.bat` → chọn sao kê `.xlsx` → CSV đối soát → thư mục XML đầu vào → xem danh sách → gõ `Y`.
-3. **Không đụng chuột/bàn phím tới khi xong**: grid "Chi tiết thu chi" chỉ nhận bàn phím nên tool chiếm focus VietDA, click + gõ như người. Bấm chỗ khác → tool tự dừng.
+2. Copy sao kê TPBank `.xlsx` + CSV Đối soát CK `doi-soat-ck_*.csv` vào **`Input\`** cạnh script (nhiều file được: tool gộp, GD trùng Mã GD giữa các file chỉ lấy 1). Thiếu file → tool mở thư mục `Input` rồi dừng. `-Statement` / `-Recon` vẫn dùng được khi chạy dòng lệnh.
+3. Double-click `Nhap-SaoKe-vao-VietDA.bat` → chọn thư mục XML đầu vào (chỉ khi có làm phiếu chi) → xem danh sách → gõ `Y`.
+4. **Không đụng chuột/bàn phím tới khi xong**: grid "Chi tiết thu chi" chỉ nhận bàn phím nên tool chiếm focus VietDA, click + gõ như người. Bấm chỗ khác → tool tự dừng.
 
 Lần đầu nên chạy thử:
 ```
@@ -23,13 +24,17 @@ powershell -ExecutionPolicy Bypass -File vietda-bank-import.ps1 ... -Limit 1
 
 | Tham số | Ý nghĩa |
 |---|---|
+| `-VerifyOnly` | không tạo phiếu, chỉ xuất bảng kê VietDA + file kết quả (không mở phiếu) |
+| `-NoVerify` | không xuất bảng kê VietDA sau khi chạy |
 | `-Mode Thu` / `-Mode Chi` | chỉ làm 1 loại phiếu (mặc định cả 2: thu trước, chi sau) |
 | `-DryRun` | chỉ liệt kê phiếu sẽ tạo (vẫn mở phiếu + list Đối tượng để đọc danh mục, không nhập gì) |
 | `-NoSave` | điền phiếu đầu tiên rồi dừng, KHÔNG Lưu (kiểm tra cách điền) |
 | `-Limit N` | mỗi loại phiếu chỉ làm N phiếu đầu |
 | `-Yes` | không hỏi Y |
 | `-Force` | làm lại cả GD đã ghi trong sổ |
-| `-ReceiptObject` | mã Đối tượng phiếu thu (mặc định `SMMM`) |
+| `-RetailObject` | mã Đối tượng cho HĐ bán ra không có MST người mua (mặc định `KH010` "Bán cho người tiêu dùng"; tên mã đó không phải kiểu khách lẻ → cảnh báo + tự tìm tên "Bán cho người tiêu dùng" / "Khách lẻ…") |
+| `-WalkInObject` | mã Khách lẻ cho phiếu "Chuyển trả tiền chuyển nhầm" (mặc định `KH001`) |
+| `-CompanyObject` | mã công ty cho nộp/rút tiền mặt, chi lương không rõ nhân viên (mặc định `CTY001`) |
 | `-AmountCell x,y` | vị trí ô Số tiền dòng 1 tính từ góc grid (mặc định `280,46`) |
 | `-StepDelayMs` | nghỉ sau mỗi thao tác (mặc định 250) |
 
@@ -39,12 +44,15 @@ Phiếu đang mở phải trống → Ngày → Đối tượng (gõ mã + Tab, 
 
 Hành vi VietDA đã thử thật (03/11/2026): **Lưu** không hiện gì, phiếu giữ nguyên dữ liệu. **Thêm** sau khi đã lưu → phiếu mới (số CT +1, giữ Ngày). **Thêm** khi phiếu CHƯA lưu → hỏi "Bạn có muốn lưu dữ liệu không?" (Yes/No; No = bỏ phiếu nhưng số CT vẫn nhảy). Vì vậy tool xác nhận đã lưu bằng cách bấm Thêm: không bị hỏi + ra phiếu mới mới ghi sổ; bị hỏi → **DỪNG**, để nguyên hộp thoại. Thông báo lạ sau Lưu / câu hỏi khác → cũng DỪNG.
 
-Tốc độ đo được: ~4,3 giây điền + Lưu, ~1 giây Thêm → **~5–6 giây/phiếu** (~600–700 phiếu/giờ). Đọc danh mục Đối tượng (OCR) ~4 giây/lượt.
+Tốc độ đo được: ~4,3 giây điền + Lưu, ~1 giây Thêm → **~5–6 giây/phiếu** (~600–700 phiếu/giờ).
 
-## Đối tượng phiếu chi (người bán XML → mã VietDA)
+## Đối tượng (người bán / người mua XML → mã VietDA)
 
-List Đối tượng là list tự vẽ (mã | tên | địa chỉ | MST), chỉ đọc được mã. Tool click mở list, cuộn từng trang, **OCR cột MST** (Windows OCR có sẵn), rồi chọn từng mã để đọc tên. Kết quả ghi `_vietda-doi-tuong.csv` (`Mã;MST(OCR);Tên`) để kiểm.
-Thứ tự khớp: `_vietda-map-mst.csv` (tự ghi tay, mỗi dòng `MST;Mã`) → MST OCR / mã = MST → tên trùng (bỏ dấu, hoa/thường). OCR đọc sai chỉ làm "không khớp", không khớp nhầm. Không khớp được → GD bị bỏ qua kèm lý do trong log.
+Thư mục XML chọn 1 lần, chứa **cả mua vào + bán ra** (quét thư mục con, vd `HoaDonXML\MuaVao` + `HoaDonXML\BanRa`). Tool tách theo MST công ty (MST có trong nhiều XML nhất): người bán = công ty → bán ra (phiếu thu), còn lại → mua vào (phiếu chi). Phiếu thu không có XML bán ra đúng Số HĐĐT (+ ký hiệu) → **bỏ qua**, ghi lý do.
+
+Trùng MST nhiều mã (1 công ty vừa là khách vừa là NCC) → phiếu thu ưu tiên mã `KH…`, phiếu chi ưu tiên `NCC…`; vẫn không rõ → ghi `MST;Mã;Thu` hoặc `MST;Mã;Chi` vào `_vietda-map-mst.csv` (`MST;Mã` = dùng cho cả 2).
+
+Thứ tự khớp: `_vietda-map-mst.csv` (tự ghi tay, mỗi dòng `MST;Mã[;Thu|Chi]`) → MST trong danh mục / mã = MST → tên trùng (bỏ dấu, hoa/thường). Không khớp được → GD bị bỏ qua kèm lý do.
 
 ## Bỏ qua / chống trùng
 
@@ -60,3 +68,45 @@ Thứ tự khớp: `_vietda-map-mst.csv` (tự ghi tay, mỗi dòng `MST;Mã`) �
   - Bước 1 chỉ đọc: Scale/DPI, gói ngôn ngữ OCR, cây cửa sổ VietDA (+ DPI awareness), chụp + OCR thanh menu và dải trên cùng theo 2 cách (`moi` = theo Scale, `cu` = như tool cũ) × phóng x2/x3/x4 × mọi engine OCR đã cài.
   - Bước 2 (chỉ khi gõ Y): bấm "Thu chi" 1 lần, chụp + OCR menu xổ, rồi Esc.
   - Ra `VietDA-chan-doan-<máy>-<giờ>.zip` trên Desktop (`bao-cao.txt` + ảnh + 150 dòng log cuối của tool) → gửi lại.
+
+## Kết quả chạy → `Output\<ngày-giờ>\` (05/11/2026)
+
+Chạy xong (cả khi dừng giữa chừng, cả DRY RUN) tool tự mở thư mục này:
+
+| File | Nội dung |
+|---|---|
+| `ket-qua-chay.csv` | Mỗi GD sao kê 1 dòng (UTF-8, dấu `;`, mở bằng Excel): Loại, Mã GD, thời gian, số tiền, diễn giải, đối tượng, lý do, **Kết quả chạy** (`Thành công` / `Lỗi` / `Bỏ qua` + lý do / `Đã tạo ở lần chạy trước` / `Chưa chạy (tool dừng trước)` / `Chưa chạy (-Limit)` / `Sẽ tạo (DRY RUN)`), Số CT, **Kiểm tra VietDA** (`ĐÚNG` / `SAI: Ngày, Số tiền, Lý do, Đối tượng` / `KHÔNG THẤY trên VietDA`) + Ngày / Họ tên / Lý do / Số tiền đọc từ bảng kê |
+| `tom-tat.txt` | file đầu vào, đếm theo kết quả, ghi chú xuất bảng kê |
+| `VietDA-bang-ke-Thu.xlsx`, `VietDA-bang-ke-Chi.xlsx` | bảng kê của chính VietDA: Thu chi > **Tìm kiếm chứng từ** (Ngày chứng từ từ/đến = ngày GD đầu/cuối trong sao kê, Loại chứng từ = tiền tố Số CT `TG` / `CG`, các lọc khác VietDA còn nhớ bị xóa) > **Hiển thị** > nút **Excel** → tool lưu file Excel VietDA mở ra (Book1) rồi đóng |
+
+- Kiểm tra theo Số CT tool đã tạo (lần này + sổ `_vietda-ck-da-nhap.txt`); không xét phiếu trùng / phiếu tạo tay.
+- Tiền tố Số CT mỗi loại phiếu tool nhớ ở `_vietda-loai-ct.txt` (`Thu=TG`, `Chi=CG`) sau lần đầu mở phiếu loại đó; chưa biết → không xuất bảng kê loại đó.
+- Lưới VietDA tự vẽ, không đọc được (UIA/MSAA trống) → đọc qua file Excel VietDA xuất (COM, kể cả instance Excel do VietDA tự mở: `EXCEL7` → `OBJID_NATIVEOM`).
+- `Input/` (trừ `HUONG-DAN.txt`) và `Output/` không commit, không đóng gói vào zip trang tải (`.gitignore`, `scripts/pack-tools.mjs`).
+
+### Phiếu trống 0 đ (thấy 05/11/2026)
+
+VietDA **ghi ngay 1 bản ghi trống** khi mở phiếu (menu hoặc nút Thêm), mỗi phiếu 1 tab (tab tên = Số CT). Để tab đó lại → bảng kê có phiếu 0 đ không đối tượng (vd TG005/10). **Thoát** phiếu + chọn **No** ("Bạn có muốn lưu dữ liệu không?") → VietDA xóa bản ghi; sau đó hay báo "Chưa có Số cho chứng từ này" (OK).
+→ Tool dọn tab trước khi tìm kiếm và cuối mỗi lần chạy: Thoát + No mọi phiếu **trống** đang mở, đóng tab bảng kê; gặp phiếu còn dữ liệu (dừng giữa phiếu) → để nguyên, không xuất bảng kê. Trước khi mở phiếu loại khác cũng Thoát phiếu trống đang mở. VietDA bị thu nhỏ → tool tự khôi phục cửa sổ.
+
+## Danh mục Đối tượng từ file + GD không theo hóa đơn (05/11/2026)
+
+**Danh mục (BẮT BUỘC):** bỏ file VietDA xuất "DANH MỤC ĐỐI TƯỢNG" (vd `DANH SACH.xlsx`: STT | Mã đối tượng | Tên đối tượng | Địa chỉ | Mã số thuế …) vào `Input\` cùng sao kê. Tool nhận file theo dòng tiêu đề, lấy mã + tên + MST chính xác. Thiếu file → tool mở `Input` rồi dừng. (Từ 05/11/2026 bỏ OCR list Đối tượng trên phiếu và file `_vietda-doi-tuong.csv`.) Quy ước mã (data thật SONG MINH): `CTY001` = công ty, `KH001` = Khách lẻ, `KH010` = Bán cho người tiêu dùng (kế toán hay dùng cho HĐ không MST), `KHxxx` khách hàng (phiếu thu), `NCCxxx` nhà cung cấp (phiếu chi), `NVxxx` nhân viên, `BH001` BHXH, `LD001` LĐLĐ.
+
+**GD không qua Đối soát CK / XML** — nhận theo nội dung CK sao kê (bỏ dấu, hoa/thường), lý do chuẩn, tool gõ thêm **TK Nợ / TK Có** vào dòng 1 lưới (sau Số tiền: Tab → TK Nợ → Tab → TK Có; đã thử 05/11/2026 ra đúng 1111/1121):
+
+| Nội dung CK chứa | Phiếu | Đối tượng | Nợ / Có |
+|---|---|---|---|
+| Nộp tiền mặt vào tài khoản công ty | thu | `CTY001` (`-CompanyObject`) | 1121 / 1111 |
+| Rút tiền gửi về nhập quỹ tiền mặt | chi | `CTY001` | 1111 / 1121 |
+| Chi lương tháng cho cán bộ nhân viên | chi | `NVxxx` có tên trong nội dung CK / tên người nhận (đúng 1 người), không thấy → `CTY001` | 334 / 1121 |
+| Chuyển trả tiền chuyển nhầm | chi | Khách lẻ `KH001` (`-WalkInObject`) | 3388 / 1121 |
+
+BHXH (`BH001`), công đoàn (`LD001`): chưa có luật (1 tháng 1 lần, kế toán làm tay).
+
+Bảng kê VietDA xuất Excel không có cột TK → Kiểm tra VietDA không so TK. Thêm loại GD: sửa bảng `$OtherKinds` trong script.
+
+### Ngày khác tháng của Số CT (thấy trên máy kế toán 05/11/2026)
+
+Số CT VietDA đánh theo tháng (vd `TG006/08`). Nhập Ngày khác tháng (30/10) rồi rời ô → VietDA hỏi "Bạn có muốn điền lại Số chứng từ tự động không?" → tool chọn **Yes** (Số CT theo tháng của ngày GD, vd `TG001/09`) rồi điền tiếp. Hộp khác sau khi nhập Ngày → DỪNG.
+Bấm Excel trên bảng kê mà VietDA báo 1 nút (vd bảng kê trống) → OK, coi như 0 phiếu. Quá 120 giây không thấy Excel → lỗi ghi cửa sổ / tiến trình bảng tính mới mở để chẩn đoán (Excel bản khác, WPS…).

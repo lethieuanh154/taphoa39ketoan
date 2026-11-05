@@ -70,7 +70,8 @@
         <span>Tổng HĐĐT CK</span>
         <b class="val-kv">{{ formatVnd(kvTotal) }}</b>
         <small>{{ invoiceCount }} hóa đơn ({{ itemCount }} khoản@if (fallbackMatched) {, gồm {{ fallbackMatched }} HĐ ghi TM}) ·
-          @if (invoiceUnmatched) { <b class="warn">{{ invoiceUnmatched }} lệch</b> } @else { khớp hết }</small>
+          @if (invoiceUnmatched) { <b class="warn">{{ invoiceUnmatched }} lệch</b> } @else { khớp hết }
+          @if (einvoiceIssueCount) { · <b class="warn">{{ einvoiceIssueCount }} HĐĐT nháp / phát hành trễ</b> }</small>
       </div>
       <div class="sum-item">
         <span>Tổng tiền vào TPBank</span>
@@ -116,7 +117,7 @@
     <div class="filter-chips">
       <button type="button" [class.active]="viewFilter === 'all'" (click)="setViewFilter('all')">Tất cả</button>
       <button type="button" [class.active]="viewFilter === 'issues'" (click)="setViewFilter('issues')">
-        Lệch ({{ invoiceUnmatched + bankUnmatched }})
+        Lệch ({{ invoiceUnmatched + bankUnmatched + einvoiceIssueCount }})
       </button>
       <button type="button" [class.active]="viewFilter === 'late'" (click)="setViewFilter('late')">
         Khớp lệch giờ ({{ lateCount }})
@@ -137,7 +138,7 @@
         </thead>
         <tbody>
           @for (r of pageRows; track $index) {
-            <tr [ngClass]="'row-' + r.kind">
+            <tr [ngClass]="r.issue ? 'row-issue' : 'row-' + r.kind">
               <td class="code">{{ r.code || '—' }}</td>
               <td class="code" [title]="r.einvoiceStatus">{{ r.einvoiceNo }}</td>
               <td>{{ r.time }}</td>

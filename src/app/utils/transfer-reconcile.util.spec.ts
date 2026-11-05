@@ -1,7 +1,8 @@
 import {
   parseMultiTransferNote, parseExcessTransferNote, expandInvoiceItems, reconcileByAmount, buildReconCsv,
   buildMultiTransferCsv, buildExcessTransferCsv, viStampToMinutes, readKvEInvoice, payerKey, ReconInvoice, ReconBankTxn,
-  readEInvoiceBills, reconcileWithFallback, reconPairHint, EInvoiceBill, EINVOICE_AMOUNT_TOLERANCE, payerNameFromDesc, payerLabel
+  readEInvoiceBills, reconcileWithFallback, reconPairHint, EInvoiceBill, EINVOICE_AMOUNT_TOLERANCE, payerNameFromDesc, payerLabel,
+  isEInvoiceIssuePair
 } from './transfer-reconcile.util';
 
 const inv = (code: string, total: number, time: string, note = 'chuyển khoản'): ReconInvoice =>
@@ -242,13 +243,33 @@ describe('transfer-reconcile.util', () => {
       expect(primary.map(i => i.id)).toEqual(['B1', 'B3', 'NEW']);
       expect(fallback.map(i => i.code)).toEqual(['HĐĐT 1400']);
       expect(primary[0]).toEqual({ id: 'B1', code: 'HD1', total: 44000, time: '30/09/2026 23:59:58', note: 'chuyển khoản',
-        einvoiceSerial: 'C26MSM', einvoiceNumber: '27852', einvoiceStatus: 'CQT chấp nhận', paymentMethod: 'CK' });
+        einvoiceSerial: 'C26MSM', einvoiceNumber: '27852', einvoiceStatus: 'CQT chấp nhận', paymentMethod: 'CK', einvoiceIssue: '' });
     });
 
     it('readEInvoiceBills: nháp → không điền số HĐĐT', () => {
       const [r] = readEInvoiceBills([bill({ status: 'GHI_TAM' })]).primary;
       expect(r.einvoiceNumber).toBe('');
       expect(r.einvoiceStatus).toBe('Nháp (chưa phát hành)');
+      expect(r.einvoiceIssue).toBe('HĐĐT chưa phát hành (nháp)');
+    });
+
+    it('nháp / phát hành trễ ngày: vẫn ghép GD nhưng là cặp lỗi (mẫu thật HD445996 04–05/11)', () => {
+      const t = [txn('T1', 2050000, '04/11/2026 16:01:09')];
+      // tối 04/11: mới là nháp, bill_date = giờ tạo
+      const [draft] = readEInvoiceBills([bill({ invoice_code: 'HD445996', total_payment: 2050000, status: 'GHI_TAM', bill_number: 0,
+        bill_date: '2026-11-04 21:24:47.867', created_at: '2026-11-04 21:24:47.867' })]).primary;
+      const p1 = reconcileByAmount(expandInvoiceItems([draft]), t)[0];
+      expect(p1.kind).toBe('matched');
+      expect(isEInvoiceIssuePair(p1)).toBeTrue();
+      expect(reconPairHint(p1)).toBe('HĐĐT chưa phát hành (nháp)');
+      // 05/11: đã phát hành, bill_date đổi sang ngày phát hành
+      const [late] = readEInvoiceBills([bill({ invoice_code: 'HD445996', total_payment: 2050000,
+        bill_date: '2026-11-05 08:28:22.533', created_at: '2026-11-04 21:24:47.867' })]).primary;
+      expect(late.einvoiceIssue).toBe('HĐĐT phát hành trễ: bán 04/11, phát hành 05/11');
+      expect(isEInvoiceIssuePair(reconcileByAmount(expandInvoiceItems([late]), t)[0])).toBeTrue();
+      // phát hành cùng ngày bán → ổn
+      const [ok] = readEInvoiceBills([bill({ bill_date: '2026-11-04 22:00:00.000', created_at: '2026-11-04 21:24:47.867' })]).primary;
+      expect(ok.einvoiceIssue).toBe('');
     });
 
     it('amountTolerance: HĐ lập tay lệch 1 ₫ vẫn khớp trong khung giờ (mẫu thật 31/03/2026)', () => {

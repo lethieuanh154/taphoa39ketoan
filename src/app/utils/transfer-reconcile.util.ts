@@ -29,6 +29,7 @@ export interface ReconInvoice {
   einvoiceNumber?: string;  // Số HĐĐT (bill_number) — chỉ khi CQT đã chấp nhận
   einvoiceStatus?: string;  // Nhãn trạng thái HĐĐT (xem readKvEInvoice)
   paymentMethod?: string;   // HĐĐT: 'CK' | 'TM' | 'TMCK'
+  einvoiceIssue?: string;   // HĐĐT chưa đạt: nháp / chưa được CQT chấp nhận / phát hành trễ ngày — '' = ổn (readEInvoiceBills)
 }
 
 export interface ReconEInvoiceInfo {
@@ -70,7 +71,8 @@ export interface EInvoiceBill {
   invoice_code: string | null;          // mã HĐ KiotViet; null = HĐ kế toán lập tay / HĐ thay thế
   bill_series: string | null;
   bill_number: number | string | null;
-  bill_date: string;                    // 'YYYY-MM-DD HH:mm:ss.SSS' giờ VN
+  bill_date: string;                    // 'YYYY-MM-DD HH:mm:ss.SSS' giờ VN — nháp: giờ tạo; phát hành: ĐỔI sang giờ phát hành
+  created_at?: string | null;           // giờ tạo nháp ≈ giờ bán (BanHang tự chuyển HĐĐT ngay sau thanh toán)
   total_payment: number | null;
   payment_method_code: string | null;   // 'CK' | 'TM' | 'TMCK'
   status: string | null;                // 'DA_TIEP_NHAN' = CQT chấp nhận, 'GHI_TAM' = nháp
@@ -88,6 +90,9 @@ const EINVOICE_STATUS_LABEL: Record<string, string> = { DA_TIEP_NHAN: 'CQT chấ
  * HĐĐT → HĐ đối soát. `primary` = HĐ CK / TMCK, hoặc ghi chú có "chuyển khoản"/"ck" (ghi nhầm TM); `fallback` = HĐ còn lại
  * (Tiền mặt) — chỉ dùng khớp GD còn dư (reconcileWithFallback). Bỏ HĐ đã bị thay thế (có HĐ adjustment_type 3 trỏ origin_id
  * tới nó, cùng số tiền → không bỏ thì dư 1 HĐ) và HĐ tổng tiền ≤ 0. Số HĐĐT chỉ điền khi CQT đã chấp nhận (như readKvEInvoice).
+ * `einvoiceIssue` (05/11/2026): HĐ nháp / chưa được CQT chấp nhận, hoặc phát hành SAU ngày bán (ngày `bill_date` > ngày
+ * `created_at`) — vẫn ghép cặp được nhưng page tô đỏ + tính vào "Lệch". Mẫu thật HD445996: khách CK 04/11 16:01, bán 04/11 21:24
+ * (nháp, bill_date 04/11) → tối 04/11 khớp xanh; phát hành 05/11 08:28 → bill_date thành 05/11.
  */
 export function readEInvoiceBills(bills: EInvoiceBill[]): { primary: ReconInvoice[]; fallback: ReconInvoice[] } {
   const replaced = new Set(bills.filter(b => Number(b.adjustment_type) === 3 && b.origin_id).map(b => b.origin_id));
@@ -110,10 +115,17 @@ export function readEInvoiceBills(bills: EInvoiceBill[]): { primary: ReconInvoic
       einvoiceStatus: EINVOICE_STATUS_LABEL[b.status || ''] || b.status || '',
       paymentMethod: b.payment_method_code || '',
     };
+    const day = (s: string | null | undefined) => (s || '').slice(0, 10);
+    const dm = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
+    inv.einvoiceIssue = b.status === 'GHI_TAM' ? 'HĐĐT chưa phát hành (nháp)'
+      : !accepted ? `HĐĐT chưa được CQT chấp nhận (${inv.einvoiceStatus || '?'})`
+      : b.created_at && day(b.created_at) < day(b.bill_date) ? `HĐĐT phát hành trễ: bán ${dm(b.created_at)}, phát hành ${dm(b.bill_date)}`
+      : '';
     const saysTransfer = /chuyen\s*khoan|\bck\b/.test(normalizeVi(note));
     (b.payment_method_code !== 'TM' || saysTransfer ? primary : fallback).push(inv);
   }
-  console.debug(`[TransferReconcile] HĐĐT ${bills.length}: CK ${primary.length}, TM dự phòng ${fallback.length}, bỏ ${skipped} (bị thay thế / tiền ≤ 0)`);
+  const issues = primary.filter(i => i.einvoiceIssue).length;
+  console.debug(`[TransferReconcile] HĐĐT ${bills.length}: CK ${primary.length} (${issues} nháp / phát hành trễ), TM dự phòng ${fallback.length}, bỏ ${skipped} (bị thay thế / tiền ≤ 0)`);
   return { primary, fallback };
 }
 
@@ -545,12 +557,18 @@ export function edgeHintLabel(hint: 'prev' | 'next' | null): string {
   return hint === 'prev' ? 'Có thể thuộc kỳ trước hoặc chuyển khoản dư' : hint === 'next' ? 'Có thể thuộc kỳ sau hoặc chuyển khoản dư' : '';
 }
 
-/** Ghi chú thêm của cặp: khớp lệch tiền lẻ, khớp với HĐĐT ghi Tiền mặt. */
+/** Ghi chú thêm của cặp: HĐĐT chưa đạt (einvoiceIssue), khớp lệch tiền lẻ, khớp với HĐĐT ghi Tiền mặt. */
 export function pairFlags(p: ReconPair): string[] {
   const flags: string[] = [];
+  if (p.item?.invoice.einvoiceIssue) flags.push(p.item.invoice.einvoiceIssue);
   if (p.amountDiff) flags.push(`lệch tiền lẻ ${p.amountDiff > 0 ? '+' : '−'}${Math.abs(p.amountDiff).toLocaleString('vi-VN')} ₫`);
   if (p.txn && p.item?.invoice.paymentMethod === 'TM') flags.push('HĐĐT ghi Tiền mặt');
   return flags;
+}
+
+/** Cặp đã ghép GD nhưng HĐĐT chưa đạt (nháp / phát hành trễ ngày) — page tô đỏ, tính vào "Lệch". */
+export function isEInvoiceIssuePair(p: ReconPair): boolean {
+  return !!p.txn && !!p.item?.invoice.einvoiceIssue;
 }
 
 /** Ghi chú hiển thị 1 cặp: lệch giờ / gợi ý biên kỳ + pairFlags. */
