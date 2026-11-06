@@ -45,11 +45,10 @@ export const MENU_SECTIONS: MenuSection[] = [
     ],
     groups: [
       {
-        // 23/10/2026: tách 2 mục con — đầu ra (HĐ KiotViet CK ⇄ sao kê TPBank) xong; đầu vào (HĐ mua ⇄ tiền trả NCC) chưa làm
+        // 06/11/2026: gộp đầu ra + đầu vào thành 1 trang (tab Bán ra / Mua vào, 1 sao kê, 1 file Excel)
         key: 'doiSoatCk', label: 'Đối soát CK', icon: 'fa-money-bill-transfer',
         items: [
-          { label: 'Chuyển khoản HĐ đầu ra', icon: 'fa-file-export', route: '/bank-reconciliation-page' },
-          { label: 'Chuyển khoản HĐ đầu vào', icon: 'fa-file-import', route: '/bank-reconciliation-in-page' },
+          { label: 'Bán ra + mua vào', icon: 'fa-scale-balanced', route: '/bank-reconciliation-page' },
         ],
       },
       {

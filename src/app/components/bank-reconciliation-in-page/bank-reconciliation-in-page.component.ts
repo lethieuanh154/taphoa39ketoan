@@ -5,7 +5,7 @@
  * HĐ: theo KỲ ở thanh chọn kỳ (XML: dùng cả HĐ ngoài kỳ để ghép tiền trả HĐ cũ, nhưng chỉ báo "HĐ chưa thấy CK" cho HĐ trong kỳ).
  * Sao kê: mọi GD tiền ra trong file đã chọn (lưu IndexedDB `tpbank-debit`). Ghép: utils/purchase-transfer-reconcile.util.ts.
  */
-import { Component, effect, inject, OnInit } from '@angular/core';
+import { Component, Input, effect, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PeriodService } from '../../services/period.service';
@@ -35,6 +35,9 @@ export class BankReconciliationInPageComponent implements OnInit {
   private companyService = inject(CompanyService);
   private cache = inject(TienIchCacheService);
   private source = inject(PurchaseInvoiceSourceService);
+
+  /** Nhúng trong trang Đối soát CK gộp (06/11/2026): sao kê chọn ở trang chứa (loadBankFiles), xuất 1 file Excel ở đó */
+  @Input() embedded = false;
 
   readonly periodLabel = this.periodService.label;
   readonly kindLabel = PURCHASE_KIND_LABEL;
@@ -165,6 +168,11 @@ export class BankReconciliationInPageComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files || []);
     input.value = '';
+    await this.loadBankFiles(files, append);
+  }
+
+  /** Đọc sao kê (.xlsx / .pdf) lấy GD tiền ra — trang gộp gọi thẳng với file đã chọn ở trên cùng. */
+  async loadBankFiles(files: File[], append = false): Promise<void> {
     if (!files.length) return;
     this.parsing = true;
     this.error = '';

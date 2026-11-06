@@ -1,18 +1,22 @@
-<div class="recon-page">
+<div class="recon-page" [class.embedded]="embedded">
+  @if (!embedded) {
   <header class="page-head">
     <h1><i class="fa-solid fa-money-bill-transfer"></i> Chuyển khoản hóa đơn đầu ra</h1>
     <p class="sub">Hóa đơn điện tử (einvoiceapp) thanh toán <b>chuyển khoản</b> ⇄ tiền vào trên <b>sao kê TPBank</b>, khớp theo số tiền.
       GD còn dư được thử với HĐĐT ghi <b>Tiền mặt</b> (chỉ trong khung giờ). HĐĐT lấy qua máy chủ KeToan (lưu theo ngày).</p>
   </header>
+  }
 
   <!-- Thanh công cụ: chọn file + khoảng ngày + lấy HĐ -->
   <div class="recon-toolbar">
+    @if (!embedded) {
     <label class="file-picker" title="Chọn được nhiều file cùng lúc (vd 3 tháng của 1 quý)">
       <i class="fa-solid fa-file-excel"></i>
       <span>{{ bankFileName || 'Chọn file Bảng kê TPBank (.xlsx, chọn được nhiều file)' }}</span>
       <input type="file" accept=".xlsx" multiple (change)="onFileSelected($event)" hidden>
     </label>
-    @if (bank) {
+    }
+    @if (bank && !embedded) {
       <button type="button" class="btn-link" (click)="clearBank()" title="Bỏ sao kê, khoảng ngày về theo thanh chọn kỳ">
         <i class="fa-solid fa-xmark"></i> Bỏ sao kê
       </button>
@@ -100,10 +104,12 @@
       <button type="button" class="tab" [class.active]="activeTab === 'excess'" (click)="activeTab = 'excess'">
         <i class="fa-solid fa-money-bill-transfer"></i> CK dư ({{ excessRows.length }})
       </button>
+      @if (!embedded) {
       <button type="button" class="btn-csv" (click)="exportActiveCsv()" [disabled]="csvDisabled"
         title="Xuất CSV (dấu ; · UTF-8) để kế toán so với file Excel ngân hàng">
         <i class="fa-solid fa-file-csv"></i> Xuất CSV
       </button>
+      }
     </div>
   }
 

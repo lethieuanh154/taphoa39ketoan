@@ -1,4 +1,4 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, Input, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { httpErrorText } from '../../services/auth.service';
@@ -94,6 +94,9 @@ export class BankReconciliationPageComponent {
   loadedFrom = '';
   loadedTo = '';
 
+  /** Nhúng trong trang Đối soát CK gộp (06/11/2026): sao kê chọn ở trang chứa (loadStatementFiles), xuất 1 file Excel ở đó */
+  @Input() embedded = false;
+
   // Kết quả gộp từ 1 hoặc nhiều file Bảng kê ngân hàng (đã loại trùng theo Mã GD)
   bank: BankStatementResult | null = null;
   bankFileName = '';
@@ -141,13 +144,19 @@ export class BankReconciliationPageComponent {
   async onFileSelected(event: Event) {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files || []);
-    if (files.length === 0) return;
+    input.value = ''; // cho phép chọn lại cùng file
+    await this.loadStatementFiles(files);
+  }
 
+  /** Đọc file Bảng kê .xlsx (Ghi có). `append` = thêm vào sao kê đang có (trang gộp: nút "Thêm file"), GD trùng Mã GD tự bỏ. */
+  async loadStatementFiles(files: File[], append = false): Promise<void> {
+    if (files.length === 0) return;
     this.error = '';
     this.parsingFile = true;
-    this.bankFileName = files.length === 1 ? files[0].name : `${files.length} file: ${files.map(f => f.name).join(', ')}`;
+    const names = [...(append && this.bank ? this.bankFileName.split(' + ') : []), ...files.map(f => f.name)];
+    this.bankFileName = names.join(' + ');
     try {
-      const results: BankStatementResult[] = [];
+      const results: BankStatementResult[] = append && this.bank ? [this.bank] : [];
       for (const f of files) results.push(await parseTpBankStatement(f));
       this.bank = this.mergeStatements(results);
       console.log(`${LOG} Sao kê: ${files.length} file, ${this.bank.count} GD ghi có, tổng ${this.bank.totalCredit.toLocaleString('vi-VN')} ₫ (${this.bank.fromDate} → ${this.bank.toDate})`);
@@ -162,8 +171,13 @@ export class BankReconciliationPageComponent {
       this.computeRows();
     } finally {
       this.parsingFile = false;
-      input.value = ''; // cho phép chọn lại cùng file
     }
+  }
+
+  /** Dữ liệu cho file Excel tổng hợp của trang gộp (utils/bank-recon-export.util.ts). null = chưa lấy HĐĐT. */
+  exportData(): { pairs: ReconPair[] | null; withBank: boolean; from: string; to: string } {
+    return { pairs: this.kvLoaded ? this.pairs : null, withBank: !!this.bank,
+      from: this.loadedFrom || this.fromDate, to: this.loadedTo || this.toDate };
   }
 
   /** Bỏ sao kê đang import → khoảng ngày về theo thanh chọn kỳ. */

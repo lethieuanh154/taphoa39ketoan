@@ -1,4 +1,5 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes } from '@angular/router';
 import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
 import { authGuard, loginGuard } from './guards/auth.guard';
 import { LoginPageComponent } from './components/login-page/login-page.component';
@@ -83,11 +84,11 @@ export const routes: Routes = [
           .then(m => m.ToolsDownloadPageComponent),
         data: { noPeriodBar: true }
       },
-      // Đối soát CK (bước 2, 23/10/2026) — HĐ CK KiotViet (qua KeToanBackEnd) ⇄ sao kê TPBank; khoảng ngày theo thanh chọn kỳ
+      // Đối soát CK (bước 2) — 06/11/2026: 1 trang bán ra + mua vào (?tab=mua-vao), 1 sao kê, 1 file Excel cho tool VietDA
       {
         path: 'bank-reconciliation-page',
-        loadComponent: () => import('./components/bank-reconciliation-page/bank-reconciliation-page.component')
-          .then(m => m.BankReconciliationPageComponent)
+        loadComponent: () => import('./components/bank-reconciliation-hub/bank-reconciliation-hub.component')
+          .then(m => m.BankReconciliationHubComponent)
       },
       // Số liệu khai thuế (bước 5, 23/10/2026) — mục cuối Tiện ích: 01/GTGT, PL142, bảng kê, 05/KK-TNCN. ?run=<id>
       {
@@ -95,12 +96,8 @@ export const routes: Routes = [
         loadComponent: () => import('./components/tax-figures-page/tax-figures-page.component')
           .then(m => m.TaxFiguresPageComponent)
       },
-      // Đối soát CK — chuyển khoản HĐ đầu vào (23/10/2026): HĐ mua (thư mục XML / Gmail) ⇄ tiền ra trên sao kê TPBank; HĐ theo kỳ
-      {
-        path: 'bank-reconciliation-in-page',
-        loadComponent: () => import('./components/bank-reconciliation-in-page/bank-reconciliation-in-page.component')
-          .then(m => m.BankReconciliationInPageComponent)
-      },
+      // Đối soát CK — HĐ đầu vào: 06/11/2026 gộp vào trang Đối soát CK (tab Mua vào); giữ link cũ
+      { path: 'bank-reconciliation-in-page', redirectTo: () => inject(Router).createUrlTree(['/bank-reconciliation-page'], { queryParams: { tab: 'mua-vao' } }) },
       // Đối soát hóa đơn XML (Pha 1 bước 3) — tải riêng khi mở trang (kèm thư viện nén ZIP fflate)
       {
         path: 'invoice-reconciliation-page',

@@ -311,7 +311,29 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - **Bảng "Mặt hàng cần xem"** (02/11/2026) — bảng DUY NHẤT trên trang: `ReconciliationService.reviewItems(id)` →
   `GET /runs/{id}/review`; cột Người bán, Hàng trên HĐ, ĐVT, SL, Máy gợi ý (mã master), Hệ số, Tin cậy, Lý do (mỗi lý do 1 dòng).
 
+## BankReconciliationHubComponent — Tiện ích "Đối soát CK" bán ra + mua vào (06/11/2026)
+
+**Path**: `components/bank-reconciliation-hub/` — route `/bank-reconciliation-page` (lazy), `?tab=mua-vao` mở tab Mua vào;
+`/bank-reconciliation-in-page` redirect về đây. Menu: nhóm Đối soát CK → "Bán ra + mua vào".
+
+- **Sao kê chọn 1 lần** ở đầu trang (.xlsx / .pdf, nhiều file, "Thêm file", "Bỏ sao kê"): .xlsx → `BankReconciliationPageComponent.loadStatementFiles()`
+  (Ghi có) + `BankReconciliationInPageComponent.loadBankFiles()` (Ghi nợ); .pdf chỉ phần mua vào. File đã chọn lưu IndexedDB
+  (`TienIchCacheService`, key `tpbank-statement-files`) → mở lại trang đọc lại cho bán ra; mua vào tự lưu GD tiền ra như trước.
+- 2 tab nhúng 2 trang cũ với `[embedded]="true"` (ẩn header, ô chọn sao kê, nút CSV riêng); cả 2 luôn sống (`[hidden]`) để xuất Excel.
+- **Xuất Excel** = 1 file `doi-soat-ck_<từ>_<đến>.xlsx` (`utils/bank-recon-export.util.ts` + `utils/xlsx-writer.util.ts`, không thêm
+  thư viện — ghi OOXML + nén `fflate`). Sheet: `Nhap-VietDA` · `Ban-ra_Doi-soat` · `Ban-ra_CK-nhieu-lan` · `Ban-ra_CK-du` · `Mua-vao` · `Thong-tin`.
+  - `Nhap-VietDA` (định dạng `taphoa39-doi-soat-ck/1`, tool đọc theo TÊN cột `VIETDA_HEADER`): mỗi GD sao kê 1 dòng, Thu (Ghi có) +
+    Chi (Ghi nợ) cùng cột — Loại · Mã GD · Thời gian GD · Ngày GD · Số tiền · Diễn giải sao kê · Người chuyển / nhận · TK đối ứng ·
+    Kết quả khớp · **Lập phiếu theo HĐ** (Có/Không) · Lý do không lập · Độ tin cậy · Số HĐ · Ký hiệu HĐ · Ngày HĐ · Tổng HĐ ·
+    Mã HĐ KiotViet · Khoản · MST đối tác · Tên đối tác · Trạng thái HĐĐT · Ghi chú. Sắp theo thời gian GD.
+  - Thu lập phiếu khi có số HĐĐT CQT chấp nhận và không nháp / phát hành trễ; Chi lập phiếu khi khớp HĐ và độ tin cậy ≠ thấp
+    (1 CK trả nhiều HĐ → Số HĐ nối ", "; 1 HĐ trả nhiều lần → lặp HĐ ở từng GD). Chưa chọn XML → GD tiền ra vẫn liệt kê, "Chưa đối soát".
+  - Các sheet chi tiết = đúng cột CSV cũ (`reconTable` / `multiTransferTable` / `excessTransferTable` trong util mirror, `purchaseReconTable`).
+- Nút nhỏ "CSV cho tool VietDA (bản cũ)" = `doi-soat-ck_*.csv` như trước — tool `tools/vietda-xml-import` bản hiện tại còn đọc file
+  này; bỏ khi tool đọc được sheet `Nhap-VietDA`.
+
 ## BankReconciliationPageComponent — Tiện ích "Đối soát CK" (23/10/2026)
+> 06/11/2026: nhúng trong BankReconciliationHubComponent (tab Bán ra) — `@Input() embedded`, `loadStatementFiles(files, append)`, `exportData()`.
 
 **Path**: `components/bank-reconciliation-page/` — route `/bank-reconciliation-page` (lazy). Port BanHang cùng tên.
 
@@ -473,6 +495,7 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - AuthService
 
 ## BankReconciliationInPageComponent — Tiện ích "Đối soát CK → Chuyển khoản HĐ đầu vào" (23/10/2026)
+> 06/11/2026: nhúng trong BankReconciliationHubComponent (tab Mua vào) — `@Input() embedded`, `loadBankFiles(files, append)`; route cũ redirect.
 
 **Path**: `components/bank-reconciliation-in-page/` — route `/bank-reconciliation-in-page` (lazy).
 

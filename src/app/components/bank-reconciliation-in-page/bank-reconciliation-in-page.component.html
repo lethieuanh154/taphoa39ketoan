@@ -1,11 +1,16 @@
 <!-- ĐỐI SOÁT CK → CHUYỂN KHOẢN HĐ ĐẦU VÀO: HĐ mua vào (thư mục XML) ⇄ tiền ra trên sao kê TPBank (23/10/2026) -->
-<div class="page">
+<div class="page" [class.embedded]="embedded">
+  @if (!embedded) {
   <header class="page-head">
     <h1><i class="fa-solid fa-money-bill-transfer"></i> Chuyển khoản hóa đơn đầu vào</h1>
     <p class="sub">Hóa đơn <b>mua vào</b> ⇄ tiền <b>ra</b> trên <b>sao kê TPBank</b> (trả nhà cung cấp). Khớp theo số tiền, ưu tiên tên người nhận
       giống tên NCC / diễn giải có số HĐ; nhận ra cả <b>1 lần CK trả nhiều HĐ</b> cùng NCC và <b>1 HĐ trả nhiều lần</b>.
       CK trong khoảng {{ window.before }} ngày trước → {{ window.after }} ngày sau ngày HĐ.</p>
   </header>
+  } @else {
+    <p class="hint">Hóa đơn <b>mua vào</b> ⇄ tiền <b>ra</b> (trả NCC). Khớp theo số tiền, ưu tiên tên người nhận giống tên NCC / diễn giải
+      có số HĐ; nhận cả 1 CK trả nhiều HĐ và 1 HĐ trả nhiều lần. CK trong {{ window.before }} ngày trước → {{ window.after }} ngày sau ngày HĐ.</p>
+  }
 
   <!-- 1. Nguồn hóa đơn -->
   <section class="card">
@@ -33,7 +38,8 @@
     @if (mstWarning) { <div class="msg warn"><i class="fa-solid fa-triangle-exclamation"></i> {{ mstWarning }}</div> }
   </section>
 
-  <!-- 2. Sao kê -->
+  <!-- 2. Sao kê (trang gộp: chọn ở trên cùng) -->
+  @if (!embedded) {
   <section class="card">
     <div class="row">
       <span class="step">2</span><b>Sao kê TPBank</b>
@@ -67,6 +73,7 @@
         không trùng kỳ đang chọn ({{ periodLabel() }}) — kiểm tra lại kỳ hoặc file.</div>
     }
   </section>
+  }
 
   @if (error) { <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div> }
 
@@ -76,7 +83,7 @@
     </section>
   } @else if (!result) {
     <div class="msg muted"><i class="fa-solid fa-circle-info"></i>
-      @if (!sourceReady) { Chọn thư mục XML hóa đơn (bước 1) } @if (!sourceReady && !bank) { và } @if (!bank) { chọn file sao kê (bước 2) } để đối soát.</div>
+      @if (!sourceReady) { Chọn thư mục XML hóa đơn (bước 1) } @if (!sourceReady && !bank) { và } @if (!bank) { chọn file sao kê@if (embedded) { (trên cùng trang) } @else { (bước 2) } } để đối soát.</div>
   } @else {
     <section class="card rel">
       @if (xmlReading || parsing) {
@@ -104,7 +111,9 @@
         </div>
         <div class="search"><i class="fa-solid fa-magnifying-glass"></i>
           <input type="text" [(ngModel)]="q" (ngModelChange)="page = 1" placeholder="Số HĐ, NCC, người nhận, diễn giải, số tiền..."></div>
-        <button type="button" class="btn small" (click)="exportCsv()" [disabled]="!filteredRows.length"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button>
+        @if (!embedded) {
+          <button type="button" class="btn small" (click)="exportCsv()" [disabled]="!filteredRows.length"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button>
+        }
       </div>
 
       <div class="table-wrap">

@@ -1,10 +1,11 @@
 ﻿<#
 .SYNOPSIS
   Tự tạo phiếu thu/chi tiền gửi trên VietDA từ sao kê TPBank (.xlsx):
-  - Ghi có  → Phiếu thu tiền gửi (báo có), lý do "Thu tiền bán hàng theo HD <số HĐĐT>" (số HĐĐT lấy từ CSV Đối soát CK),
-              đối tượng = người mua trong XML hóa đơn bán ra (không có MST → Khách lẻ).
-  - Ghi nợ  → Phiếu chi tiền gửi (báo nợ), lý do "Chuyển trả tiền hàng theo HD <số HĐ>", đối tượng = người bán
-              trong XML hóa đơn đầu vào (khớp theo "HD <số>" trong diễn giải sao kê).
+  - Ghi có  → Phiếu thu tiền gửi (báo có), lý do "Thu tiền bán hàng theo HD <số HĐĐT>" (số HĐĐT lấy từ Excel Đối soát CK
+              doi-soat-ck_*.xlsx, sheet Nhap-VietDA; CSV doi-soat-ck_*.csv cũ vẫn nhận), đối tượng = người mua trong XML hóa đơn
+              bán ra (không có MST → Khách lẻ).
+  - Ghi nợ  → Phiếu chi tiền gửi (báo nợ), lý do "Chuyển trả tiền hàng theo HD <số HĐ>", đối tượng = MST đối tác theo Excel
+              Đối soát CK (không có dòng Excel → cách cũ: "HD <số>" trong diễn giải sao kê + XML hóa đơn đầu vào).
 
 .DESCRIPTION
   Mỗi lượt chạy làm 1 loại phiếu = loại phiếu đang mở ở tab chọn trên VietDA (mở Thu chi > Phiếu thu/chi tiền gửi).
@@ -390,8 +391,45 @@ function Pick-Folder([string]$Title) {
 
 # ---------- Sao kê TPBank (.xlsx) — cùng layout utils/tpbank-statement.util.ts ----------
 # A = Ngày GD (dd/mm/yyyy hh:mm:ss), C = Diễn giải, D = Ghi nợ, E = Ghi có, H = Chủ TK đối ứng, I = Mã GD
-# Ô sheet đầu của .xlsx → mỗi dòng 1 hashtable { 'A' = …, 'B' = … } (đọc thẳng XML, không cần Excel)
-function Read-XlsxRows([string]$Path) {
+# Tên sheet → file XML trong .xlsx, theo thứ tự (xl/workbook.xml + xl/_rels/workbook.xml.rels). File Excel lưu lại có thể đổi
+# tên file sheetN.xml / thêm sharedStrings → luôn tra theo tên sheet, không đoán sheetN.
+function Get-XlsxSheetMap($ReadEntry) {
+    $list = New-Object System.Collections.Generic.List[object]
+    $wbXml = & $ReadEntry 'xl/workbook.xml'
+    $relXml = & $ReadEntry 'xl/_rels/workbook.xml.rels'
+    if (-not $wbXml -or -not $relXml) { return , $list }
+    $wb = New-Object Xml.XmlDocument; $wb.LoadXml($wbXml)
+    $rel = New-Object Xml.XmlDocument; $rel.LoadXml($relXml)
+    $targets = @{}
+    foreach ($r in $rel.SelectNodes("//*[local-name()='Relationship']")) { $targets[$r.GetAttribute('Id')] = $r.GetAttribute('Target') }
+    foreach ($s in $wb.SelectNodes("//*[local-name()='sheets']/*[local-name()='sheet']")) {
+        $id = $s.GetAttribute('id', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships')
+        $t = [string]$targets[$id]
+        if (-not $t) { continue }
+        $t = if ($t.StartsWith('/')) { $t.TrimStart('/') } else { 'xl/' + $t }
+        $list.Add([pscustomobject]@{ Name = $s.GetAttribute('name'); Entry = $t })
+    }
+    return , $list
+}
+
+# Tên các sheet của .xlsx (không đọc ô)
+function Get-XlsxSheetNames([string]$Path) {
+    $fs = New-Object IO.FileStream($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+    $zip = New-Object IO.Compression.ZipArchive($fs, [IO.Compression.ZipArchiveMode]::Read)
+    try {
+        $readEntry = {
+            param($name)
+            $e = $zip.GetEntry($name)
+            if (-not $e) { return $null }
+            $r = New-Object IO.StreamReader($e.Open(), [Text.Encoding]::UTF8)
+            try { $r.ReadToEnd() } finally { $r.Dispose() }
+        }
+        return @((Get-XlsxSheetMap $readEntry) | ForEach-Object { $_.Name })
+    } finally { $zip.Dispose() }
+}
+
+# Ô 1 sheet của .xlsx (mặc định sheet đầu; -Sheet = tên sheet) → mỗi dòng 1 hashtable { 'A' = …, 'B' = … } (đọc thẳng XML, không cần Excel)
+function Read-XlsxRows([string]$Path, [string]$Sheet = '') {
     # FileShare.ReadWrite: đọc được cả khi file đang mở trong Excel
     $fs = New-Object IO.FileStream($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
     $zip = New-Object IO.Compression.ZipArchive($fs, [IO.Compression.ZipArchiveMode]::Read)
@@ -403,8 +441,16 @@ function Read-XlsxRows([string]$Path) {
             $r = New-Object IO.StreamReader($e.Open(), [Text.Encoding]::UTF8)
             try { $r.ReadToEnd() } finally { $r.Dispose() }
         }
-        $sheetXml = & $readEntry 'xl/worksheets/sheet1.xml'
-        if (-not $sheetXml) { throw 'không thấy xl/worksheets/sheet1.xml' }
+        $map = Get-XlsxSheetMap $readEntry
+        if ($Sheet) {
+            $hit = @($map | Where-Object { $_.Name -eq $Sheet })
+            if (-not $hit.Count) { throw "không có sheet '$Sheet' (có: $(($map | ForEach-Object { $_.Name }) -join ', '))" }
+            $entry = $hit[0].Entry
+        } else {
+            $entry = if ($map.Count) { $map[0].Entry } else { 'xl/worksheets/sheet1.xml' }
+        }
+        $sheetXml = & $readEntry $entry
+        if (-not $sheetXml) { throw "không thấy $entry" }
         $shared = @()
         $ssXml = & $readEntry 'xl/sharedStrings.xml'
         if ($ssXml) {
@@ -497,6 +543,61 @@ function Read-Recon([string]$Path) {
         })
     }
     if ($map.Count -eq 0) { throw "không có dòng nào có cột 'Mã GD' — có đúng file CSV Đối soát CK (doi-soat-ck_*.csv) không?" }
+    return $map
+}
+
+# ---------- Excel Đối soát CK (KeToan, từ 06/11/2026: bank-recon-export.util.ts) → Mã GD → dòng sheet Nhap-VietDA ----------
+# Bán ra + mua vào chung 1 file doi-soat-ck_<từ>_<đến>.xlsx. Sheet Thong-tin "Định dạng" phải = $ReconSchema (đổi/bỏ cột = tăng số).
+# Sheet Nhap-VietDA: dòng 1 = tiêu đề, đọc theo TÊN cột; mỗi GD sao kê đúng 1 dòng.
+$ReconSchema = 'taphoa39-doi-soat-ck/1'
+$ReconSheet = 'Nhap-VietDA'
+$ReconCols = @('Loại', 'Mã GD', 'Số tiền', 'Kết quả khớp', 'Lập phiếu theo HĐ', 'Lý do không lập', 'Độ tin cậy', 'Số HĐ', 'Ký hiệu HĐ', 'Tổng HĐ', 'MST đối tác', 'Tên đối tác')
+
+function Test-ReconXlsx([string]$Path) { (@(Get-XlsxSheetNames $Path) -contains $ReconSheet) }
+
+# "123, 124" → @('123','124')
+function Split-List([string]$s) { @(([string]$s -split '\s*[,;]\s*') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
+
+function Read-ReconXlsx([string]$Path) {
+    $info = Read-XlsxRows $Path 'Thong-tin'
+    $schema = ''
+    foreach ($r in $info) { if (([string]$r['A']).Trim() -eq 'Định dạng') { $schema = ([string]$r['B']).Trim(); break } }
+    if ($schema -ne $ReconSchema) { throw "định dạng '$(if ($schema) { $schema } else { 'không ghi' })' — tool này đọc '$ReconSchema'. Tải lại tool mới ở trang Tải công cụ hoặc xuất lại Excel từ trang Đối soát CK." }
+
+    $rows = Read-XlsxRows $Path $ReconSheet
+    if ($rows.Count -lt 1) { throw "sheet $ReconSheet trống" }
+    $col = @{}
+    foreach ($k in $rows[0].Keys) { $col[([string]$rows[0][$k]).Trim()] = $k }
+    $missing = @($ReconCols | Where-Object { -not $col.ContainsKey($_) })
+    if ($missing.Count) { throw "sheet $ReconSheet thiếu cột: $($missing -join ', ')" }
+    $get = { param($r, $name) ([string]$r[$col[$name]]).Trim() }
+    $num = { param($x) $d = 0.0; if ($x -and [double]::TryParse($x, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$d)) { [long][Math]::Round($d) } else { 0L } }
+
+    $map = @{}
+    $odd = 0
+    $dup = 0
+    for ($i = 1; $i -lt $rows.Count; $i++) {
+        $r = $rows[$i]
+        $code = & $get $r 'Mã GD'
+        if (-not $code) { continue }
+        if ($map.ContainsKey($code)) { $dup++; continue }
+        $mode = & $get $r 'Loại'
+        $make = & $get $r 'Lập phiếu theo HĐ'
+        $noWhy = & $get $r 'Lý do không lập'
+        if ($mode -notin @('Thu', 'Chi') -or $make -notin @('Có', 'Không')) {
+            $odd++
+            $noWhy = "dòng $($i + 1) Excel lạ: Loại='$mode', Lập phiếu theo HĐ='$make'"
+            $make = 'Không'
+        }
+        $map[$code] = [pscustomobject]@{
+            Mode = $mode; Code = $code; Amount = (& $num (& $get $r 'Số tiền'))
+            Match = & $get $r 'Kết quả khớp'; Make = ($make -eq 'Có'); NoWhy = $noWhy; Confidence = & $get $r 'Độ tin cậy'
+            Numbers = @(Split-List (& $get $r 'Số HĐ')); Serials = @(Split-List (& $get $r 'Ký hiệu HĐ'))
+            Total = (& $num (& $get $r 'Tổng HĐ')); Msts = @(Split-List (& $get $r 'MST đối tác')); Name = & $get $r 'Tên đối tác'
+        }
+    }
+    if ($odd) { Write-Log WARN "$(Split-Path $Path -Leaf): $odd dòng Loại / Lập phiếu theo HĐ không hợp lệ → coi như không lập theo HĐ" }
+    if ($dup) { Write-Log WARN "$(Split-Path $Path -Leaf): $dup dòng trùng Mã GD trong file (lấy dòng đầu)" }
     return $map
 }
 
@@ -868,13 +969,16 @@ function Invoke-Voucher($Item) {
 $script:rows = New-Object System.Collections.Generic.List[object]
 $script:objByCode = @{}
 $script:prefix = @{}
+# Nguồn + "Lý do không lập" (Excel đối soát) của GD đang xét — Build-Queue đặt trước khi gọi Add-Row
+$script:rowSource = ''
+$script:rowNoWhy = ''
 
 # 1 dòng kết quả cho 1 GD sao kê (Kết quả / Số CT cập nhật dần khi chạy)
 function Add-Row([string]$M, $T, [string]$Result, [string]$SoCt = '', [string]$Object = '', [string]$Reason = '', [string]$Note = '') {
     $row = [pscustomobject]@{
         Mode = $M; Code = $T.Code; DateTime = $T.DateTime; Date = $T.Date; Amount = $T.Debit + $T.Credit; Desc = $T.Desc
         Object = $Object; ObjectName = $(if ($Object -and $script:objByCode.ContainsKey($Object)) { $script:objByCode[$Object] } else { '' })
-        Reason = $Reason; Result = $Result; SoCt = $SoCt; Note = $Note
+        Reason = $Reason; Result = $Result; SoCt = $SoCt; Note = $Note; Source = $script:rowSource; NoWhy = $script:rowNoWhy
         Check = ''; VdDate = ''; VdName = ''; VdReason = ''; VdAmount = ''
     }
     $script:rows.Add($row)
@@ -1239,6 +1343,7 @@ function Invoke-Verify {
 $ReportCols = @(
     @('Loại', 'Mode'), @('Mã GD', 'Code'), @('Thời gian GD', 'DateTime'), @('Số tiền', 'Amount'), @('Diễn giải sao kê', 'Desc'),
     @('Đối tượng', 'Object'), @('Lý do', 'Reason'), @('Kết quả chạy', 'Result'), @('Số CT', 'SoCt'), @('Ghi chú', 'Note'),
+    @('Nguồn', 'Source'), @('Lý do không lập', 'NoWhy'),
     @('Kiểm tra VietDA', 'Check'), @('Ngày (VietDA)', 'VdDate'), @('Họ tên (VietDA)', 'VdName'), @('Lý do (VietDA)', 'VdReason'), @('Số tiền (VietDA)', 'VdAmount'))
 
 # CSV (UTF-8 BOM, dấu ;) mở thẳng bằng Excel; tóm tắt ghi tom-tat.txt
@@ -1264,13 +1369,16 @@ if ([Vdb]::Dialogs($script:vda.Pid).Count) { Fail 'VietDA đang mở hộp tho�
 Close-SearchDialog
 $modes = @(if ($Mode) { $Mode } else { 'Thu'; 'Chi' })
 
-# Sao kê + CSV đối soát: lấy hết trong Input\ (hoặc -Statement / -Recon); chỉ hỏi thư mục XML
-# .xlsx trong Input: file "DANH MỤC ĐỐI TƯỢNG" của VietDA → danh mục; còn lại → sao kê TPBank
+# Sao kê + đối soát: lấy hết trong Input\ (hoặc -Statement / -Recon); chỉ hỏi thư mục XML
+# .xlsx trong Input: có sheet Nhap-VietDA → Excel Đối soát CK; "DANH MỤC ĐỐI TƯỢNG" của VietDA → danh mục; còn lại → sao kê TPBank
 $xlsxRows = @{}
 $objectLists = New-Object System.Collections.Generic.List[string]
 $statements = New-Object System.Collections.Generic.List[string]
+$reconXlsx = New-Object System.Collections.Generic.List[string]
 $inputXlsx = if ($Statement) { @(Get-ChildItem -LiteralPath $InputDir -File -Filter *.xlsx -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '~$*' } | ForEach-Object { $_.FullName }) } else { @(Get-InputFiles '.xlsx' 'sao kê TPBank (.xlsx)') }
 foreach ($f in $inputXlsx) {
+    try { $isRecon = Test-ReconXlsx $f } catch { Fail "Đọc $(Split-Path $f -Leaf) lỗi: $($_.Exception.Message)" }
+    if ($isRecon) { if (-not $Recon) { $reconXlsx.Add($f) }; continue }
     try { $xlsxRows[$f] = Read-XlsxRows $f } catch { Fail "Đọc $(Split-Path $f -Leaf) lỗi: $($_.Exception.Message)" }
     if (Test-ObjectList $xlsxRows[$f]) { $objectLists.Add($f) } elseif (-not $Statement) { $statements.Add($f) }
 }
@@ -1279,7 +1387,18 @@ if ($Statement) {
     $statements.Add($Statement)
 }
 if ($statements.Count -eq 0) { Start-Process explorer.exe $InputDir; Fail "Chưa có sao kê TPBank (.xlsx) trong $InputDir — copy file vào thư mục vừa mở rồi chạy lại." }
-$recons = @(if ($modes -contains 'Thu') { if ($Recon) { $Recon } else { Get-InputFiles '.csv' 'CSV Đối soát CK (doi-soat-ck_*.csv)' } })
+# CSV doi-soat-ck_*.csv cũ: vẫn nhận một thời gian (fallback), Excel có Mã GD nào thì Excel thắng
+$reconCsv = New-Object System.Collections.Generic.List[string]
+if ($Recon) {
+    if ([IO.Path]::GetExtension($Recon) -eq '.xlsx') { $reconXlsx.Add($Recon) } else { $reconCsv.Add($Recon) }
+} else {
+    foreach ($f in @(Get-ChildItem -LiteralPath $InputDir -File -Filter *.csv -ErrorAction SilentlyContinue | Where-Object { $_.Extension -eq '.csv' -and $_.Name -notlike '~$*' } | Sort-Object Name)) { $reconCsv.Add($f.FullName) }
+}
+if ($modes -contains 'Thu' -and $reconXlsx.Count -eq 0 -and $reconCsv.Count -eq 0) {
+    Start-Process explorer.exe $InputDir
+    Fail "Chưa có file Đối soát CK trong $InputDir — trên KeToan trang Đối soát CK bấm Xuất Excel (doi-soat-ck_<từ>_<đến>.xlsx), copy vào thư mục vừa mở rồi chạy lại."
+}
+$recons = @($reconXlsx) + @($reconCsv)
 foreach ($p in $statements + $recons) { if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { Fail "Không thấy file: $p" } }
 if (-not $XmlFolder) { $XmlFolder = Pick-Folder 'Chọn thư mục XML hóa đơn (mua vào + bán ra, quét cả thư mục con)' }
 if ($XmlFolder -and -not (Test-Path -LiteralPath $XmlFolder -PathType Container)) { Fail "Không thấy thư mục: $XmlFolder" }
@@ -1298,13 +1417,22 @@ foreach ($f in $statements) {
     Write-Log INFO "Sao kê $(Split-Path $f -Leaf): $($part.Count) GD, Ghi có $(@($part | Where-Object { $_.Credit -gt 0 }).Count), Ghi nợ $(@($part | Where-Object { $_.Debit -gt 0 }).Count)$(if ($dup) { ", $dup GD trùng file khác (bỏ)" })."
     if ($part.Count -eq 0) { Write-Log WARN "Sao kê $(Split-Path $f -Leaf) không có GD nào — có đúng file sao kê TPBank (.xlsx) không?" }
 }
-if ($modes -contains 'Thu') {
-    $reconMap = @{}
-    foreach ($f in $recons) {
-        try { $part = Read-Recon $f } catch { Fail "Đọc CSV đối soát $(Split-Path $f -Leaf) lỗi: $($_.Exception.Message)" }
-        foreach ($k in $part.Keys) { if (-not $reconMap.ContainsKey($k)) { $reconMap[$k] = $part[$k] } }
-        Write-Log INFO "CSV đối soát $(Split-Path $f -Leaf): $($part.Count) Mã GD."
-    }
+# Excel đối soát: Mã GD → dòng Nhap-VietDA (nhiều file gộp, trùng Mã GD lấy file đầu)
+$reconX = @{}
+foreach ($f in $reconXlsx) {
+    try { $part = Read-ReconXlsx $f } catch { Fail "Đọc Excel đối soát $(Split-Path $f -Leaf) lỗi: $($_.Exception.Message)" }
+    $dup = 0
+    foreach ($k in $part.Keys) { if ($reconX.ContainsKey($k)) { $dup++ } else { $reconX[$k] = $part[$k] } }
+    $v = @($part.Values)
+    $cnt = { param($m, $mk) @($v | Where-Object { $_.Mode -eq $m -and (-not $mk -or $_.Make) }).Count }
+    Write-Log INFO "Excel đối soát $(Split-Path $f -Leaf) ($ReconSchema): Thu $(& $cnt 'Thu' $false) GD (lập phiếu theo HĐ $(& $cnt 'Thu' $true)), Chi $(& $cnt 'Chi' $false) GD (lập phiếu theo HĐ $(& $cnt 'Chi' $true))$(if ($dup) { ", $dup Mã GD trùng file khác (bỏ)" })."
+}
+# CSV cũ (chỉ phiếu thu dùng): Mã GD → số HĐĐT
+$reconMap = @{}
+foreach ($f in $reconCsv) {
+    try { $part = Read-Recon $f } catch { Fail "Đọc CSV đối soát $(Split-Path $f -Leaf) lỗi: $($_.Exception.Message)" }
+    foreach ($k in $part.Keys) { if (-not $reconMap.ContainsKey($k)) { $reconMap[$k] = $part[$k] } }
+    Write-Log WARN "CSV đối soát $(Split-Path $f -Leaf): $($part.Count) Mã GD — định dạng cũ, sắp bỏ; dùng Excel từ trang Đối soát CK (Xuất Excel)$(if ($reconXlsx.Count) { '. Mã GD có trong Excel thì lấy theo Excel' })."
 }
 # MST công ty = MST có mặt trong nhiều XML nhất (người mua của HĐ mua vào, người bán của HĐ bán ra)
 $xmls = @(Read-InvoiceXml $XmlFolder)
@@ -1375,6 +1503,10 @@ function Build-Queue([string]$M) {
     $side = if ($M -eq 'Thu') { @($txns | Where-Object { $_.Credit -gt 0 }) } else { @($txns | Where-Object { $_.Debit -gt 0 }) }
     foreach ($t in $side) {
         $key = if ($t.Code) { "$M|$($t.Code)" } else { "$M|$($t.DateTime)|$($t.Debit + $t.Credit)|$($t.Desc)" }
+        # dòng Excel đối soát của GD (nếu có) → cột Nguồn / Lý do không lập của ket-qua-chay.csv
+        $er = if ($t.Code -and $reconX.ContainsKey($t.Code)) { $reconX[$t.Code] } else { $null }
+        $script:rowNoWhy = if ($er -and -not $er.Make) { $er.NoWhy } else { '' }
+        $script:rowSource = if ($er) { 'Excel' } elseif ($M -eq 'Thu' -and $t.Code -and $reconMap.ContainsKey($t.Code)) { 'CSV cũ' } elseif ($M -eq 'Chi') { 'Diễn giải + XML (cũ)' } else { '' }
         if ($done.ContainsKey($key)) {
             $skippedLedger++
             $l = @($done[$key]) + @('', '', '', '', '')
@@ -1384,6 +1516,7 @@ function Build-Queue([string]$M) {
         $label = "$($t.DateTime) $('{0:N0}' -f ($t.Debit + $t.Credit)) $($t.Code)"
         $kind = Get-OtherKind $M $t
         if ($kind) {
+            $script:rowSource = 'Luật khác'
             $code = if ($kind.Object -eq 'RETAIL') { $retailCode } else { $kind.Object }
             $who = ''
             if ($kind.Person) {
@@ -1400,14 +1533,44 @@ function Build-Queue([string]$M) {
                 continue
             }
             $note = "$($kind.Name) · Nợ $($kind.Debit) / Có $($kind.Credit)$who"
+            if ($er -and $er.Make) {
+                $note += " · Excel đối soát ghi lập theo HĐ $($er.Numbers -join ', ') — ưu tiên luật '$($kind.Name)'"
+                Write-Log WARN "[$M] $label — nội dung khớp luật '$($kind.Name)' nhưng Excel đối soát ghi lập phiếu theo HĐ $($er.Numbers -join ', ') → theo luật, kiểm lại"
+            }
             $row = Add-Row $M $t $NotRun '' $code $kind.Reason $note
             $queue.Add([pscustomobject]@{ Key = $key; Date = $t.Date; Amount = $t.Debit + $t.Credit; Object = $code; Reason = $kind.Reason; Label = $label; Note = $note; Row = $row; Debit = $kind.Debit; Credit = $kind.Credit })
             continue
         }
+        # Excel đối soát: kiểm khớp sao kê rồi "Lập phiếu theo HĐ" = Không → không lập (đã qua luật khác ở trên)
+        if ($er) {
+            $amt = $t.Debit + $t.Credit
+            $why = if ($er.Mode -ne $M) { "Excel đối soát ghi Loại=$($er.Mode) nhưng sao kê là $(if ($M -eq 'Thu') { 'Ghi có' } else { 'Ghi nợ' })" }
+                elseif ($er.Amount -and $er.Amount -ne $amt) { "Số tiền trên Excel đối soát $('{0:N0}' -f $er.Amount) ≠ sao kê $('{0:N0}' -f $amt) (Excel của sao kê khác?)" }
+                elseif (-not $er.Make) { "không lập theo HĐ: $(if ($er.NoWhy) { $er.NoWhy } else { 'Excel không ghi lý do' })$(if ($er.Match) { " ($($er.Match))" })" }
+                else { '' }
+            if ($why) {
+                $skipped.Add("$label — $why")
+                [void](Add-Row $M $t 'Bỏ qua' -Note $why)
+                continue
+            }
+        }
         if ($M -eq 'Thu') {
-            $inv = if ($t.Code -and $reconMap.ContainsKey($t.Code)) { @($reconMap[$t.Code] | Where-Object { $_.Number }) } else { @() }
+            if ($er) {
+                # Số HĐĐT + ký hiệu từ Excel (ký hiệu: cùng số lượng → ghép theo thứ tự; 1 ký hiệu → dùng chung)
+                $inv = @(for ($j = 0; $j -lt $er.Numbers.Count; $j++) {
+                    [pscustomobject]@{ Number = $er.Numbers[$j]; Serial = $(if ($er.Serials.Count -eq $er.Numbers.Count) { $er.Serials[$j] } elseif ($er.Serials.Count -eq 1) { $er.Serials[0] } else { '' }) }
+                })
+                if ($inv.Count -eq 0) {
+                    $why = 'Excel đối soát ghi lập phiếu theo HĐ nhưng thiếu Số HĐ'
+                    $skipped.Add("$label — $why")
+                    [void](Add-Row $M $t 'Bỏ qua' -Note $why)
+                    continue
+                }
+            } else {
+                $inv = if ($t.Code -and $reconMap.ContainsKey($t.Code)) { @($reconMap[$t.Code] | Where-Object { $_.Number }) } else { @() }
+            }
             if ($inv.Count -eq 0) {
-                $why = if ($t.Code -and $reconMap.ContainsKey($t.Code)) { "chưa có số HĐĐT ($(($reconMap[$t.Code] | ForEach-Object { "$($_.Kind) $($_.Code)".Trim() }) -join ', '))" } else { 'không có trong CSV đối soát (GD thừa / khác ngày?)' }
+                $why = if ($t.Code -and $reconMap.ContainsKey($t.Code)) { "chưa có số HĐĐT ($(($reconMap[$t.Code] | ForEach-Object { "$($_.Kind) $($_.Code)".Trim() }) -join ', '))" } else { "không có trong file đối soát$(if ($reconX.Count) { ' Excel' }) (GD thừa / khác ngày?)" }
                 $skipped.Add("$label — $why")
                 [void](Add-Row $M $t 'Bỏ qua' -Note $why)
                 continue
@@ -1447,7 +1610,28 @@ function Build-Queue([string]$M) {
             $reason = $ReasonPrefix.Thu + ($numbers -join ', ')
             $row = Add-Row $M $t $NotRun '' $objCode $reason $note
             $queue.Add([pscustomobject]@{ Key = $key; Date = $t.Date; Amount = $t.Credit; Object = $objCode; Reason = $reason; Label = $label; Note = $note; Row = $row })
+        } elseif ($er) {
+            # Chi theo Excel đối soát: Số HĐ + MST đối tác đã ghép ở trang Đối soát CK (không đoán "HD <số>" trong diễn giải)
+            $why = if ($er.Numbers.Count -eq 0) { 'Excel đối soát ghi lập phiếu theo HĐ nhưng thiếu Số HĐ' }
+                elseif ($er.Msts.Count -eq 0) { "Excel đối soát thiếu MST đối tác (HĐ $($er.Numbers -join ', '))" }
+                elseif ($er.Msts.Count -gt 1) { "các HĐ thuộc nhiều người bán ($($er.Msts -join ', '))" }
+                else { '' }
+            if (-not $why) {
+                $obj = Resolve-Object $er.Msts[0] $er.Name $objects $manualMap 'Chi'
+                if ($obj.Error) { $why = "người bán $($er.Name): $($obj.Error)" }
+            }
+            if ($why) {
+                $skipped.Add("$label '$($t.Desc)' — $why")
+                [void](Add-Row $M $t 'Bỏ qua' -Note $why)
+                continue
+            }
+            $note = "$($er.Name) [Excel đối soát: $($er.Match)$(if ($er.Confidence) { ", tin cậy $($er.Confidence)" }), mã theo $($obj.By)]$(if ($er.Total -and $er.Total -ne $t.Debit) { " · tổng HĐ $('{0:N0}' -f $er.Total) ≠ số tiền CK" })"
+            $reason = $ReasonPrefix.Chi + ($er.Numbers -join ', ')
+            $row = Add-Row $M $t $NotRun '' $obj.Code $reason $note
+            $queue.Add([pscustomobject]@{ Key = $key; Date = $t.Date; Amount = $t.Debit; Object = $obj.Code; Reason = $reason; Label = $label; Note = $note; Row = $row })
         } else {
+            # không có dòng Excel đối soát (chỉ có CSV cũ / không có file) → logic cũ: "HD <số>" trong diễn giải + XML mua vào
+            if ($reconX.Count) { Write-Log WARN "[$M] $label — không có trong Excel đối soát, khớp HĐ theo diễn giải + XML (cách cũ)" }
             $hit = Find-DebitInvoices $t $purchases
             $why = if ($hit.Error) { $hit.Error } else { '' }
             if (-not $why) {
@@ -1543,7 +1727,8 @@ $summary = [ordered]@{
     'Thời gian chạy' = $startedAt.ToString('dd/MM/yyyy HH:mm:ss')
     'Chế độ' = "$runMode · $($modes -join ' + ')$(if ($Limit -gt 0) { " · -Limit $Limit" })"
     'Sao kê' = ($statements | ForEach-Object { Split-Path $_ -Leaf }) -join ', '
-    'CSV đối soát' = ($recons | ForEach-Object { Split-Path $_ -Leaf }) -join ', '
+    'File đối soát' = ($recons | ForEach-Object { "$(Split-Path $_ -Leaf)$(if ($_ -like '*.csv') { ' (CSV cũ)' })" }) -join ', '
+    'Nguồn' = (& $countBy 'Source')
     'Thư mục XML' = [string]$XmlFolder
     'Kết quả chạy' = (& $countBy 'Result')
     'Kiểm tra VietDA' = (& $countBy 'Check')

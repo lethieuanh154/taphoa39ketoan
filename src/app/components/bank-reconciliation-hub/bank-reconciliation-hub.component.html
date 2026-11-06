@@ -1,0 +1,59 @@
+<!-- ĐỐI SOÁT CK: bán ra + mua vào chung 1 trang, 1 sao kê, 1 file Excel (06/11/2026) -->
+<div class="hub">
+  <header class="page-head">
+    <h1><i class="fa-solid fa-money-bill-transfer"></i> Đối soát chuyển khoản</h1>
+    <p class="sub">Sao kê TPBank ⇄ hóa đơn: tiền <b>vào</b> ⇄ HĐĐT <b>bán ra</b> · tiền <b>ra</b> ⇄ HĐ <b>mua vào</b>.
+      Xuất <b>1 file Excel</b> (sheet <code>Nhap-VietDA</code> cho tool nhập phiếu thu / chi tiền gửi vào VietDA + các bảng chi tiết).</p>
+  </header>
+
+  <!-- Sao kê dùng chung 2 phần -->
+  <section class="card">
+    <div class="row">
+      <b><i class="fa-solid fa-building-columns"></i> Sao kê TPBank</b>
+      <label class="btn btn-primary pick" [class.disabled]="loading" title="Chọn được NHIỀU file cùng lúc (giữ Ctrl / Shift) — vd T01, T02, T03 của 1 quý">
+        <i class="fa-solid" [ngClass]="loading ? 'fa-spinner fa-spin' : 'fa-file-excel'"></i>
+        {{ loading ? 'Đang đọc...' : (files.length ? 'Chọn lại sao kê' : 'Chọn sao kê (.xlsx / .pdf, nhiều file)') }}
+        <input type="file" accept=".xlsx,.pdf" multiple (change)="onStatementSelected($event)" [disabled]="loading" hidden>
+      </label>
+      @if (files.length) {
+        <label class="btn pick" [class.disabled]="loading" title="Thêm file vào sao kê đang dùng (vd thêm tháng mới) — giao dịch trùng tự bỏ">
+          <i class="fa-solid fa-plus"></i> Thêm file
+          <input type="file" accept=".xlsx,.pdf" multiple (change)="onStatementSelected($event, true)" [disabled]="loading" hidden>
+        </label>
+        <button type="button" class="btn-link" (click)="clearStatement()"><i class="fa-solid fa-xmark"></i> Bỏ sao kê</button>
+      }
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-excel" (click)="exportExcel()" [disabled]="!canExport"
+        title="1 file .xlsx: Nhap-VietDA (Thu + Chi) · Ban-ra_Doi-soat · Ban-ra_CK-nhieu-lan · Ban-ra_CK-du · Mua-vao · Thong-tin">
+        <i class="fa-solid fa-file-excel"></i> Xuất Excel
+      </button>
+      @if (sale.canCompare) {
+        <button type="button" class="btn-link small" (click)="exportLegacyCsv()"
+          title="Tool VietDA bản hiện tại còn đọc file doi-soat-ck_*.csv — bỏ nút này khi tool đọc được file Excel">CSV cho tool VietDA (bản cũ)</button>
+      }
+    </div>
+    @if (files.length) {
+      <div class="row hint">
+        <span><i class="fa-regular fa-file"></i> {{ files.length }} file: {{ fileNames }}</span>
+        <span>· tiền vào <b>{{ creditCount | number }}</b> GD · tiền ra <b>{{ debitCount | number }}</b> GD</span>
+      </div>
+    } @else {
+      <div class="row hint">Chọn 1 lần cho cả 2 phần. File .pdf chỉ đọc được tiền ra (mua vào).</div>
+    }
+    @if (error) { <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div> }
+    @if (exportNote) { <div class="msg ok"><i class="fa-solid fa-check"></i> {{ exportNote }}</div> }
+  </section>
+
+  <nav class="hub-tabs">
+    <button type="button" [class.active]="tab === 'ban-ra'" (click)="setTab('ban-ra')">
+      <i class="fa-solid fa-file-export"></i> Bán ra (HĐ đầu ra)
+    </button>
+    <button type="button" [class.active]="tab === 'mua-vao'" (click)="setTab('mua-vao')">
+      <i class="fa-solid fa-file-import"></i> Mua vào (HĐ đầu vào)
+    </button>
+  </nav>
+
+  <!-- Giữ cả 2 phần sống (ẩn / hiện) để xuất Excel lấy được dữ liệu cả 2 -->
+  <div [hidden]="tab !== 'ban-ra'"><app-bank-reconciliation-page [embedded]="true"></app-bank-reconciliation-page></div>
+  <div [hidden]="tab !== 'mua-vao'"><app-bank-reconciliation-in-page [embedded]="true"></app-bank-reconciliation-in-page></div>
+</div>

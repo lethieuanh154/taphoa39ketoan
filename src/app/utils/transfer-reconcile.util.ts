@@ -608,6 +608,16 @@ function toCsv<T>(columns: CsvColumn<T>[], rows: T[]): string {
   return '﻿' + lines.join('\r\n');
 }
 
+/** Bảng (tiêu đề + dòng giá trị thô) — cùng cột với CSV; KeToan dùng để xuất 1 file Excel nhiều sheet (06/11/2026). */
+export interface ReconTable {
+  header: string[];
+  rows: (string | number)[][];
+}
+
+function toTable<T>(columns: CsvColumn<T>[], rows: T[]): ReconTable {
+  return { header: columns.map(c => c.header), rows: rows.map(r => columns.map(c => c.value(r) ?? '')) };
+}
+
 // Cột HĐĐT dùng chung 2 file CSV — số HĐĐT chỉ có khi CQT đã chấp nhận
 const einvoiceColumns = (inv: (p: ReconPair) => ReconInvoice | undefined): CsvColumn<ReconPair>[] => [
   { header: 'Ký hiệu HĐĐT', value: p => inv(p)?.einvoiceSerial ?? '', text: true },
@@ -616,9 +626,9 @@ const einvoiceColumns = (inv: (p: ReconPair) => ReconInvoice | undefined): CsvCo
 ];
 
 /** CSV toàn bộ đối soát — mỗi dòng 1 cặp (giống bảng 2 cột trên màn hình). */
-export function buildReconCsv(pairs: ReconPair[]): string {
+function reconColumns(): CsvColumn<ReconPair>[] {
   const inv = (p: ReconPair) => p.item?.invoice;
-  return toCsv<ReconPair>([
+  return [
     { header: 'Trạng thái', value: p => RECON_KIND_LABEL[p.kind], text: true },
     { header: 'Số tiền', value: p => p.amount },
     { header: 'Mã HĐ', value: p => inv(p)?.code ?? '', text: true },
@@ -632,7 +642,16 @@ export function buildReconCsv(pairs: ReconPair[]): string {
     { header: 'Mã GD', value: p => p.txn?.code ?? '', text: true },
     { header: 'Lệch giờ (phút)', value: p => p.deltaMinutes },
     { header: 'Gợi ý', value: csvHint, text: true },
-  ], pairs);
+  ];
+}
+
+export function buildReconCsv(pairs: ReconPair[]): string {
+  return toCsv(reconColumns(), pairs);
+}
+
+/** Như buildReconCsv, dạng bảng (sheet Excel). */
+export function reconTable(pairs: ReconPair[]): ReconTable {
+  return toTable(reconColumns(), pairs);
 }
 
 // Cột khớp GD dùng chung CSV CK nhiều lần / CK dư. `withBank: false` (chưa import sao kê) → bỏ hết,
@@ -646,11 +665,11 @@ const bankMatchColumns = (withBank: boolean): CsvColumn<ReconPair>[] => withBank
 ] : [];
 
 /** CSV HĐ chuyển khoản nhiều lần — mỗi khoản 1 dòng, kèm GD đã khớp. */
-export function buildMultiTransferCsv(pairs: ReconPair[], options: { withBank?: boolean } = {}): string {
+function multiTransferColumns(withBank: boolean): CsvColumn<ReconPair>[] {
   const inv = (p: ReconPair) => p.item!.invoice;
   const partsSum = (p: ReconPair) => p.item!.note?.parts.reduce((s, x) => s + x, 0) ?? 0;
   const hasParts = (p: ReconPair) => !!p.item!.note?.parts.length;
-  return toCsv<ReconPair>([
+  return [
     { header: 'Mã HĐ', value: p => inv(p).code, text: true },
     { header: 'Giờ HĐ', value: p => inv(p).time, text: true },
     ...einvoiceColumns(inv),
@@ -662,15 +681,24 @@ export function buildMultiTransferCsv(pairs: ReconPair[], options: { withBank?: 
     { header: 'Tổng các khoản', value: partsSum },
     { header: 'Chênh lệch', value: p => inv(p).total - partsSum(p) },
     { header: 'Tình trạng ghi chú', value: p => p.item!.note ? NOTE_STATUS_LABEL[p.item!.note.status] : '', text: true },
-    ...bankMatchColumns(options.withBank !== false),
-  ], multiTransferPairs(pairs));
+    ...bankMatchColumns(withBank),
+  ];
+}
+
+export function buildMultiTransferCsv(pairs: ReconPair[], options: { withBank?: boolean } = {}): string {
+  return toCsv(multiTransferColumns(options.withBank !== false), multiTransferPairs(pairs));
+}
+
+/** Như buildMultiTransferCsv, dạng bảng (sheet Excel). */
+export function multiTransferTable(pairs: ReconPair[], options: { withBank?: boolean } = {}): ReconTable {
+  return toTable(multiTransferColumns(options.withBank !== false), multiTransferPairs(pairs));
 }
 
 /** CSV HĐ khách chuyển khoản dư (đã trả lại tiền mặt) — mỗi HĐ 1 dòng, kèm GD đã khớp. */
-export function buildExcessTransferCsv(pairs: ReconPair[], options: { withBank?: boolean } = {}): string {
+function excessTransferColumns(withBank: boolean): CsvColumn<ReconPair>[] {
   const inv = (p: ReconPair) => p.item!.invoice;
   const ex = (p: ReconPair) => p.item!.excess!;
-  return toCsv<ReconPair>([
+  return [
     { header: 'Mã HĐ', value: p => inv(p).code, text: true },
     { header: 'Giờ HĐ', value: p => inv(p).time, text: true },
     ...einvoiceColumns(inv),
@@ -680,8 +708,17 @@ export function buildExcessTransferCsv(pairs: ReconPair[], options: { withBank?:
     { header: 'Trả lại khách', value: p => ex(p).refund ?? '' },
     { header: 'Chênh lệch', value: p => ex(p).refund === null ? '' : inv(p).total - (ex(p).transferred - ex(p).refund!) },
     { header: 'Tình trạng ghi chú', value: p => NOTE_STATUS_LABEL[ex(p).status], text: true },
-    ...bankMatchColumns(options.withBank !== false),
-  ], excessTransferPairs(pairs));
+    ...bankMatchColumns(withBank),
+  ];
+}
+
+export function buildExcessTransferCsv(pairs: ReconPair[], options: { withBank?: boolean } = {}): string {
+  return toCsv(excessTransferColumns(options.withBank !== false), excessTransferPairs(pairs));
+}
+
+/** Như buildExcessTransferCsv, dạng bảng (sheet Excel). */
+export function excessTransferTable(pairs: ReconPair[], options: { withBank?: boolean } = {}): ReconTable {
+  return toTable(excessTransferColumns(options.withBank !== false), excessTransferPairs(pairs));
 }
 
 /** Các cặp thuộc HĐ có ghi chú "N lần", sắp theo giờ HĐ rồi khoản thứ. */

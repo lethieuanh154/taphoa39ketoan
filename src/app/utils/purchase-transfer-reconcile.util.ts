@@ -229,21 +229,30 @@ function vnd(n: number): string {
   return `${n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString('vi-VN')}`;
 }
 
-/** CSV (dấu ; · UTF-8 BOM do nơi gọi thêm) — 1 dòng / kết quả, nhiều HĐ / nhiều CK nối bằng " | " */
+/**
+ * Bảng kết quả (tiêu đề + dòng) — 1 dòng / kết quả, nhiều HĐ / nhiều CK nối bằng " | " (1 giá trị số thì giữ số → Excel cộng được).
+ * Dùng cho CSV và sheet "Mua-vao" của file Excel Đối soát CK (06/11/2026).
+ */
+export function purchaseReconTable(rows: PurchaseMatchRow[]): { header: string[]; rows: (string | number)[][] } {
+  const j = (xs: (string | number)[]) => xs.length === 1 ? xs[0] : xs.join(' | ');
+  const header = ['Kết quả', 'Độ tin cậy', 'Số HĐ', 'Ký hiệu', 'Ngày HĐ', 'MST NCC', 'Tên NCC', 'Tổng TT HĐ', 'Nguồn HĐ',
+    'Ngày CK', 'Số tiền CK', 'Người nhận', 'Diễn giải', 'Mã GD', 'Lệch ngày', 'Ghi chú'];
+  return { header, rows: rows.map(r => [
+    PURCHASE_KIND_LABEL[r.kind], r.confidence, j(r.invoices.map(i => i.no)), j(r.invoices.map(i => i.symbol)), j(r.invoices.map(i => i.date)),
+    j([...new Set(r.invoices.map(i => i.sellerMst))]), j([...new Set(r.invoices.map(i => i.sellerName))]), j(r.invoices.map(i => i.total)),
+    j([...new Set(r.invoices.map(i => i.source === 'xml' ? 'XML' : 'Gmail'))]),
+    j(r.txns.map(t => t.date)), j(r.txns.map(t => t.amount)), j([...new Set(r.txns.map(t => t.counterparty))]), j(r.txns.map(t => t.desc)),
+    j(r.txns.map(t => t.code)), r.days ?? '', r.hint,
+  ]) };
+}
+
+/** CSV (dấu ; · UTF-8 BOM do nơi gọi thêm) — cùng cột purchaseReconTable */
 export function buildPurchaseReconCsv(rows: PurchaseMatchRow[]): string {
   const cell = (v: string | number | null | undefined) => {
     let s = v === null || v === undefined ? '' : String(v);
     if (/^[=+\-@]/.test(s)) s = `'${s}`;
     return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const j = (xs: (string | number)[]) => xs.join(' | ');
-  const head = ['Kết quả', 'Độ tin cậy', 'Số HĐ', 'Ký hiệu', 'Ngày HĐ', 'MST NCC', 'Tên NCC', 'Tổng TT HĐ', 'Nguồn HĐ',
-    'Ngày CK', 'Số tiền CK', 'Người nhận', 'Diễn giải', 'Mã GD', 'Lệch ngày', 'Ghi chú'];
-  return [head.join(';'), ...rows.map(r => [
-    PURCHASE_KIND_LABEL[r.kind], r.confidence, j(r.invoices.map(i => i.no)), j(r.invoices.map(i => i.symbol)), j(r.invoices.map(i => i.date)),
-    j([...new Set(r.invoices.map(i => i.sellerMst))]), j([...new Set(r.invoices.map(i => i.sellerName))]), j(r.invoices.map(i => i.total)),
-    j([...new Set(r.invoices.map(i => i.source === 'xml' ? 'XML' : 'Gmail'))]),
-    j(r.txns.map(t => t.date)), j(r.txns.map(t => t.amount)), j([...new Set(r.txns.map(t => t.counterparty))]), j(r.txns.map(t => t.desc)),
-    j(r.txns.map(t => t.code)), r.days ?? '', r.hint,
-  ].map(cell).join(';'))].join('\r\n');
+  const t = purchaseReconTable(rows);
+  return [t.header.join(';'), ...t.rows.map(r => r.map(cell).join(';'))].join('\r\n');
 }

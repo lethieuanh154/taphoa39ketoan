@@ -1,5 +1,6 @@
 :host { display: block; }
 
+.recon-page.embedded { max-width: none; padding: 0; }
 .recon-page {
   max-width: 1200px;
   padding: 1rem 1.25rem 2rem;
