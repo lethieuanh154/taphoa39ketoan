@@ -328,6 +328,9 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
     Mã HĐ KiotViet · Khoản · MST đối tác · Tên đối tác · Trạng thái HĐĐT · Ghi chú. Sắp theo thời gian GD.
   - Thu lập phiếu khi có số HĐĐT CQT chấp nhận và không nháp / phát hành trễ; Chi lập phiếu khi khớp HĐ và độ tin cậy ≠ thấp
     (1 CK trả nhiều HĐ → Số HĐ nối ", "; 1 HĐ trả nhiều lần → lặp HĐ ở từng GD). Chưa chọn XML → GD tiền ra vẫn liệt kê, "Chưa đối soát".
+  - Định dạng (06/11/2026): tiêu đề nền xanh đậm chữ trắng, viền mảnh, số `#,##0`. **Màu dòng**: xanh = khớp / lập phiếu theo HĐ ·
+    vàng = khớp nhưng cần xem (lệch giờ, tin cậy thấp) · đỏ = không khớp / không lập (thiếu, thừa, HĐĐT nháp / phát hành trễ, ghi chú lệch).
+    Nhap-VietDA chỉ xanh / đỏ theo cột "Lập phiếu theo HĐ". Cột kết quả in đậm cùng màu (`XlsxSheet.tones` / `emphasisCols`).
   - Các sheet chi tiết = đúng cột CSV cũ (`reconTable` / `multiTransferTable` / `excessTransferTable` trong util mirror, `purchaseReconTable`).
 - Nút nhỏ "CSV cho tool VietDA (bản cũ)" = `doi-soat-ck_*.csv` như trước — tool `tools/vietda-xml-import` bản hiện tại còn đọc file
   này; bỏ khi tool đọc được sheet `Nhap-VietDA`.

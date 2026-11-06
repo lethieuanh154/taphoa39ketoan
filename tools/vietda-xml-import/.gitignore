@@ -2,3 +2,5 @@
 Input/*
 !Input/HUONG-DAN.txt
 Output/
+xml/*
+!xml/HUONG-DAN.txt

@@ -1,4 +1,4 @@
 Copy vao day: sao ke TPBank (.xlsx) + Excel Doi soat CK (doi-soat-ck_<tu>_<den>.xlsx, trang Doi soat CK > Xuat Excel) + danh muc Doi tuong xuat tu VietDA (DANH SACH.xlsx).
 (CSV doi-soat-ck_*.csv cu van doc duoc mot thoi gian, nhung nen dung file Excel.)
 Tool doc HET cac file trong thu muc nay (gop lai). Chay xong co the xoa / chuyen file cu di.
-Ket qua: thu muc Output\<ngay-gio>\ (ket-qua-chay.csv + tom-tat.txt + VietDA-bang-ke-*.xlsx).
+Ket qua: thu muc Output\<ngay-gio>\ (ket-qua-chay.xlsx: xanh la = dat, do = bo qua / loi / sai; + tom-tat.txt).

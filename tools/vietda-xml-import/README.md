@@ -4,8 +4,8 @@
 
 | Sao kê | Phiếu VietDA | Đối tượng | Lý do |
 |---|---|---|---|
-| Ghi có | Phiếu thu tiền gửi (báo có) | người mua trong **XML HĐ bán ra** cùng Số HĐĐT: không có MST → **`KH010` "Bán cho người tiêu dùng"** (`-RetailObject`); có MST → mã theo danh mục | `Thu tiền bán hàng theo HD <số HĐĐT>` — Số HĐ + Ký hiệu HĐ lấy từ **Excel Đối soát CK** (`doi-soat-ck_*.xlsx`, sheet `Nhap-VietDA`) theo Mã GD |
-| Ghi nợ | Phiếu chi tiền gửi (báo nợ) | **MST đối tác** trong Excel Đối soát CK → mã theo danh mục | `Chuyển trả tiền hàng theo HD <số HĐ>` — Số HĐ lấy từ Excel (1 CK trả nhiều HĐ → `123, 124`) |
+| Ghi có | Phiếu thu tiền gửi (báo có) | người mua trong **XML HĐ bán ra** cùng Số HĐĐT: không có MST → **`KH010` "Bán cho người tiêu dùng"** (`-RetailObject`); có MST → mã theo danh mục | `Thu tiền bán hàng theo HD <số HĐĐT> ngày dd/mm/yyyy` (ngày = NLap trong XML bán ra) — Số HĐ + Ký hiệu HĐ lấy từ **Excel Đối soát CK** (`doi-soat-ck_*.xlsx`, sheet `Nhap-VietDA`) theo Mã GD |
+| Ghi nợ | Phiếu chi tiền gửi (báo nợ) | **MST đối tác** trong Excel Đối soát CK → mã theo danh mục | `Chuyển trả tiền hàng theo HD <số HĐ> ngày dd/mm/yyyy` (ngày = cột Ngày HĐ của Excel; nhiều HĐ khác ngày → `HD 123 ngày 01/09/2026, 124 ngày 02/09/2026`) — Số HĐ lấy từ Excel (1 CK trả nhiều HĐ → `123, 124`) |
 
 Mỗi GD sao kê đúng 1 phiếu (khách lẻ cũng vậy, không gộp theo ngày).
 
@@ -34,8 +34,10 @@ Ngày phiếu = ngày giao dịch. Số tiền = số tiền sao kê (VietDA t�
 
 1. Mở VietDA, đăng nhập đúng file dữ liệu. Không để hộp thoại nào mở. Tool **tự mở** menu Thu chi > Phiếu thu/chi tiền gửi.
 2. Copy sao kê TPBank `.xlsx` + **Excel Đối soát CK `doi-soat-ck_*.xlsx`** (trang Đối soát CK > Xuất Excel) + danh mục Đối tượng vào **`Input\`** cạnh script (nhiều file được: tool gộp, GD trùng Mã GD giữa các file chỉ lấy 1). Thiếu file → tool mở thư mục `Input` rồi dừng. `-Statement` / `-Recon` (`.xlsx` hoặc `.csv` cũ) vẫn dùng được khi chạy dòng lệnh.
-3. Double-click `Nhap-SaoKe-vao-VietDA.bat` → chọn thư mục XML đầu vào (chỉ khi có làm phiếu chi) → xem danh sách → gõ `Y`.
+3. Bỏ XML hóa đơn vào thư mục **`xml\`** cạnh tool (hoặc `Input\xml\`): `xml\sold\` = bán ra, `xml\purchase\` = mua vào (tool quét cả thư mục con, tự tách theo MST công ty). Từ 06/11/2026 tool **không hỏi chọn thư mục** nữa; thiếu thư mục → mở thư mục tool rồi dừng. `-XmlFolder` vẫn dùng được khi chạy dòng lệnh.
+4. Double-click `Nhap-SaoKe-vao-VietDA.bat` → xem danh sách → gõ `Y`.
 4. **Không đụng chuột/bàn phím tới khi xong**: grid "Chi tiết thu chi" chỉ nhận bàn phím nên tool chiếm focus VietDA, click + gõ như người. Bấm chỗ khác → tool tự dừng.
+   Thông báo Chrome / Zalo / Windows hiện đè lên chỗ tool sắp click (nút Thêm, Lưu…) → tool **chờ thông báo tự tắt** (tối đa 30 giây, log `Cửa sổ … đè lên`) rồi mới click, không click nhầm vào thông báo; quá 30 giây → DỪNG, ghi tên app. Hay bị thì tắt thông báo app đó / bật Focus assist (Windows: Settings > System > Notifications).
 
 Lần đầu nên chạy thử:
 ```
@@ -97,9 +99,9 @@ Chạy xong (cả khi dừng giữa chừng, cả DRY RUN) tool tự mở thư m
 
 | File | Nội dung |
 |---|---|
-| `ket-qua-chay.csv` | Mỗi GD sao kê 1 dòng (UTF-8, dấu `;`, mở bằng Excel): Loại, Mã GD, thời gian, số tiền, diễn giải, đối tượng, lý do, **Kết quả chạy** (`Thành công` / `Lỗi` / `Bỏ qua` + lý do / `Đã tạo ở lần chạy trước` / `Chưa chạy (tool dừng trước)` / `Chưa chạy (-Limit)` / `Sẽ tạo (DRY RUN)`), Số CT, **Nguồn** (`Excel` / `CSV cũ` / `Luật khác` / `Diễn giải + XML (cũ)`), **Lý do không lập** (từ Excel đối soát), **Kiểm tra VietDA** (`ĐÚNG` / `SAI: Ngày, Số tiền, Lý do, Đối tượng` / `KHÔNG THẤY trên VietDA`) + Ngày / Họ tên / Lý do / Số tiền đọc từ bảng kê |
+| `ket-qua-chay.xlsx` | Mỗi GD sao kê 1 dòng (từ 06/11/2026 là `.xlsx` để tô màu: ô **Kết quả chạy** / **Kiểm tra VietDA** xanh lá = `Thành công` / `ĐÚNG` / `Đã tạo ở lần chạy trước` / `Sẽ tạo (DRY RUN)`, đỏ = còn lại; không ghi được `.xlsx` → ghi tạm `ket-qua-chay.csv`): Loại, Mã GD, thời gian, số tiền, diễn giải, đối tượng, lý do, **Kết quả chạy** (`Thành công` / `Lỗi` / `Bỏ qua` + lý do / `Đã tạo ở lần chạy trước` / `Chưa chạy (tool dừng trước)` / `Chưa chạy (-Limit)` / `Sẽ tạo (DRY RUN)`), Số CT, **Nguồn** (`Excel` / `CSV cũ` / `Luật khác` / `Diễn giải + XML (cũ)`), **Lý do không lập** (từ Excel đối soát), **Kiểm tra VietDA** (`ĐÚNG` / `SAI: Ngày, Số tiền, Lý do, Đối tượng` / `KHÔNG THẤY trên VietDA`) + Ngày / Họ tên / Lý do / Số tiền đọc từ bảng kê |
 | `tom-tat.txt` | file đầu vào, đếm theo kết quả, ghi chú xuất bảng kê |
-| `VietDA-bang-ke-Thu.xlsx`, `VietDA-bang-ke-Chi.xlsx` | bảng kê của chính VietDA: Thu chi > **Tìm kiếm chứng từ** (Ngày chứng từ từ/đến = ngày GD đầu/cuối trong sao kê, Loại chứng từ = tiền tố Số CT `TG` / `CG`, các lọc khác VietDA còn nhớ bị xóa) > **Hiển thị** > nút **Excel** → tool lưu file Excel VietDA mở ra (Book1) rồi đóng |
+| (không lưu file) | Kiểm tra VietDA đọc bảng kê của chính VietDA: Thu chi > **Tìm kiếm chứng từ** (Ngày chứng từ từ/đến = ngày GD đầu/cuối trong sao kê, Loại chứng từ = tiền tố Số CT `TG` / `CG`, các lọc khác VietDA còn nhớ bị xóa) > **Hiển thị** > nút **Excel** → tool đọc file Excel VietDA mở ra (Book1) rồi đóng **không lưu** (từ 06/11/2026 bỏ `VietDA-bang-ke-*.xlsx` khỏi Output) |
 
 - Kiểm tra theo Số CT tool đã tạo (lần này + sổ `_vietda-ck-da-nhap.txt`); không xét phiếu trùng / phiếu tạo tay.
 - Tiền tố Số CT mỗi loại phiếu tool nhớ ở `_vietda-loai-ct.txt` (`Thu=TG`, `Chi=CG`) sau lần đầu mở phiếu loại đó; chưa biết → không xuất bảng kê loại đó.

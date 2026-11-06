@@ -58,7 +58,11 @@ describe('bank-recon-export.util', () => {
     expect(names).toEqual(['Nhap-VietDA', 'Ban-ra_Doi-soat', 'Ban-ra_CK-nhieu-lan', 'Ban-ra_CK-du', 'Mua-vao', 'Thong-tin']);
     const s1 = strFromU8(files['xl/worksheets/sheet1.xml']);
     for (const h of VIETDA_HEADER) expect(s1).toContain(`<t xml:space="preserve">${h}</t>`);
-    expect(s1).toMatch(/<c r="E2" s="2"><v>99000<\/v><\/c>/);
+    // màu dòng: style = 2 + tone×3 + (0 chữ | 1 số | 2 chữ đậm) — tone 1 = ok (xanh), 3 = bad (đỏ)
+    expect(s1).toMatch(/<c r="E2" s="12"><v>99000<\/v><\/c>/);   // T3 GD thừa → đỏ
+    expect(s1).toMatch(/<c r="E3" s="6"><v>500000<\/v><\/c>/);   // D1 khớp → xanh
+    expect(s1).toMatch(/<c r="J3" t="inlineStr" s="7">/);         // cột "Lập phiếu theo HĐ" đậm xanh
+    expect(strFromU8(files['xl/styles.xml'])).toContain('FFE2F0D9');
     expect(strFromU8(files['xl/worksheets/sheet6.xml'])).toContain(EXPORT_SCHEMA);
   });
 });

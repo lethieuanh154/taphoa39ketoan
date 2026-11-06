@@ -20,9 +20,9 @@
   Người bán / người mua XML → mã: _vietda-map-mst.csv (MST;Mã, tự ghi tay) → mã = MST → tên trùng (bỏ dấu, hoa/thường).
   Thư mục XML chứa cả mua vào + bán ra (quét thư mục con); tool tách theo MST công ty (MST có trong nhiều XML nhất).
 
-  Đầu vào: mọi sao kê *.xlsx + CSV Đối soát CK *.csv trong thư mục Input\ cạnh script (gộp lại); chỉ hỏi chọn thư mục XML.
-  Chạy xong: Output\<ngày-giờ>\ có ket-qua-chay.csv + tom-tat.txt (từng GD: thành công / lỗi / bỏ qua + Đúng/Sai so với VietDA)
-  và VietDA-bang-ke-*.xlsx (Thu chi > Tìm kiếm chứng từ theo khoảng ngày sao kê > Hiển thị > Excel).
+  Đầu vào: mọi sao kê *.xlsx + CSV Đối soát CK *.csv trong thư mục Input\ cạnh script (gộp lại); XML hóa đơn trong <tool>\xml (hoặc Input\xml): sold\ + purchase\, không hỏi chọn.
+  Chạy xong: Output\<ngày-giờ>\ có ket-qua-chay.xlsx (từng GD: thành công / lỗi / bỏ qua + Đúng/Sai so với VietDA, tô xanh/đỏ)
+  + tom-tat.txt. Đúng/Sai đọc từ bảng kê VietDA (Thu chi > Tìm kiếm chứng từ > Hiển thị > Excel), bảng kê không lưu lại.
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File vietda-bank-import.ps1 -DryRun
@@ -141,6 +141,13 @@ public static class Vdb {
     public static void Press(IntPtr dlg, int id) { PostMessage(dlg, WM_COMMAND, (IntPtr)id, GetDlgItem(dlg, id)); }
     // BM_CLICK: bấm nút WinForms không cần chuột/focus
     public static void ClickButton(IntPtr b) { PostMessage(b, 0xF5, IntPtr.Zero, IntPtr.Zero); }
+
+    // Cửa sổ (gốc) đang nằm trên điểm (x,y) — phát hiện thông báo Chrome / Zalo / Windows đè lên nút VietDA trước khi click
+    [StructLayout(LayoutKind.Sequential)] public struct PT { public int X; public int Y; }
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(PT p);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h, uint flags);
+    public static IntPtr RootAt(int x, int y) { PT p; p.X = x; p.Y = y; IntPtr h = WindowFromPoint(p); return h == IntPtr.Zero ? h : GetAncestor(h, 2); }
+    public static int PidOf(IntPtr h) { uint pid; GetWindowThreadProcessId(h, out pid); return (int)pid; }
 
     public static void Click(int x, int y) {
         SetCursorPos(x, y);
@@ -336,6 +343,19 @@ $InputDir = Join-Path $ToolDir 'Input'
 $OutDir = Join-Path (Join-Path $ToolDir 'Output') (Get-Date -Format 'yyyy-MM-dd_HHmmss')
 $FormTitles = @{ 'Phiếu thu tiền gửi' = 'Thu'; 'Phiếu chi tiền gửi' = 'Chi' }
 $ReasonPrefix = @{ Thu = 'Thu tiền bán hàng theo HD '; Chi = 'Chuyển trả tiền hàng theo HD ' }
+
+# Lý do = tiền tố + số HĐ + "ngày dd/mm/yyyy" (06/11/2026). $Refs = @(@{ Number; Date }) theo thứ tự HĐ; Date 'yyyy-mm-dd' (XML)
+# hoặc 'dd/mm/yyyy' (Excel). Cùng 1 ngày → "HD 123, 124 ngày 01/09/2026"; khác ngày → "HD 123 ngày 01/09/2026, 124 ngày 02/09/2026".
+function Format-InvoiceRef([string]$M, $Refs) {
+    $vi = { param($d) $d = [string]$d; if ($d -match '^(\d{4})-(\d{2})-(\d{2})') { "$($Matches[3])/$($Matches[2])/$($Matches[1])" } elseif ($d -match '^\d{2}/\d{2}/\d{4}') { $d.Substring(0, 10) } else { '' } }
+    $items = @($Refs | ForEach-Object { [pscustomobject]@{ N = [string]$_.Number; D = (& $vi $_.Date) } })
+    $dates = @($items | ForEach-Object { $_.D } | Select-Object -Unique)
+    $text = if ($dates.Count -eq 1 -and $dates[0]) { (($items | ForEach-Object { $_.N }) -join ', ') + " ngày $($dates[0])" }
+        else { ($items | ForEach-Object { if ($_.D) { "$($_.N) ngày $($_.D)" } else { $_.N } }) -join ', ' }
+    $missing = @($items | Where-Object { -not $_.D }).Count
+    if ($missing) { Write-Log WARN "[$M] Lý do HD $(($items | ForEach-Object { $_.N }) -join ', '): $missing HĐ không có ngày → ghi số HĐ không kèm ngày" }
+    return $ReasonPrefix[$M] + $text
+}
 # GD KHÔNG qua Đối soát CK / XML: nhận theo nội dung CK sao kê (bỏ dấu, hoa/thường) → lý do chuẩn + đối tượng + TK gõ vào lưới.
 # Object 'RETAIL' = mã Khách lẻ (-RetailObject). Thứ tự = ưu tiên khi diễn giải khớp nhiều loại.
 $OtherKinds = @(
@@ -382,11 +402,23 @@ function Get-InputFiles([string]$Ext, [string]$What) {
     return $files
 }
 
-function Pick-Folder([string]$Title) {
-    $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dlg.Description = $Title
-    if ($dlg.ShowDialog() -ne 'OK') { Fail "Đã hủy: $Title" }
-    return $dlg.SelectedPath
+# Thư mục XML cố định (06/11/2026, bỏ hộp chọn thư mục): <tool>\xml hoặc <tool>\Input\xml, trong có sold\ + purchase\
+# (quét cả thư mục con nên tên con không bắt buộc). Không có → mở thư mục tool rồi dừng.
+function Find-XmlFolder {
+    $cands = @((Join-Path $ToolDir 'xml'), (Join-Path $InputDir 'xml'))
+    # chỉ tính thư mục có file .xml (thư mục xml\ trong zip tải về chỉ có HUONG-DAN.txt)
+    $found = @($cands | Where-Object { (Test-Path -LiteralPath $_ -PathType Container) -and @(Get-ChildItem -LiteralPath $_ -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1).Count })
+    if (-not $found.Count) {
+        $open = @($cands | Where-Object { Test-Path -LiteralPath $_ -PathType Container }) + @($ToolDir)
+        Start-Process explorer.exe $open[0]
+        Fail "Chưa có XML hóa đơn trong $($cands -join ' / ') — bỏ XML vào xml\sold (bán ra) + xml\purchase (mua vào) cạnh tool rồi chạy lại."
+    }
+    if ($found.Count -gt 1) { Write-Log WARN "Cả $($found -join ' và ') đều có XML — chỉ dùng $($found[0])" }
+    $dir = $found[0]
+    foreach ($sub in 'sold', 'purchase') {
+        if (-not (Test-Path -LiteralPath (Join-Path $dir $sub) -PathType Container)) { Write-Log WARN "Thư mục XML $dir không có thư mục con '$sub' (vẫn quét mọi XML trong đó)" }
+    }
+    return $dir
 }
 
 # ---------- Sao kê TPBank (.xlsx) — cùng layout utils/tpbank-statement.util.ts ----------
@@ -551,7 +583,7 @@ function Read-Recon([string]$Path) {
 # Sheet Nhap-VietDA: dòng 1 = tiêu đề, đọc theo TÊN cột; mỗi GD sao kê đúng 1 dòng.
 $ReconSchema = 'taphoa39-doi-soat-ck/1'
 $ReconSheet = 'Nhap-VietDA'
-$ReconCols = @('Loại', 'Mã GD', 'Số tiền', 'Kết quả khớp', 'Lập phiếu theo HĐ', 'Lý do không lập', 'Độ tin cậy', 'Số HĐ', 'Ký hiệu HĐ', 'Tổng HĐ', 'MST đối tác', 'Tên đối tác')
+$ReconCols = @('Loại', 'Mã GD', 'Số tiền', 'Kết quả khớp', 'Lập phiếu theo HĐ', 'Lý do không lập', 'Độ tin cậy', 'Số HĐ', 'Ký hiệu HĐ', 'Ngày HĐ', 'Tổng HĐ', 'MST đối tác', 'Tên đối tác')
 
 function Test-ReconXlsx([string]$Path) { (@(Get-XlsxSheetNames $Path) -contains $ReconSheet) }
 
@@ -592,7 +624,7 @@ function Read-ReconXlsx([string]$Path) {
         $map[$code] = [pscustomobject]@{
             Mode = $mode; Code = $code; Amount = (& $num (& $get $r 'Số tiền'))
             Match = & $get $r 'Kết quả khớp'; Make = ($make -eq 'Có'); NoWhy = $noWhy; Confidence = & $get $r 'Độ tin cậy'
-            Numbers = @(Split-List (& $get $r 'Số HĐ')); Serials = @(Split-List (& $get $r 'Ký hiệu HĐ'))
+            Numbers = @(Split-List (& $get $r 'Số HĐ')); Serials = @(Split-List (& $get $r 'Ký hiệu HĐ')); Dates = @(Split-List (& $get $r 'Ngày HĐ'))
             Total = (& $num (& $get $r 'Tổng HĐ')); Msts = @(Split-List (& $get $r 'MST đối tác')); Name = & $get $r 'Tên đối tác'
         }
     }
@@ -839,11 +871,34 @@ function Send-Keys([string]$Keys) {
     Start-Sleep -Milliseconds $StepDelayMs
 }
 
+# Thông báo (Chrome, Zalo, Windows…) đè lên điểm sắp click → chờ nó tự tắt (tối đa $CoverWaitSec giây) rồi mới click;
+# vẫn còn → dừng, ghi tên cửa sổ đè (để tắt thông báo app đó). Không click vào cửa sổ của app khác.
+$CoverWaitSec = 30
+function Wait-Uncovered([int]$X, [int]$Y) {
+    $deadline = $null
+    $warned = $false
+    while ($true) {
+        $h = [Vdb]::RootAt($X, $Y)
+        if ($h -eq [IntPtr]::Zero -or [Vdb]::PidOf($h) -eq $script:vda.Pid) { break }
+        $who = try { "$((Get-Process -Id ([Vdb]::PidOf($h)) -ErrorAction Stop).ProcessName) '$([Vdb]::TextOf($h))' [$([Vdb]::ClassOf($h))]" } catch { "[$([Vdb]::ClassOf($h))]" }
+        if (-not $deadline) { $deadline = (Get-Date).AddSeconds($CoverWaitSec) }
+        if (-not $warned) { Write-Log WARN "Cửa sổ $who đè lên chỗ tool sắp click ($X,$Y) — chờ nó tắt (tối đa $CoverWaitSec giây)…"; $warned = $true }
+        if ((Get-Date) -gt $deadline) { throw "cửa sổ $who đè lên nút VietDA quá $CoverWaitSec giây — tắt thông báo của app đó (Windows: Settings > System > Notifications / Focus assist) rồi chạy lại" }
+        Start-Sleep -Milliseconds 500
+    }
+    if ($warned) {
+        Write-Log INFO 'Cửa sổ đè đã tắt — click tiếp.'
+        if ([Vdb]::GetForegroundWindow() -ne $script:vda.Main -and -not ($script:extraFg -ne [IntPtr]::Zero -and [Vdb]::GetForegroundWindow() -eq $script:extraFg)) { [void][Vdb]::Activate($script:vda.Main) }
+        Assert-Foreground
+    }
+}
+
 function Click-Control($Ctl, [int]$Dx = -1, [int]$Dy = -1) {
     Assert-Foreground
     $r = [Vdb]::Rect($Ctl.H)
     $x = if ($Dx -ge 0) { $r.L + $Dx } else { [int](($r.L + $r.R) / 2) }
     $y = if ($Dy -ge 0) { $r.T + $Dy } else { [int](($r.T + $r.B) / 2) }
+    Wait-Uncovered $x $y
     [Vdb]::Click($x, $y)
     Start-Sleep -Milliseconds $StepDelayMs
 }
@@ -890,8 +945,9 @@ function Invoke-Button($Button, [string]$What, [int]$TimeoutSec = 60) {
 }
 
 # Sau khi đổi Ngày: chờ hộp hỏi đánh lại Số CT (Yes); hộp khác → FATAL. Trả $null nếu ổn.
-function Wait-DateDialog {
-    $deadline = (Get-Date).AddMilliseconds(1500)
+# $TimeoutMs: khác tháng Số CT → 1500 (hộp CHẮC hiện, thoát ngay khi thấy); cùng tháng → ngắn (chỉ bắt hộp lạ), không chờ phí 1,5 giây/phiếu
+function Wait-DateDialog([int]$TimeoutMs = 1500) {
+    $deadline = (Get-Date).AddMilliseconds($TimeoutMs)
     while ((Get-Date) -lt $deadline) {
         Start-Sleep -Milliseconds 150
         $dlgs = @([Vdb]::Dialogs($script:vda.Pid))
@@ -917,12 +973,16 @@ function Invoke-Voucher($Item) {
     # phiếu trước đã Lưu + Thêm → phiếu đang mở phải trống
     if ((Digits ([Vdb]::TextOf($c.Total.H))) -ne 0) { return New-Result FATAL "phiếu đang mở đã có dữ liệu (Tổng thanh toán $([Vdb]::TextOf($c.Total.H))) — bấm Thêm/mở phiếu mới rồi chạy lại" }
 
+    # tháng của Số CT trước khi đổi Ngày (TG006/08 → 08); không đọc được → coi như khác tháng (chờ đủ)
+    $soCtBefore = [Vdb]::TextOf($c.SoCt.H)
+    $sameMonth = $soCtBefore -match '/(\d{2})\s*$' -and $Matches[1] -eq $Item.Date.Substring(3, 2)
     Click-Control $c.Date 10
     Send-Keys $Item.Date
     if ([Vdb]::TextOf($c.Date.H) -ne $Item.Date) { return New-Result FATAL "không đặt được Ngày (đọc lại: '$([Vdb]::TextOf($c.Date.H))')" }
     # Rời ô Ngày khi tháng khác tháng của Số CT (vd TG006/08, ngày 30/10) → VietDA hỏi "điền lại Số chứng từ tự động?" → Yes (số theo tháng mới)
     Send-Keys '{TAB}'
-    $r = Wait-DateDialog
+    if (-not $sameMonth) { Write-Log INFO "Số CT '$soCtBefore' khác tháng ngày $($Item.Date) → chờ VietDA hỏi điền lại Số CT" }
+    $r = Wait-DateDialog $(if ($sameMonth) { 300 } else { 1500 })
     if ($r) { return $r }
 
     $ok = Set-Field $c.ObjectEdit $Item.Object { ([Vdb]::TextOf($c.ObjectEdit.H) -eq $Item.Object) -and [Vdb]::TextOf($c.ObjectName.H) }
@@ -1156,8 +1216,8 @@ function Read-ListingRows($Ws) {
     return @{ Rows = $list; Info = ($info -join ' · ') }
 }
 
-# Thu chi > Tìm kiếm chứng từ: Ngày từ/đến + Loại chứng từ (xóa các lọc khác VietDA còn nhớ) > Hiển thị > Excel → lưu $File
-function Export-Listing([string]$Prefix, [string]$From, [string]$To, [string]$File) {
+# Thu chi > Tìm kiếm chứng từ: Ngày từ/đến + Loại chứng từ (xóa các lọc khác VietDA còn nhớ) > Hiển thị > Excel → đọc dòng rồi đóng (không lưu)
+function Export-Listing([string]$Prefix, [string]$From, [string]$To) {
     Close-SearchDialog
     foreach ($old in Find-Listings) {
         $quit = @(Get-VisibleKids $old | Where-Object { $_.Cls -like '*BUTTON*' -and $_.Text -eq 'Thoát' }) | Select-Object -First 1
@@ -1229,7 +1289,7 @@ function Export-Listing([string]$Prefix, [string]$From, [string]$To, [string]$Fi
     $wait = (Get-Date).AddSeconds(60)
     while (-not $listing -and (Get-Date) -lt $wait) { Start-Sleep -Milliseconds 300; $listing = @(Find-Listings) | Select-Object -First 1 }
     Close-SearchDialog
-    if (-not $listing) { return @{ Rows = @(); File = ''; Info = "VietDA không ra bảng kê$(if ($r.Message) { " — $($r.Message)" })" } }
+    if (-not $listing) { return @{ Rows = @(); Info = "VietDA không ra bảng kê$(if ($r.Message) { " — $($r.Message)" })" } }
 
     $excel = @(Get-VisibleKids $listing | Where-Object { $_.Cls -like '*BUTTON*' -and $_.Text -eq 'Excel' }) | Select-Object -First 1
     if (-not $excel) { throw "bảng kê không có nút Excel" }
@@ -1247,7 +1307,7 @@ function Export-Listing([string]$Prefix, [string]$From, [string]$To, [string]$Fi
             if ([Vdb]::ButtonCount($d) -le 1) {
                 [Vdb]::Press($d, $(if ([Vdb]::GetDlgItem($d, 1) -ne [IntPtr]::Zero) { 1 } else { 2 }))
                 Close-ToolTabs | Out-Null
-                return @{ Rows = @(); File = ''; Info = "bấm Excel, VietDA báo: $text" }
+                return @{ Rows = @(); Info = "bấm Excel, VietDA báo: $text" }
             }
             throw "bấm Excel, VietDA hỏi: $text (để nguyên cho người dùng xử lý)"
         }
@@ -1274,15 +1334,12 @@ function Export-Listing([string]$Prefix, [string]$From, [string]$To, [string]$Fi
         try { $parsed = Read-ListingRows $wb.Worksheets.Item(1) }
         catch { if ($try -eq 5 -or $_.Exception.Message -match 'bảng kê VietDA') { throw }; Start-Sleep -Milliseconds 700 }
     }
-    if (-not (Test-Path -LiteralPath $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
+    # 06/11/2026: chỉ đọc để kiểm Đúng/Sai, KHÔNG lưu VietDA-bang-ke-*.xlsx vào Output (user: không cần)
     $app = $wb.Application
-    $alerts = $app.DisplayAlerts
-    $app.DisplayAlerts = $false
-    try { $wb.SaveAs($File, 51) } finally { $app.DisplayAlerts = $alerts }
     $wb.Close($false)
     try { if ($app.Workbooks.Count -eq 0) { $app.Quit() } } catch { }
     Close-ToolTabs | Out-Null
-    return @{ Rows = $parsed.Rows; File = $File; Info = $parsed.Info }
+    return @{ Rows = $parsed.Rows; Info = $parsed.Info }
 }
 
 # Xuất bảng kê VietDA cho từng loại phiếu (khoảng ngày = ngày GD sao kê) rồi so từng Số CT tool đã tạo
@@ -1309,13 +1366,12 @@ function Invoke-Verify {
         if (-not $dates.Count) { $notes.Add("[$tag] sao kê không có GD → không xuất bảng kê"); continue }
         $from = $dates[0].ToString('dd/MM/yyyy', $inv)
         $to = $dates[-1].ToString('dd/MM/yyyy', $inv)
-        $file = Join-Path $OutDir "VietDA-bang-ke-$tag.xlsx"
         Write-Log INFO "[$tag] Tìm kiếm chứng từ $p từ $from đến $to → Excel — KHÔNG đụng chuột/bàn phím..."
         try {
-            $res = Export-Listing $p $from $to $file
+            $res = Export-Listing $p $from $to
             foreach ($x in $res.Rows) { $listing[$x.SoCt] = $x }
             foreach ($m in $ms) { $checked[$m] = $true }
-            $msg = "[$tag] bảng kê VietDA $p $from → $to`: $($res.Rows.Count) phiếu$(if ($res.File) { " → $(Split-Path $res.File -Leaf)" })$(if ($res.Info) { " ($($res.Info))" })"
+            $msg = "[$tag] bảng kê VietDA $p $from → $to`: $($res.Rows.Count) phiếu$(if ($res.Info) { " ($($res.Info))" })"
             Write-Log OK $msg
             $notes.Add($msg)
         } catch {
@@ -1346,13 +1402,86 @@ $ReportCols = @(
     @('Nguồn', 'Source'), @('Lý do không lập', 'NoWhy'),
     @('Kiểm tra VietDA', 'Check'), @('Ngày (VietDA)', 'VdDate'), @('Họ tên (VietDA)', 'VdName'), @('Lý do (VietDA)', 'VdReason'), @('Số tiền (VietDA)', 'VdAmount'))
 
-# CSV (UTF-8 BOM, dấu ;) mở thẳng bằng Excel; tóm tắt ghi tom-tat.txt
+# Ô trạng thái tô màu (06/11/2026): xanh lá = đạt, đỏ = còn lại (bỏ qua, lỗi, SAI, KHÔNG THẤY, chưa chạy…)
+$ColorCols = @('Result', 'Check')
+$PassValues = '^(Thành công|ĐÚNG|Đã tạo ở lần chạy trước|Sẽ tạo \(DRY RUN\))$'
+$NumberCols = @('Amount', 'VdAmount')
+
+# .xlsx tự ghi (OOXML tối giản, không cần Excel — tránh lỗi định dạng số theo locale VN): dòng 1 tiêu đề đậm, cố định khi cuộn, có lọc;
+# style 0 thường · 1 tiêu đề · 2 số #,##0 · 3 xanh lá · 4 đỏ
+function Write-XlsxReport([string]$Path, [object[]]$Rows) {
+    $esc = { param($s) [Security.SecurityElement]::Escape(([string]$s -replace '[\x00-\x08\x0B\x0C\x0E-\x1F]', '')) }
+    $colName = { param($i) $s = ''; for ($n = $i + 1; $n -gt 0; $n = [Math]::Floor(($n - 1) / 26)) { $s = [char](65 + (($n - 1) % 26)) + $s }; $s }
+    $cell = {
+        param($ref, $v, [int]$style)
+        if ($null -eq $v -or [string]$v -eq '') { return '' }
+        if ($v -is [long] -or $v -is [int] -or $v -is [double]) { return "<c r=`"$ref`" s=`"$(if ($style) { $style } else { 2 })`"><v>$([Convert]::ToString($v, [Globalization.CultureInfo]::InvariantCulture))</v></c>" }
+        $st = if ($style) { ' s="' + $style + '"' } else { '' }
+        '<c r="' + $ref + '" t="inlineStr"' + $st + '><is><t xml:space="preserve">' + (& $esc $v) + '</t></is></c>'
+    }
+    $nCol = $ReportCols.Count
+    $widths = @(for ($c = 0; $c -lt $nCol; $c++) {
+        $p = $ReportCols[$c][1]
+        $w = ([string]$ReportCols[$c][0]).Length + 2
+        foreach ($r in $Rows | Select-Object -First 2000) { $l = ([string]$r.$p).Length + 2; if ($l -gt $w) { $w = $l } }
+        [Math]::Min(60, [Math]::Max(8, $w))
+    })
+    $sb = New-Object Text.StringBuilder
+    [void]$sb.Append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">')
+    [void]$sb.Append('<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>')
+    for ($c = 0; $c -lt $nCol; $c++) { [void]$sb.Append("<col min=`"$($c + 1)`" max=`"$($c + 1)`" width=`"$($widths[$c])`" customWidth=`"1`"/>") }
+    [void]$sb.Append('</cols><sheetData><row r="1">')
+    for ($c = 0; $c -lt $nCol; $c++) { [void]$sb.Append((& $cell "$(& $colName $c)1" $ReportCols[$c][0] 1)) }
+    [void]$sb.Append('</row>')
+    $i = 1
+    foreach ($r in $Rows) {
+        $i++
+        [void]$sb.Append("<row r=`"$i`">")
+        for ($c = 0; $c -lt $nCol; $c++) {
+            $p = $ReportCols[$c][1]
+            $v = $r.$p
+            $style = 0
+            if ($ColorCols -contains $p -and [string]$v) { $style = if ([string]$v -match $PassValues) { 3 } else { 4 } }
+            if ($NumberCols -contains $p -and [string]$v -match '^-?\d+$') { $v = [long]$v }
+            [void]$sb.Append((& $cell "$(& $colName $c)$i" $v $style))
+        }
+        [void]$sb.Append('</row>')
+    }
+    [void]$sb.Append("</sheetData><autoFilter ref=`"A1:$(& $colName ($nCol - 1))$i`"/></worksheet>")
+    $parts = [ordered]@{
+        '[Content_Types].xml' = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'
+        '_rels/.rels' = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'
+        'xl/workbook.xml' = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Ket-qua" sheetId="1" r:id="rId1"/></sheets></workbook>'
+        'xl/_rels/workbook.xml.rels' = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'
+        'xl/styles.xml' = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF006100"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF9C0006"/><name val="Calibri"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF5"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="3" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'
+        'xl/worksheets/sheet1.xml' = $sb.ToString()
+    }
+    if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }
+    $fs = [IO.File]::Open($Path, [IO.FileMode]::CreateNew)
+    $zip = New-Object IO.Compression.ZipArchive($fs, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        $utf8 = New-Object Text.UTF8Encoding($false)
+        foreach ($k in $parts.Keys) {
+            $w = New-Object IO.StreamWriter($zip.CreateEntry($k).Open(), $utf8)
+            try { $w.Write($parts[$k]) } finally { $w.Dispose() }
+        }
+    } finally { $zip.Dispose(); $fs.Dispose() }
+}
+
+# ket-qua-chay.xlsx (ô Kết quả chạy / Kiểm tra VietDA tô xanh lá / đỏ); tóm tắt ghi tom-tat.txt
 function Write-Report([string]$Path, $Summary) {
     if (-not (Test-Path -LiteralPath $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
     $inv = [Globalization.CultureInfo]::InvariantCulture
     $rows = @($script:rows | Sort-Object @{ e = { [Array]::IndexOf([string[]]$modes, $_.Mode) } }, @{ e = { [DateTime]::ParseExact($_.DateTime, 'dd/MM/yyyy HH:mm:ss', $inv) } })
-    $sel = @($ReportCols | ForEach-Object { $p = $_[1]; @{ n = $_[0]; e = [scriptblock]::Create("`$_.$p") } })
-    $rows | Select-Object $sel | Export-Csv -LiteralPath $Path -Delimiter ';' -NoTypeInformation -Encoding UTF8
+    try { Write-XlsxReport $Path $rows }
+    catch {
+        # không ghi được .xlsx (file đang mở…) → vẫn để lại CSV để không mất kết quả
+        $csv = [IO.Path]::ChangeExtension($Path, '.csv')
+        Write-Log ERROR "Ghi $(Split-Path $Path -Leaf) lỗi: $($_.Exception.Message) → ghi tạm $(Split-Path $csv -Leaf)"
+        $sel = @($ReportCols | ForEach-Object { $p = $_[1]; @{ n = $_[0]; e = [scriptblock]::Create("`$_.$p") } })
+        $rows | Select-Object $sel | Export-Csv -LiteralPath $csv -Delimiter ';' -NoTypeInformation -Encoding UTF8
+        $Path = $csv
+    }
     $sumFile = Join-Path $OutDir 'tom-tat.txt'
     @($Summary.Keys | ForEach-Object { "{0}: {1}" -f $_, $Summary[$_] }) | Set-Content -LiteralPath $sumFile -Encoding UTF8
     Write-Log OK "Kết quả chạy → $Path ($($rows.Count) dòng) + $(Split-Path $sumFile -Leaf)"
@@ -1400,7 +1529,7 @@ if ($modes -contains 'Thu' -and $reconXlsx.Count -eq 0 -and $reconCsv.Count -eq 
 }
 $recons = @($reconXlsx) + @($reconCsv)
 foreach ($p in $statements + $recons) { if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { Fail "Không thấy file: $p" } }
-if (-not $XmlFolder) { $XmlFolder = Pick-Folder 'Chọn thư mục XML hóa đơn (mua vào + bán ra, quét cả thư mục con)' }
+if (-not $XmlFolder) { $XmlFolder = Find-XmlFolder }
 if ($XmlFolder -and -not (Test-Path -LiteralPath $XmlFolder -PathType Container)) { Fail "Không thấy thư mục: $XmlFolder" }
 
 $txns = New-Object System.Collections.Generic.List[object]
@@ -1503,7 +1632,7 @@ function Build-Queue([string]$M) {
     $side = if ($M -eq 'Thu') { @($txns | Where-Object { $_.Credit -gt 0 }) } else { @($txns | Where-Object { $_.Debit -gt 0 }) }
     foreach ($t in $side) {
         $key = if ($t.Code) { "$M|$($t.Code)" } else { "$M|$($t.DateTime)|$($t.Debit + $t.Credit)|$($t.Desc)" }
-        # dòng Excel đối soát của GD (nếu có) → cột Nguồn / Lý do không lập của ket-qua-chay.csv
+        # dòng Excel đối soát của GD (nếu có) → cột Nguồn / Lý do không lập của ket-qua-chay.xlsx
         $er = if ($t.Code -and $reconX.ContainsKey($t.Code)) { $reconX[$t.Code] } else { $null }
         $script:rowNoWhy = if ($er -and -not $er.Make) { $er.NoWhy } else { '' }
         $script:rowSource = if ($er) { 'Excel' } elseif ($M -eq 'Thu' -and $t.Code -and $reconMap.ContainsKey($t.Code)) { 'CSV cũ' } elseif ($M -eq 'Chi') { 'Diễn giải + XML (cũ)' } else { '' }
@@ -1575,7 +1704,6 @@ function Build-Queue([string]$M) {
                 [void](Add-Row $M $t 'Bỏ qua' -Note $why)
                 continue
             }
-            $numbers = @($inv | ForEach-Object { $_.Number } | Select-Object -Unique)
             # người mua: XML bán ra cùng Số HĐĐT (+ ký hiệu); không có MST → Khách lẻ; có MST → mã theo danh mục
             $why = ''
             $buyers = New-Object System.Collections.Generic.List[object]
@@ -1607,7 +1735,8 @@ function Build-Queue([string]$M) {
                 [void](Add-Row $M $t 'Bỏ qua' -Note $why)
                 continue
             }
-            $reason = $ReasonPrefix.Thu + ($numbers -join ', ')
+            # ngày HĐ: NLap trong XML bán ra (cùng XML lấy người mua)
+            $reason = Format-InvoiceRef 'Thu' @($buyers | Sort-Object Number -Unique | ForEach-Object { @{ Number = $_.Number; Date = $_.Date } })
             $row = Add-Row $M $t $NotRun '' $objCode $reason $note
             $queue.Add([pscustomobject]@{ Key = $key; Date = $t.Date; Amount = $t.Credit; Object = $objCode; Reason = $reason; Label = $label; Note = $note; Row = $row })
         } elseif ($er) {
@@ -1626,7 +1755,11 @@ function Build-Queue([string]$M) {
                 continue
             }
             $note = "$($er.Name) [Excel đối soát: $($er.Match)$(if ($er.Confidence) { ", tin cậy $($er.Confidence)" }), mã theo $($obj.By)]$(if ($er.Total -and $er.Total -ne $t.Debit) { " · tổng HĐ $('{0:N0}' -f $er.Total) ≠ số tiền CK" })"
-            $reason = $ReasonPrefix.Chi + ($er.Numbers -join ', ')
+            # ngày HĐ theo cột Ngày HĐ của Excel: cùng số lượng → ghép theo thứ tự; 1 ngày → dùng chung; lệch → nối sau
+            $refs = if ($er.Dates.Count -eq $er.Numbers.Count -or $er.Dates.Count -le 1) {
+                    @(for ($j = 0; $j -lt $er.Numbers.Count; $j++) { @{ Number = $er.Numbers[$j]; Date = $(if ($er.Dates.Count -eq $er.Numbers.Count) { $er.Dates[$j] } elseif ($er.Dates.Count) { $er.Dates[0] } else { '' }) } })
+                } else { $null }
+            $reason = if ($refs) { Format-InvoiceRef 'Chi' $refs } else { $ReasonPrefix.Chi + ($er.Numbers -join ', ') + ' ngày ' + ($er.Dates -join ', ') }
             $row = Add-Row $M $t $NotRun '' $obj.Code $reason $note
             $queue.Add([pscustomobject]@{ Key = $key; Date = $t.Date; Amount = $t.Debit; Object = $obj.Code; Reason = $reason; Label = $label; Note = $note; Row = $row })
         } else {
@@ -1650,7 +1783,7 @@ function Build-Queue([string]$M) {
             }
             $sum = ($hit.Invoices | Measure-Object Total -Sum).Sum
             $note = "$($first.SellerName) [khớp HĐ theo $($hit.By), mã theo $($obj.By)]$(if ($sum -ne $t.Debit) { " · LỆCH: tổng HĐ $('{0:N0}' -f $sum)" })"
-            $reason = $ReasonPrefix.Chi + (($hit.Invoices | ForEach-Object { $_.Number }) -join ', ')
+            $reason = Format-InvoiceRef 'Chi' @($hit.Invoices | ForEach-Object { @{ Number = $_.Number; Date = $_.Date } })
             $row = Add-Row $M $t $NotRun '' $obj.Code $reason $note
             $queue.Add([pscustomobject]@{ Key = $key; Date = $t.Date; Amount = $t.Debit; Object = $obj.Code; Reason = $reason; Label = $label; Note = $note; Row = $row })
         }
@@ -1736,7 +1869,7 @@ $summary = [ordered]@{
     'Log' = $LogFile
 }
 Write-Log INFO "Kết quả chạy: $($summary['Kết quả chạy'])$(if ($summary['Kiểm tra VietDA']) { " · Kiểm tra VietDA: $($summary['Kiểm tra VietDA'])" })"
-Write-Report (Join-Path $OutDir 'ket-qua-chay.csv') $summary
+Write-Report (Join-Path $OutDir 'ket-qua-chay.xlsx') $summary
 if (Test-Path -LiteralPath $OutDir) { Start-Process explorer.exe $OutDir }
 
 Write-Log INFO "===== Kết thúc → $OutDir"
