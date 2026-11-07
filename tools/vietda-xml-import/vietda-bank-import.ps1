@@ -49,6 +49,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# -AmountCell truyền tay → dùng đúng vị trí đó, không OCR tìm ô Số tiền
+$script:amountCellGiven = $PSBoundParameters.ContainsKey('AmountCell')
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms, System.IO.Compression
 
@@ -304,14 +306,13 @@ function Await-WinRt($Op, [Type]$T) { $task = $script:asTask.MakeGenericMethod($
 # Chụp vùng màn hình, phóng to $Scale lần rồi OCR → các dòng { Text, X, Y } (tọa độ màn hình, tâm dòng)
 # X/Y/W/H và kết quả theo tọa độ của tool; chụp theo pixel thật (× $script:screenScale) để đúng khi Windows Scale ≠ 100%
 $script:screenScale = [Vdb]::ScreenScale()
-function Ocr-Screen([int]$X, [int]$Y, [int]$W, [int]$H, [int]$Scale = 3, [string]$SaveTo = '') {
+function Ocr-Screen([int]$X, [int]$Y, [int]$W, [int]$H, [int]$Scale = 3) {
     Init-Ocr
     $s = $script:screenScale
     $bmp = New-Object Drawing.Bitmap ([Math]::Max(1, [int][Math]::Round($W * $s))), ([Math]::Max(1, [int][Math]::Round($H * $s)))
     $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen([int][Math]::Round($X * $s), [int][Math]::Round($Y * $s), 0, 0, $bmp.Size); $g.Dispose()
     $big = New-Object Drawing.Bitmap ($W * $Scale), ($H * $Scale)
     $g = [Drawing.Graphics]::FromImage($big); $g.InterpolationMode = 'HighQualityBicubic'; $g.DrawImage($bmp, 0, 0, $big.Width, $big.Height); $g.Dispose(); $bmp.Dispose()
-    if ($SaveTo) { try { $big.Save($SaveTo, [Drawing.Imaging.ImageFormat]::Png) } catch { Write-Log WARN "không lưu được ảnh chẩn đoán $SaveTo`: $($_.Exception.Message)" } }
     $ms = New-Object IO.MemoryStream
     $big.Save($ms, [Drawing.Imaging.ImageFormat]::Png); $big.Dispose()
     $ras = New-Object Windows.Storage.Streams.InMemoryRandomAccessStream
@@ -746,16 +747,14 @@ function Click-ThuChiItem([string]$Want, [string]$What) {
     $bar = @($kids | Where-Object { $_.Name -eq 'mainMenu' -and $_.Ht -gt 0 }) | Select-Object -First 1
     if (-not $bar) { $bar = @($kids | Where-Object { $_.Ht -ge 15 -and $_.Ht -le 40 } | Sort-Object T) | Select-Object -First 1 }
     if (-not $bar) { throw 'không thấy thanh menu VietDA' }
-    $diag = Join-Path $PSScriptRoot '_vietda-menu.png'
-    $line = @(Ocr-Screen $bar.L $bar.T ([Math]::Min($bar.W, 900)) $bar.Ht 3 $diag)
+    $line = @(Ocr-Screen $bar.L $bar.T ([Math]::Min($bar.W, 900)) $bar.Ht 3)
     $words = @($line | ForEach-Object { $_.Words })
     $hit = $null
     for ($i = 0; $i -lt $words.Count -and -not $hit; $i++) {
         if ($words[$i].Text -match '(?i)^Th[uưúùủũụ]-?ch[iíìỉĩị]') { $hit = $words[$i]; $hit.X -= 10 }
         elseif ($i -lt $words.Count - 1 -and $words[$i].Text -match '(?i)^Th[uưúùủũụ]$' -and $words[$i + 1].Text -match '(?i)^ch[iíìỉĩị]') { $hit = $words[$i] }
     }
-    if (-not $hit) { throw "OCR không thấy menu 'Thu chi' (đọc được: '$(($line | ForEach-Object { $_.Text }) -join ' / ')'; thanh menu $($bar.L),$($bar.T) $($bar.W)x$($bar.Ht), Scale màn hình $([Math]::Round($script:screenScale * 100))%) — ảnh vùng đã đọc: $diag" }
-    Remove-Item -LiteralPath $diag -ErrorAction SilentlyContinue
+    if (-not $hit) { throw "OCR không thấy menu 'Thu chi' (đọc được: '$(($line | ForEach-Object { $_.Text }) -join ' / ')'; thanh menu $($bar.L),$($bar.T) $($bar.W)x$($bar.Ht), Scale màn hình $([Math]::Round($script:screenScale * 100))%)" }
     Write-Log INFO "Menu 'Thu chi' ở $($hit.X),$($hit.Y) (Scale màn hình $([Math]::Round($script:screenScale * 100))%)"
 
     $drop = $null
@@ -903,6 +902,45 @@ function Click-Control($Ctl, [int]$Dx = -1, [int]$Dy = -1) {
     Start-Sleep -Milliseconds $StepDelayMs
 }
 
+# Ô Số tiền dòng 1 (độ lệch so với góc grid, tọa độ của tool). -AmountCell cố định 280,46 lệch khi Windows Scale ≠ 100% / cột
+# rộng khác → OCR dòng tiêu đề grid tìm chữ "Số tiền": X = giữa chữ đó, Y = tâm dòng 1 (ước lượng: tiêu đề cao 2×(tâm chữ − mép
+# trên), dòng 1 cao bằng tiêu đề → tâm dòng 1 ≈ 3×). Người dùng tự truyền -AmountCell → dùng đúng số đó. OCR không thấy → -AmountCell.
+$script:amountPt = $null
+$script:amountBy = ''
+function Get-AmountCell($Grid) {
+    if ($script:amountPt) { return $script:amountPt }
+    $pt = @($AmountCell[0], $AmountCell[1])
+    $script:amountBy = "-AmountCell $($AmountCell -join ',')"
+    if (-not $script:amountCellGiven) {
+        $r = [Vdb]::Rect($Grid.H)
+        $w = $r.R - $r.L
+        $h = [Math]::Min(70, $r.B - $r.T)
+        try {
+            $lines = @(Ocr-Screen $r.L $r.T $w $h 3)
+            $words = @($lines | ForEach-Object { $_.Words })
+            $hit = $null
+            for ($i = 0; $i -lt $words.Count -and -not $hit; $i++) {
+                $a = Normalize-Name $words[$i].Text
+                $b = if ($i -lt $words.Count - 1) { Normalize-Name $words[$i + 1].Text } else { '' }
+                # OCR hay đọc lệch: "Sö tjén", "S0 tien"… → chữ 1 = S/5 (+O/0), chữ 2 = T…N dài 3–6
+                if ($a -match '^[S5][O0]?$' -and $b -match '^T[A-Z]{1,4}N$' -and [Math]::Abs($words[$i + 1].Y - $words[$i].Y) -le 6) {
+                    $hit = [pscustomobject]@{ X = [int](($words[$i].X + $words[$i + 1].X) / 2); Y = $words[$i].Y }
+                } elseif ($a -eq 'SOTIEN' -or $a -eq 'SO TIEN') { $hit = $words[$i] }
+            }
+            if ($hit) {
+                $dy = [Math]::Max(1, $hit.Y - $r.T)
+                $pt = @(($hit.X - $r.L), [int][Math]::Min($r.B - $r.T - 2, 3 * $dy))
+                $script:amountBy = "OCR tiêu đề 'Số tiền' ở $($hit.X),$($hit.Y)"
+            } else {
+                Write-Log WARN "OCR không thấy tiêu đề cột 'Số tiền' trong grid (đọc được: '$(($lines | ForEach-Object { $_.Text }) -join ' / ')') → dùng -AmountCell $($AmountCell -join ',')"
+            }
+        } catch { Write-Log WARN "OCR tiêu đề grid lỗi: $($_.Exception.Message) → dùng -AmountCell $($AmountCell -join ',')" }
+    }
+    Write-Log INFO "Ô Số tiền dòng 1: lệch $($pt -join ',') từ góc grid ($($script:amountBy); Scale màn hình $([Math]::Round($script:screenScale * 100))%)"
+    $script:amountPt = $pt
+    return $pt
+}
+
 # Ô chữ: WM_SETTEXT (không qua bộ gõ Unikey/Telex) rồi Tab ra để WinForms nhận giá trị; không được thì gõ phím
 function Set-Field($Edit, [string]$Value, [scriptblock]$Check) {
     Click-Control $Edit
@@ -991,7 +1029,20 @@ function Invoke-Voucher($Item) {
     $ok = Set-Field $c.ReasonEdit $Item.Reason { [Vdb]::TextOf($c.ReasonEdit.H) -eq $Item.Reason }
     if (-not $ok) { return New-Result FATAL "không nhập được Lý do (đọc lại: '$([Vdb]::TextOf($c.ReasonEdit.H))')" }
 
-    Click-Control $c.Grid $AmountCell[0] $AmountCell[1]
+    $pt = Get-AmountCell $c.Grid
+    # Sau Lý do VietDA đưa con trỏ vào ô Diễn giải dòng 1 (tự điền lý do): click đầu vào grid chỉ lấy focus, ô chọn vẫn là
+    # Diễn giải (đã thấy 07/11/2026) → click lần 2 mới chọn ô Số tiền. Chờ giữa 2 click > thời gian double-click.
+    Click-Control $c.Grid $pt[0] $pt[1]
+    Start-Sleep -Milliseconds ([Math]::Max(600, [System.Windows.Forms.SystemInformation]::DoubleClickTime + 100))
+    Click-Control $c.Grid $pt[0] $pt[1]
+    # Focus phải ở grid (hoặc ô sửa con của grid) mới gõ — không thì số tiền rơi vào ô khác (Lý do…)
+    $f = [Vdb]::FocusOf($script:vda.Main)
+    $inGrid = $false
+    for ($p = $f; $p -ne [IntPtr]::Zero -and -not $inGrid; $p = [Vdb]::GetParent($p)) { if ($p -eq $c.Grid.H) { $inGrid = $true } }
+    if (-not $inGrid) {
+        $fc = if ($f -ne [IntPtr]::Zero) { "$([Vdb]::ClassOf($f)) '$([Vdb]::TextOf($f))'" } else { 'không có' }
+        return New-Result FATAL "click ô Số tiền xong nhưng focus không ở grid (đang ở: $fc) — chưa gõ số tiền (để nguyên phiếu, chưa Lưu)"
+    }
     Send-Keys "$($Item.Amount){TAB}"
     # GD không theo HĐ (nộp/rút tiền mặt, lương, trả chuyển nhầm): sau Số tiền là ô TK Nợ, TK Có (VietDA mặc định sai TK cho các loại này)
     if ($Item.Debit) { Send-Keys "$($Item.Debit){TAB}"; Send-Keys "$($Item.Credit){TAB}" }
@@ -1002,7 +1053,7 @@ function Invoke-Voucher($Item) {
         if ($total -eq $Item.Amount) { break }
         Start-Sleep -Milliseconds 200
     } while ((Get-Date) -lt $wait)
-    if ($total -ne $Item.Amount) { return New-Result FATAL "Tổng thanh toán = $total, cần $($Item.Amount) — ô Số tiền dòng 1 không ở vị trí -AmountCell $($AmountCell -join ',')? (để nguyên phiếu, chưa Lưu)" }
+    if ($total -ne $Item.Amount) { return New-Result FATAL "Tổng thanh toán = $total, cần $($Item.Amount) — click ô Số tiền dòng 1 tại $($pt -join ',') từ góc grid ($script:amountBy) không trúng? Chạy lại với -AmountCell x,y đúng (để nguyên phiếu, chưa Lưu)" }
     if ([Vdb]::TextOf($c.Date.H) -ne $Item.Date -or [Vdb]::TextOf($c.ObjectEdit.H) -ne $Item.Object) { return New-Result FATAL 'Ngày/Đối tượng bị đổi sau khi nhập số tiền (để nguyên phiếu, chưa Lưu)' }
 
     $soCt = [Vdb]::TextOf($c.SoCt.H)
@@ -1294,8 +1345,6 @@ function Export-Listing([string]$Prefix, [string]$From, [string]$To) {
     $excel = @(Get-VisibleKids $listing | Where-Object { $_.Cls -like '*BUTTON*' -and $_.Text -eq 'Excel' }) | Select-Object -First 1
     if (-not $excel) { throw "bảng kê không có nút Excel" }
     $known = Get-XlBooks
-    $winBefore = @{}
-    foreach ($pr in Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero }) { $winBefore["$($pr.Id)|$($pr.MainWindowHandle)"] = $true }
     [Vdb]::ClickButton($excel.H)
     $wb = $null
     $deadline = (Get-Date).AddSeconds(120)
@@ -1316,12 +1365,7 @@ function Export-Listing([string]$Prefix, [string]$From, [string]$To) {
             try { if ([string]$e.Value.Worksheets.Item(1).Range('A4').Text -match 'BẢNG KÊ') { $wb = $e.Value; break } } catch { }
         }
     }
-    if (-not $wb) {
-        # chẩn đoán: cửa sổ mới mở ra sau khi bấm Excel (Excel bản khác / WPS / hộp thoại Excel)
-        $new = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and -not $winBefore.ContainsKey("$($_.Id)|$($_.MainWindowHandle)") } | ForEach-Object { "$($_.ProcessName) '$($_.MainWindowTitle)' [$([Vdb]::ClassOf($_.MainWindowHandle))]" })
-        $procs = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '(?i)^(excel|et|wps|ksolaunch|scalc|soffice)' } | ForEach-Object { "$($_.ProcessName)#$($_.Id) '$($_.MainWindowTitle)'" })
-        throw "bấm Excel trên bảng kê nhưng không thấy Excel mở bảng kê (120 giây) — cửa sổ mới: $(if ($new.Count) { $new -join '; ' } else { 'không có' }); tiến trình bảng tính: $(if ($procs.Count) { $procs -join '; ' } else { 'không có' })"
-    }
+    if (-not $wb) { throw 'bấm Excel trên bảng kê nhưng không thấy Excel mở bảng kê (120 giây)' }
     # VietDA ghi từng ô qua COM (chặn UI) → xong khi VietDA rảnh + số dòng đứng yên
     $stable = 0; $last = -1
     while ($stable -lt 3 -and (Get-Date) -lt $deadline) {

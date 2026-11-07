@@ -46,8 +46,10 @@
       </button>
     </div>
     <div class="hint indent">Mỗi mã master KiotViet (ĐVT nhỏ nhất) được máy tự cấp 1 mã HH cố định, không trùng
-      @if (hhStatus) { ({{ hhStatus.count | number }} mã, mã mới tiếp theo {{ hhStatus.next_code }}) }. Bản sao XML quy đổi chỉ ghi mã HH —
-      không dùng mã KiotViet; dòng chưa có mã HH giữ nguyên.</div>
+      @if (hhStatus) { ({{ hhStatus.count | number }} mã, mã mới tiếp theo {{ hhStatus.next_code }}) }. Hàng khuyến mại (tên
+      KiotViet có "(KM)") dùng mã KM như Danh sách đối tượng Vietda
+      @if (hhStatus?.next_km_code) { ({{ hhStatus?.km_count ?? 0 | number }} mã, mã KM tiếp theo {{ hhStatus?.next_km_code }}) }.
+      Bản sao XML quy đổi chỉ ghi mã HH / KM — không dùng mã KiotViet; dòng chưa có mã giữ nguyên.</div>
     @if (catalogInfo) {
     <div class="msg ok"><i class="fa-solid fa-circle-check"></i> {{ catalogInfo }}</div>
     }

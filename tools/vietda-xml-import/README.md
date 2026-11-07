@@ -58,7 +58,7 @@ powershell -ExecutionPolicy Bypass -File vietda-bank-import.ps1 ... -Limit 1
 | `-RetailObject` | mã Đối tượng cho HĐ bán ra không có MST người mua (mặc định `KH010` "Bán cho người tiêu dùng"; tên mã đó không phải kiểu khách lẻ → cảnh báo + tự tìm tên "Bán cho người tiêu dùng" / "Khách lẻ…") |
 | `-WalkInObject` | mã Khách lẻ cho phiếu "Chuyển trả tiền chuyển nhầm" (mặc định `KH001`) |
 | `-CompanyObject` | mã công ty cho nộp/rút tiền mặt, chi lương không rõ nhân viên (mặc định `CTY001`) |
-| `-AmountCell x,y` | vị trí ô Số tiền dòng 1 tính từ góc grid (mặc định `280,46`) |
+| `-AmountCell x,y` | vị trí ô Số tiền dòng 1 tính từ góc grid. Không truyền → tool OCR dòng tiêu đề grid tìm cột "Số tiền" (đúng cả khi Scale 125%/150%, cột rộng khác); OCR không thấy → `280,46`. |
 | `-StepDelayMs` | nghỉ sau mỗi thao tác (mặc định 250) |
 
 ## Mỗi phiếu
@@ -85,13 +85,11 @@ Thứ tự khớp: `_vietda-map-mst.csv` (tự ghi tay, mỗi dòng `MST;Mã[;Th
 - Sổ `_vietda-ck-da-nhap.txt` (cạnh script, khóa `Thu|Chi + Mã GD`) chỉ ghi sau khi Lưu xong → chạy lại không tạo trùng. Log: `_vietda-ck-import.log`.
 - Exit code: `0` xong, `1` lỗi đầu vào, `2` dừng giữa chừng.
 
-## Lỗi OCR ("không thấy menu 'Thu chi'", không đọc được mục menu / MST) — 04/11/2026
+## OCR menu / tiêu đề grid — 04/11/2026
 
-- Tool chụp màn hình theo **Scale của Windows** (125%/150%…): tọa độ của tool × `DESKTOPHORZRES/HORZRES`. Thanh menu tìm theo control tên `mainMenu`. Không thấy menu → lưu ảnh vùng đã đọc `_vietda-menu.png` cạnh script + ghi Scale vào lỗi.
-- Vẫn lỗi trên máy nào → chạy **`Chan-Doan-OCR-VietDA.bat`** trên máy đó (VietDA đã đăng nhập, ở màn hình chính). Script `chan-doan-ocr.ps1`:
-  - Bước 1 chỉ đọc: Scale/DPI, gói ngôn ngữ OCR, cây cửa sổ VietDA (+ DPI awareness), chụp + OCR thanh menu và dải trên cùng theo 2 cách (`moi` = theo Scale, `cu` = như tool cũ) × phóng x2/x3/x4 × mọi engine OCR đã cài.
-  - Bước 2 (chỉ khi gõ Y): bấm "Thu chi" 1 lần, chụp + OCR menu xổ, rồi Esc.
-  - Ra `VietDA-chan-doan-<máy>-<giờ>.zip` trên Desktop (`bao-cao.txt` + ảnh + 150 dòng log cuối của tool) → gửi lại.
+- Tool chụp màn hình theo **Scale của Windows** (125%/150%…): tọa độ của tool × `DESKTOPHORZRES/HORZRES`. Thanh menu tìm theo control tên `mainMenu`. Không thấy menu → lỗi ghi chữ OCR đọc được + Scale vào log.
+- Ô Số tiền dòng 1: OCR tiêu đề grid tìm cột "Số tiền" (07/11/2026, sửa trên máy kế toán); click 2 lần (lần 1 grid chỉ lấy focus) rồi kiểm focus đã ở grid mới gõ.
+- (07/11/2026 bỏ `Chan-Doan-OCR-VietDA.bat` / `chan-doan-ocr.ps1` và ảnh chẩn đoán `_vietda-menu.png` / `_vietda-grid.png`: tool đã chạy ổn trên máy kế toán.)
 
 ## Kết quả chạy → `Output\<ngày-giờ>\` (05/11/2026)
 
@@ -133,4 +131,4 @@ Bảng kê VietDA xuất Excel không có cột TK → Kiểm tra VietDA không 
 ### Ngày khác tháng của Số CT (thấy trên máy kế toán 05/11/2026)
 
 Số CT VietDA đánh theo tháng (vd `TG006/08`). Nhập Ngày khác tháng (30/10) rồi rời ô → VietDA hỏi "Bạn có muốn điền lại Số chứng từ tự động không?" → tool chọn **Yes** (Số CT theo tháng của ngày GD, vd `TG001/09`) rồi điền tiếp. Hộp khác sau khi nhập Ngày → DỪNG.
-Bấm Excel trên bảng kê mà VietDA báo 1 nút (vd bảng kê trống) → OK, coi như 0 phiếu. Quá 120 giây không thấy Excel → lỗi ghi cửa sổ / tiến trình bảng tính mới mở để chẩn đoán (Excel bản khác, WPS…).
+Bấm Excel trên bảng kê mà VietDA báo 1 nút (vd bảng kê trống) → OK, coi như 0 phiếu. Quá 120 giây không thấy Excel → lỗi, dừng phần kiểm tra.

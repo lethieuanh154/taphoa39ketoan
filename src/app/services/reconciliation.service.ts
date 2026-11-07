@@ -60,7 +60,11 @@ export interface CatalogStatus {
 }
 
 /** Bảng mã HH Vietda theo mã master KiotViet (02/11/2026) — /api/vietda-codes */
-export interface HhCodeStatus { version: number; count: number; next_code: string; updated_at: string; }
+export interface HhCodeStatus {
+  version: number; count: number; next_code: string; updated_at: string;
+  /** hàng khuyến mại — tên KiotViet có (KM) → mã KM (07/11/2026) */
+  next_km_code?: string; km_count?: number;
+}
 export interface HhCode { hh: string; master_code: string; name: string; unit: string; }
 
 const HH_BASE = `${environment.ketoanBackendUrl}/api/vietda-codes`;
