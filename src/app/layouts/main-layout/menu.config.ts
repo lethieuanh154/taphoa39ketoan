@@ -49,6 +49,8 @@ export const MENU_SECTIONS: MenuSection[] = [
         key: 'doiSoatCk', label: 'Đối soát CK', icon: 'fa-money-bill-transfer',
         items: [
           { label: 'Bán ra + mua vào', icon: 'fa-scale-balanced', route: '/bank-reconciliation-page' },
+          // 13/11/2026: bản lưu tab CK nhiều lần / CK dư do nhân viên chạy đối soát ở BanHang
+          { label: 'CK nhiều lần / CK dư (BanHang)', icon: 'fa-layer-group', route: '/ck-snapshot-page' },
         ],
       },
       {

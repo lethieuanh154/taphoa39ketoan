@@ -4,3 +4,5 @@ Input/*
 Output/
 xml/*
 !xml/HUONG-DAN.txt
+_vietda-*.log
+_vietda-ui.json

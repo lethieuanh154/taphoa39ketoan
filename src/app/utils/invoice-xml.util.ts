@@ -17,6 +17,8 @@ export interface LocalXmlInvoice {
   tgtcthue: number; tgtthue: number; tgtttbso: number;
   file: string;       // đường dẫn file (hoặc zip/tên trong zip)
   mccqt?: string;     // mã CQT cấp (28/10/2026 — bản lưu IndexedDB cũ không có)
+  httt?: string;      // hình thức thanh toán TTChung/HTTToan ("Chuyển khoản", "Tiền mặt", "TM/CK"…) — 13/11/2026, bản lưu cũ không có
+  nmhvten?: string;   // NMua/HVTNMHang — tên người mua hàng (HĐ bán lẻ không có Ten, vd "Bán cho người tiêu dùng")
   lookup?: InvoiceLookup;   // mã / link tra cứu HĐ gốc (invoice-lookup.util.ts)
 }
 
@@ -79,7 +81,7 @@ export function parseInvoiceXml(xml: string, file: string): LocalXmlInvoice | nu
     khmshdon: text(ttc, 'KHMSHDon'), khhdon: text(ttc, 'KHHDon'), shdon, tdlap: text(ttc, 'NLap').slice(0, 10),
     nbmst: text(nban, 'MST'), nbten: text(nban, 'Ten'), nmmst: text(nmua, 'MST'), nmten: text(nmua, 'Ten'),
     tgtcthue: num(text(tt, 'TgTCThue')), tgtthue: num(text(tt, 'TgTThue')), tgtttbso: num(text(tt, 'TgTTTBSo')),
-    file, mccqt: (first(doc, 'MCCQT')?.textContent || '').trim(),
+    file, mccqt: (first(doc, 'MCCQT')?.textContent || '').trim(), httt: text(ttc, 'HTTToan'), nmhvten: text(nmua, 'HVTNMHang'),
     lookup: detectLookup(text(ttc, 'MSTTCGP'), headerFields(doc)),
   };
 }

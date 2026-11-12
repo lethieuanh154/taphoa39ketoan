@@ -316,6 +316,13 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 **Path**: `components/bank-reconciliation-hub/` — route `/bank-reconciliation-page` (lazy), `?tab=mua-vao` mở tab Mua vào;
 `/bank-reconciliation-in-page` redirect về đây. Menu: nhóm Đối soát CK → "Bán ra + mua vào".
 
+> **13/11/2026 — bán ra theo XML, KHÁC BanHang có chủ đích** (user: kế toán đối soát theo chứng từ, không lấy HĐ từ einvoiceapp):
+> sao kê chọn 1 lần ở đầu trang; tab **Bán ra** chọn thư mục XML **HĐ đầu ra**, tab **Mua vào** chọn thư mục XML **HĐ đầu vào**.
+> 2 tab dùng chung **1 bảng** `components/shared/recon-table` (dòng `ReconViewRow` — `utils/recon-view.util.ts` `saleViewRows` /
+> `purchaseViewRows`): cột Số HĐ · Ngày HĐ · Người mua / NCC · Tổng HĐ · Số tiền GD · Giao dịch khớp · Lệch ngày · Trạng thái; màu
+> xanh (khớp) / vàng (cần xem) / đỏ (lệch); chip lọc theo `tags`, ô tìm, "Lệch lên đầu", phân trang. Excel: sheet `Ban-ra` và
+> `Mua-vao` CÙNG cột (`reconViewTable`) thay `Ban-ra_Doi-soat` / `Ban-ra_CK-nhieu-lan` / `Ban-ra_CK-du` / `Mua-vao` cũ.
+
 - **Sao kê chọn 1 lần** ở đầu trang (.xlsx / .pdf, nhiều file, "Thêm file", "Bỏ sao kê"): .xlsx → `BankReconciliationPageComponent.loadStatementFiles()`
   (Ghi có) + `BankReconciliationInPageComponent.loadBankFiles()` (Ghi nợ); .pdf chỉ phần mua vào. File đã chọn lưu IndexedDB
   (`TienIchCacheService`, key `tpbank-statement-files`) → mở lại trang đọc lại cho bán ra; mua vào tự lưu GD tiền ra như trước.
@@ -335,8 +342,27 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - Nút nhỏ "CSV cho tool VietDA (bản cũ)" = `doi-soat-ck_*.csv` như trước — tool `tools/vietda-xml-import` bản hiện tại còn đọc file
   này; bỏ khi tool đọc được sheet `Nhap-VietDA`.
 
+## CkSnapshotPageComponent — "CK nhiều lần / CK dư (BanHang)" (13/11/2026)
+
+**Path**: `components/ck-snapshot-page/` — route `/ck-snapshot-page` (lazy), menu Đối soát CK. Chỉ ĐỌC bản lưu 2 tab CK nhiều lần / CK dư
+do BanHang tự ghi khi nhân viên chạy Đối soát CK có sao kê + HĐĐT (`services/ck-snapshot.service.ts` → KeToanBackEnd
+`GET /api/bank-reconciliation/ck-snapshots`; schema `ReconSnapshotRow` trong util mirror). Khoảng ngày = thanh chọn kỳ; báo ngày nào
+chưa có bản lưu. 2 tab, chip Tất cả / Lệch / Ghi chú lệch, ô tìm (khớp 1 khoản → hiện cả HĐ), màu dòng xanh / vàng / đỏ, Xuất Excel
+2 sheet. Ít dòng nên lọc trên trình duyệt (không qua server-table). → `TapHoa39BackEnd/docs/BANK-RECON-SNAPSHOTS.md`
+
 ## BankReconciliationPageComponent — Tiện ích "Đối soát CK" (23/10/2026)
 > 06/11/2026: nhúng trong BankReconciliationHubComponent (tab Bán ra) — `@Input() embedded`, `loadStatementFiles(files, append)`, `exportData()`.
+>
+> **13/11/2026 — nguồn HĐ = thư mục XML HĐ đầu ra** (`services/sale-invoice-source.service.ts`, IndexedDB `xml-out` dùng chung trang
+> Kiểm tra số lượng HĐ đầu ra; bên bán = MST công ty). Bỏ "Lấy HĐĐT" / einvoice (`BankReconciliationService` không còn trang nào dùng)
+> và tab CK nhiều lần / CK dư (XML không có ghi chú KiotViet). XML chỉ có NGÀY lập (= ngày phát hành) + `HTTToan`:
+> - `toRecon`: giờ HĐ = ngày lập 00:00; mã HĐ "HĐĐT <số>"; `HTTToan` → CK / TM / TMCK (TM chỉ khớp GD dư trong cùng ngày).
+> - Khớp `reconcileWithFallback` với `windowBeforeMin 0 / windowAfterMin 1439` (cùng ngày) + `lateWindow` [−3 ngày, +1 ngày]
+>   (`EINVOICE_PUBLISH_LAG_DAYS`). GD TRƯỚC ngày lập = "Khớp (phát hành trễ)" xanh, chỉ ghi chú; GD SAU = vàng.
+> - Lấy HĐ lập đến ngày cuối + 3 ngày; HĐ sau kỳ không khớp GD thì bỏ (không báo thiếu GD).
+> - Bản XML lưu trước 13/11 chưa có `httt` → coi như CK, trang nhắc chọn lại thư mục.
+> - Đo thử 12/11/2026 (143 GD, HĐ giả lập phát hành hôm sau): khớp 96,5% (einvoice 99,3% — chênh chủ yếu HĐ "chuyển khoản N lần").
+> Các ý dưới đây là bản einvoice cũ (03–12/11/2026).
 
 **Path**: `components/bank-reconciliation-page/` — route `/bank-reconciliation-page` (lazy). Port BanHang cùng tên.
 
@@ -347,6 +373,8 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
   **Lấy lại từ einvoice** = mọi ngày. Cache IndexedDB key `hddt-range:` (bản `ck-range:` cũ là HĐ KiotViet, bỏ).
 - Khớp: `readEInvoiceBills` → `reconcileWithFallback` (HĐ CK trước, GD dư thử HĐĐT ghi TM trong khung giờ) + dung sai tiền lẻ
   `EINVOICE_AMOUNT_TOLERANCE`. Ô Tổng tiền vào hiện "khớp X%" (mục tiêu > 90%; đo 09/2026 98,3%, 03/2026 90,6%).
+- HĐĐT trùng (12/11/2026): ≥ 2 HĐĐT cùng mã HĐ KiotViet → Gợi ý "HĐĐT trùng: HD447316 có 2 HĐĐT (34653, 34655) — cần xử lý
+  bản thừa" (`einvoiceDuplicate`); bản không có GD = "HĐ thiếu GD" đỏ. Kế toán xử lý HĐĐT thừa (điều chỉnh / sai sót).
 - Khớp theo số tiền + 3 tab Đối soát / CK nhiều lần / CK dư + Xuất CSV: y BanHang (`utils/transfer-reconcile.util.ts`).
   Khác BanHang: bảng 2 cột **phân trang** (100–1000 dòng / trang, KeToan chưa có `@angular/cdk`), bỏ nút "Đánh sao HĐ thiếu".
 - (23/10/2026) Tab CK nhiều lần + CK dư có cột **Số HĐ** (số HĐĐT CQT đã chấp nhận, `readKvEInvoice`; chưa có → trống, rê chuột xem
@@ -498,6 +526,7 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - AuthService
 
 ## BankReconciliationInPageComponent — Tiện ích "Đối soát CK → Chuyển khoản HĐ đầu vào" (23/10/2026)
+> 13/11/2026: bảng kết quả = `app-recon-table` dùng chung tab Bán ra (`purchaseViewRows`; tin cậy thấp → vàng); chip / tìm / phân trang nằm trong bảng.
 > 06/11/2026: nhúng trong BankReconciliationHubComponent (tab Mua vào) — `@Input() embedded`, `loadBankFiles(files, append)`; route cũ redirect.
 
 **Path**: `components/bank-reconciliation-in-page/` — route `/bank-reconciliation-in-page` (lazy).

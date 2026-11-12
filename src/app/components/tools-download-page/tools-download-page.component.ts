@@ -33,18 +33,21 @@ export class ToolsDownloadPageComponent {
     },
     {
       file: 'vietda-xml-import.zip',
-      title: 'Tạo phiếu thu/chi tiền gửi trên VietDA từ sao kê',
+      title: 'VietDA: phiếu thu/chi tiền gửi từ sao kê + kiểm phiếu XH sau Hội nhập XML',
       icon: 'fa-solid fa-file-import',
       summary: 'Mỗi GD sao kê TPBank → 1 phiếu: Ghi có → Phiếu thu tiền gửi (lý do "Thu tiền bán hàng theo HD <số> ngày <ngày HĐ>" theo Excel Đối soát CK, người mua từ XML bán ra — không MST → KH010 Bán cho người tiêu dùng), Ghi nợ → Phiếu chi tiền gửi (số HĐ + MST người bán theo Excel Đối soát CK). Nộp/rút tiền mặt, chi lương, trả tiền chuyển nhầm nhận theo nội dung CK, tự gõ TK Nợ/Có. Tự mở menu, tự Lưu, bỏ qua GD đã tạo.',
       requires: 'Windows, VietDA đã đăng nhập — không cần cài thêm',
       steps: [
         'Giải nén zip. Mở VietDA, đăng nhập đúng file dữ liệu, không để hộp thoại nào đang mở.',
+        'Dễ nhất: double-click VietDA-Tools.bat → cửa sổ 2 tab làm theo từng bước: thêm file / chọn thư mục ngay trong cửa sổ (sao kê, Đối soát CK, danh mục, XML), mỗi bước báo ✔/✘. Phiếu XH: Kiểm tra trước, chỉ khi KHÔNG ĐẠT mới bật nút Sửa.',
         'Copy sao kê TPBank (.xlsx) + Excel Đối soát CK (trang Đối soát CK > Xuất Excel, doi-soat-ck_*.xlsx) + danh mục Đối tượng xuất từ VietDA (DANH SACH.xlsx) vào thư mục Input trong thư mục tool (nhiều sao kê được, tool gộp lại).',
         'Copy XML hóa đơn tải từ GDT vào thư mục xml trong thư mục tool: xml/sold = bán ra, xml/purchase = mua vào.',
         'Double-click Nhap-SaoKe-vao-VietDA.bat → xem danh sách → gõ Y + Enter.',
         'Chạy xong tool tự mở thư mục Output/<ngày-giờ>: ket-qua-chay.xlsx (từng GD: Thành công / Lỗi / Bỏ qua + ĐÚNG/SAI so với VietDA; xanh lá = đạt, đỏ = còn lại) + tom-tat.txt.',
         'Trong lúc chạy: KHÔNG đụng chuột/bàn phím (tool gõ phím vào VietDA, mất focus là tự dừng).',
         'Lần đầu nên chạy thêm -Limit 1 để kiểm 1 phiếu trước.',
+        'Kiểm phiếu XH (chỉ đọc, không sửa phiếu): bỏ XML QUY ĐỔI bán ra vào xml/sold + danh mục Vật tư hàng hóa xuất từ VietDA vào Input/danh-muc-vthh (không để thẳng trong Input: tool sao kê sẽ coi là sao kê) → trên VietDA mở Tìm kiếm chứng từ (loại XH, khoảng ngày) → double-click Kiem-PhieuXH-VietDA.bat. Tool mở lần lượt từng phiếu trong danh sách (như double-click), đọc đầu phiếu + từng dòng hàng rồi đóng; trong lúc chạy KHÔNG bấm vào VietDA (dùng app khác được). Kết quả Output/<ngày-giờ>_kiem-xh/ket-qua-kiem-xh.xlsx (sheet Phieu: OK / Cần sửa đầu phiếu — Lý do, Ký hiệu, Số HĐ, Ghi nợ/Có, tick thuế suất / Lỗi dòng / Chưa nhập; sheet Loi-dong: dòng 0 đ, thuế sai, mã lệch XML/danh mục, giá vốn 0…).',
+        'Tự sửa đầu phiếu: double-click Sua-PhieuXH-VietDA.bat → gõ Y. Tool sửa Lý do, Ký hiệu, Số HĐ, Phương thức TT, Ghi nợ (CK 131 / TM 1111), Ghi có 33311 theo XML, bấm Lưu rồi mở lại kiểm; dòng hàng vẫn sửa tay. Lần đầu nên thêm -Limit 3.',
       ],
     },
   ];

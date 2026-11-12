@@ -1,150 +1,170 @@
-import { Component, Input, effect, inject } from '@angular/core';
+import { Component, Input, OnInit, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { httpErrorText } from '../../services/auth.service';
 import { TableLoadingComponent } from '../shared/table-loading/table-loading.component';
-import { BankReconciliationService, TransferRange } from '../../services/bank-reconciliation.service';
+import { ReconTableComponent } from '../shared/recon-table/recon-table.component';
 import { PeriodService } from '../../services/period.service';
+import { CompanyService } from '../../services/company.service';
+import { BgJob } from '../../services/background-job.service';
+import { CachedXml } from '../../services/purchase-invoice-source.service';
+import { SaleInvoiceSourceService } from '../../services/sale-invoice-source.service';
+import { LocalXmlInvoice } from '../../utils/invoice-xml.util';
 import { parseTpBankStatement, BankStatementResult } from '../../utils/tpbank-statement.util';
 import {
-  ReconInvoice, ReconPair, ReconKind, expandInvoiceItems, reconcileWithFallback, multiTransferPairs, excessTransferPairs,
-  buildReconCsv, buildMultiTransferCsv, buildExcessTransferCsv, reconPairHint, payerLabel, isEInvoiceIssuePair, NOTE_STATUS_LABEL,
-  RECON_KIND_LABEL, readEInvoiceBills, EINVOICE_AMOUNT_TOLERANCE
+  ReconInvoice, ReconPair, expandInvoiceItems, reconcileWithFallback, buildReconCsv, EINVOICE_AMOUNT_TOLERANCE, EINVOICE_PUBLISH_LAG_DAYS
 } from '../../utils/transfer-reconcile.util';
+import { ReconViewRow, SALE_CHIPS, saleViewRows } from '../../utils/recon-view.util';
 
 /**
- * ĐỐI SOÁT CK (Tiện ích) — HĐĐT einvoiceapp ⇄ sao kê TPBank (plan-ketoan-flow.md bước 2; 03/11/2026 trước là HĐ CK KiotViet).
- * Port từ BanHang bank-reconciliation-page: logic khớp dùng y utils/transfer-reconcile.util.ts + tpbank-statement.util.ts
- * (vùng mirror, chép nguyên file); khác BanHang: HĐ đọc qua KeToanBackEnd (BankReconciliationService), khoảng ngày theo
- * thanh chọn kỳ, bảng khớp phân trang (KeToan chưa có @angular/cdk), bỏ nút "đánh sao" (thao tác ghi lên KiotViet).
+ * ĐỐI SOÁT CK — BÁN RA (KeToan): HĐ đầu ra từ THƯ MỤC XML ⇄ tiền vào (Ghi có) trên sao kê TPBank.
+ * 13/11/2026: KHÁC BanHang có chủ đích — kế toán đối soát theo XML (chứng từ pháp lý), không lấy HĐ từ einvoiceapp.
+ * XML chỉ có NGÀY lập (= ngày phát hành), không có giờ bán / mã HĐ KiotViet / ghi chú "chuyển khoản N lần" ⇒
+ * - khớp theo số tiền trong CÙNG NGÀY (bước 1), phần dư cùng số tiền trong [ngày HĐ − EINVOICE_PUBLISH_LAG_DAYS, ngày HĐ + 1]
+ *   = "Khớp (phát hành trễ)" — GD trước ngày lập: xanh, chỉ ghi chú; GD sau ngày lập: vàng. Không có tab CK nhiều lần / CK dư như BanHang.
+ * - HĐ ghi Tiền mặt (HTTToan) chỉ dùng khớp GD còn dư trong cùng ngày (reconcileWithFallback).
+ * - Lấy HĐ đến ngày cuối + EINVOICE_PUBLISH_LAG_DAYS (HĐ bán cuối kỳ phát hành sau); HĐ sau kỳ không khớp thì bỏ (không báo thiếu GD).
+ * Logic khớp: utils/transfer-reconcile.util.ts (mirror BanHang); hiển thị: utils/recon-view.util.ts + app-recon-table (dùng chung Mua vào).
  */
 const LOG = '[BankRecon]';
-
-// 1 dòng tab "Đối soát" — cùng cột với tab "CK nhiều lần" (03/11/2026); dòng chỉ có GD thì các cột HĐ để trống
-interface AlignedRow {
-  amount: number;           // số tiền của dòng: khoản HĐ (HĐ nhiều lần đã tách) hoặc GD khi chỉ có GD
-  kind: ReconKind;
-  kindLabel: string;
-  code: string;
-  einvoiceNo: string;       // Số HĐĐT đã phát hành (CQT chấp nhận) — '' khi chưa có
-  einvoiceStatus: string;
-  time: string;
-  total: number | null;     // tổng HĐ; null = dòng chỉ có GD
-  note: string;
-  part: string;             // "1/2" | "CK dư, trả lại …" | "—"
-  issue: boolean;           // đã ghép GD nhưng HĐĐT nháp / phát hành trễ ngày → tô đỏ, tính vào "Lệch"
-  txnText: string;          // "NGUYEN VAN A · 17/10/2026 09:10:00 · 371ITC..."
-  hint: string;
-}
-
-// 1 dòng của tab "CK nhiều lần" (mỗi khoản 1 dòng)
-interface MultiRow {
-  first: boolean;
-  code: string;
-  /** Số HĐĐT (CQT đã chấp nhận) — '' khi chưa có (23/10/2026) */
-  einvoiceNo: string;
-  einvoiceStatus: string;
-  time: string;
-  total: number;
-  note: string;
-  noteStatus: string;
-  noteOk: boolean;
-  part: string;
-  amount: number | null;
-  kind: ReconKind;
-  kindLabel: string;
-  txnText: string;
-  hint: string;
-}
-
-// 1 dòng của tab "CK dư" (mỗi HĐ 1 dòng): khách chuyển dư, đã trả lại tiền mặt
-interface ExcessRow {
-  code: string;
-  einvoiceNo: string;
-  einvoiceStatus: string;
-  time: string;
-  total: number;
-  note: string;
-  noteStatus: string;
-  noteOk: boolean;
-  transferred: number | null;
-  refund: number | null;
-  kind: ReconKind;
-  kindLabel: string;
-  txnText: string;
-  hint: string;
-}
+const DAY = 1440;
 
 @Component({
   selector: 'app-bank-reconciliation-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TableLoadingComponent],
+  imports: [CommonModule, FormsModule, TableLoadingComponent, ReconTableComponent],
   templateUrl: './bank-reconciliation-page.component.html',
   styleUrls: ['./bank-reconciliation-page.component.css']
 })
-export class BankReconciliationPageComponent {
-  private service = inject(BankReconciliationService);
+export class BankReconciliationPageComponent implements OnInit {
   private periodService = inject(PeriodService);
+  private companyService = inject(CompanyService);
+  private source = inject(SaleInvoiceSourceService);
   readonly periodLabel = this.periodService.label;
-
-  // Khoảng ngày lấy HĐ CK (yyyy-mm-dd): theo thanh chọn kỳ; import sao kê → theo ngày GD thực tế trong file
-  fromDate = '';
-  toDate = '';
-  /** Khoảng ngày của bộ HĐ đang hiển thị (khác fromDate/toDate → nhắc bấm lấy lại) */
-  loadedFrom = '';
-  loadedTo = '';
+  readonly chips = SALE_CHIPS;
+  readonly lagDays = EINVOICE_PUBLISH_LAG_DAYS;
 
   /** Nhúng trong trang Đối soát CK gộp (06/11/2026): sao kê chọn ở trang chứa (loadStatementFiles), xuất 1 file Excel ở đó */
   @Input() embedded = false;
 
-  // Kết quả gộp từ 1 hoặc nhiều file Bảng kê ngân hàng (đã loại trùng theo Mã GD)
-  bank: BankStatementResult | null = null;
-  bankFileName = '';
-
-  // HĐĐT: CK = khớp chính; TM = chỉ để khớp GD còn dư (reconcileWithFallback)
-  private invoices: ReconInvoice[] = [];
-  private fallbackInvoices: ReconInvoice[] = [];
-  kvLoaded = false;
-  loadProgress = '';
-  /** Tình trạng dữ liệu HĐ trên máy chủ cho khoảng đã lấy */
-  range: TransferRange | null = null;
-  syncNote = '';
-
-  private pairs: ReconPair[] = [];
-
-  activeTab: 'all' | 'multi' | 'excess' = 'all';
-
-  alignedRows: AlignedRow[] = [];
-  sortMode: 'unmatched' | 'amountDesc' | 'amountAsc' = 'unmatched';
-  viewFilter: 'all' | 'issues' | 'late' = 'all';
-  page = 1;
-  pageSize = 200;
-  readonly pageSizes = [100, 200, 500, 1000];
-
-  multiRows: MultiRow[] = [];
-  excessRows: ExcessRow[] = [];
-
+  // Khoảng ngày đối soát (yyyy-mm-dd): theo thanh chọn kỳ; có sao kê → theo ngày GD thực tế trong file
+  fromDate = '';
+  toDate = '';
   dateNote = '';
 
+  // Sao kê (Ghi có), gộp nhiều file, loại trùng Mã GD
+  bank: BankStatementResult | null = null;
+  bankFileName = '';
   parsingFile = false;
-  loadingKv = false;
+
+  // XML HĐ đầu ra
+  xmlFolder = '';
+  xmlJob: BgJob<CachedXml> | null = null;
+  xmlReading = false;
+  xmlSavedAt: number | null = null;
+  xmlInfo = '';
+  mstWarning = '';
+  /** HĐ đọc từ bản lưu cũ chưa có hình thức thanh toán → coi như CK, nhắc đọc lại thư mục */
+  noPaymentCount = 0;
+  private xmlRaw: CachedXml | null = null;
+  private xmlSales: LocalXmlInvoice[] = [];
+  private xmlById = new Map<string, LocalXmlInvoice>();
+
+  private invoices: ReconInvoice[] = [];
+  private fallbackInvoices: ReconInvoice[] = [];
+  private pairs: ReconPair[] = [];
+  viewRows: ReconViewRow[] = [];
+  outsideUnmatched = 0;
   error = '';
 
   constructor() {
-    // Theo thanh chọn kỳ khi chưa import sao kê (đã import → khoảng ngày theo sao kê, như BanHang)
     effect(() => {
       const p = this.periodService.period();
       if (this.bank) return;
       this.fromDate = p.from;
       this.toDate = p.to;
+      this.computeRows();
+    });
+    effect(() => {
+      this.companyService.mst();
+      if (this.xmlRaw) {
+        this.applyXml();
+        this.computeRows();
+      }
     });
   }
 
-  /** Chọn 1 hoặc nhiều file Bảng kê (vd 3 tháng của 1 quý) — thay toàn bộ dữ liệu ngân hàng cũ. */
+  ngOnInit(): void {
+    void this.restoreXml();
+  }
+
+  /** Mở lại trang: XML đã đọc (ở đây hoặc trang Kiểm tra số lượng HĐ đầu ra) / đang đọc nền → dùng ngay */
+  private async restoreXml(): Promise<void> {
+    const job = this.source.runningXml();
+    if (job) {
+      await this.awaitXml(job);
+    } else {
+      const c = await this.source.cachedXml();
+      if (c) {
+        this.xmlRaw = c.data;
+        this.xmlFolder = c.data.folder;
+        this.xmlSavedAt = c.savedAt;
+        console.log(`${LOG} Dùng XML đầu ra đã đọc lúc ${new Date(c.savedAt).toLocaleString('vi-VN')} ("${c.data.folder}")`);
+        this.applyXml();
+      }
+    }
+    this.computeRows();
+  }
+
+  async onXmlSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) return;
+    // chọn file ZIP / RAR (không phải thư mục) → không có webkitRelativePath: lấy tên file
+    const folder = (files[0] as any).webkitRelativePath?.split('/')[0] || (files.length === 1 ? files[0].name : `${files.length} file`);
+    this.error = '';
+    console.log(`${LOG} Chọn XML đầu ra "${folder}" (${files.length} file)`);
+    await this.awaitXml(this.source.startXml(files, folder));
+    this.computeRows();
+  }
+
+  private async awaitXml(job: BgJob<CachedXml>): Promise<void> {
+    this.xmlJob = job;
+    this.xmlReading = true;
+    this.xmlFolder = job.meta['folder'];
+    try {
+      this.xmlRaw = await job.promise;
+      this.xmlSavedAt = Date.now();
+      this.applyXml();
+    } catch (e: any) {
+      console.error(`${LOG} Không đọc được thư mục XML đầu ra: ${e?.message || e}`);
+      this.error = `Không đọc được thư mục XML: ${e?.message || e}`;
+    } finally {
+      this.xmlReading = false;
+      this.xmlJob = null;
+    }
+  }
+
+  private applyXml(): void {
+    if (!this.xmlRaw) return;
+    const set = this.companyService.mst();
+    const { mst, detected, invoices } = this.source.xmlSales(this.xmlRaw.result, set);
+    this.mstWarning = set && detected && set !== detected
+      ? `MST công ty đã nhập ${set} khác MST bên bán gặp nhiều nhất trong XML ${detected} — có đúng thư mục HĐ đầu ra không?` : '';
+    this.xmlSales = invoices;
+    this.xmlById = new Map(invoices.map(i => [String(SaleInvoiceSourceService.toRecon(i).id), i]));
+    this.noPaymentCount = invoices.filter(i => i.httt === undefined).length;
+    const days = invoices.map(i => i.tdlap).sort();
+    this.xmlInfo = `${invoices.length.toLocaleString('vi-VN')} HĐ đầu ra (MST ${mst || '?'})`
+      + (days.length ? ` · ngày lập ${this.viDate(days[0])} → ${this.viDate(days[days.length - 1])}` : '');
+    console.log(`${LOG} XML "${this.xmlFolder}": ${this.xmlInfo}` + (this.noPaymentCount ? ` · ${this.noPaymentCount} HĐ bản lưu cũ chưa có HTTT` : ''));
+  }
+
+  // ===== sao kê =====
   async onFileSelected(event: Event) {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files || []);
-    input.value = ''; // cho phép chọn lại cùng file
+    input.value = '';
     await this.loadStatementFiles(files);
   }
 
@@ -161,26 +181,18 @@ export class BankReconciliationPageComponent {
       this.bank = this.mergeStatements(results);
       console.log(`${LOG} Sao kê: ${files.length} file, ${this.bank.count} GD ghi có, tổng ${this.bank.totalCredit.toLocaleString('vi-VN')} ₫ (${this.bank.fromDate} → ${this.bank.toDate})`);
       this.applyBankDateRange();
-      if (this.kvLoaded) this.activeTab = 'all';
-      this.computeRows();
     } catch (e: any) {
       console.warn(`${LOG} Không đọc được sao kê (${files.map(f => f.name).join(', ')}): ${e?.message || e}`);
       this.bank = null;
       this.dateNote = '';
       this.error = e?.message || 'Không đọc được file Bảng kê.';
-      this.computeRows();
     } finally {
       this.parsingFile = false;
+      this.computeRows();
     }
   }
 
-  /** Dữ liệu cho file Excel tổng hợp của trang gộp (utils/bank-recon-export.util.ts). null = chưa lấy HĐĐT. */
-  exportData(): { pairs: ReconPair[] | null; withBank: boolean; from: string; to: string } {
-    return { pairs: this.kvLoaded ? this.pairs : null, withBank: !!this.bank,
-      from: this.loadedFrom || this.fromDate, to: this.loadedTo || this.toDate };
-  }
-
-  /** Bỏ sao kê đang import → khoảng ngày về theo thanh chọn kỳ. */
+  /** Bỏ sao kê → khoảng ngày về theo thanh chọn kỳ. */
   clearBank(): void {
     this.bank = null;
     this.bankFileName = '';
@@ -188,11 +200,9 @@ export class BankReconciliationPageComponent {
     const p = this.periodService.period();
     this.fromDate = p.from;
     this.toDate = p.to;
-    if (this.activeTab === 'all') this.activeTab = 'multi';
     this.computeRows();
   }
 
-  /** Gộp nhiều bảng kê, loại GD trùng (các file chồng ngày nhau) theo Mã GD. */
   private mergeStatements(list: BankStatementResult[]): BankStatementResult {
     if (list.length === 1) return list[0];
     const seen = new Set<string>();
@@ -202,8 +212,7 @@ export class BankReconciliationPageComponent {
       seen.add(key);
       return true;
     });
-    const pick = (vals: string[], dir: 1 | -1) =>
-      vals.filter(Boolean).sort((a, b) => a.localeCompare(b) * dir)[0] || '';
+    const pick = (vals: string[], dir: 1 | -1) => vals.filter(Boolean).sort((a, b) => a.localeCompare(b) * dir)[0] || '';
     return {
       transactions,
       totalCredit: transactions.reduce((s, t) => s + t.credit, 0),
@@ -217,324 +226,136 @@ export class BankReconciliationPageComponent {
     };
   }
 
-  /**
-   * HĐĐT đã lưu trên máy chủ; ngày chưa lấy / lấy khi chưa hết ngày → máy chủ lấy từ einvoice (≤ 7 ngày / lần).
-   * `force` = lấy lại mọi ngày (HĐ nháp đã phát hành, HĐ thay thế / xóa).
-   */
-  async loadKiotViet(force = false) {
-    if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) {
-      console.warn(`${LOG} Khoảng ngày không hợp lệ: ${this.fromDate} → ${this.toDate}`);
-      this.error = 'Vui lòng chọn khoảng ngày hợp lệ.';
-      return;
-    }
-    this.error = '';
-    this.loadingKv = true;
-    this.loadProgress = '';
-    try {
-      const { data, syncedDays, cachedAt } = await this.service.load(this.fromDate, this.toDate, force,
-        (i, n) => this.loadProgress = `lấy từ einvoice ${i}/${n}`);
-      const { primary, fallback } = readEInvoiceBills(data.invoices);
-      this.invoices = primary;
-      this.fallbackInvoices = fallback;
-      this.range = data;
-      this.loadedFrom = this.fromDate;
-      this.loadedTo = this.toDate;
-      this.syncNote = syncedDays ? `vừa lấy ${syncedDays} ngày từ einvoice`
-        : cachedAt ? `bản lưu trên máy này lúc ${new Date(cachedAt).toLocaleString('vi-VN')}` : 'dữ liệu đã lưu trên máy chủ';
-      this.kvLoaded = true;
-      console.log(`${LOG} ${this.fromDate} → ${this.toDate}: ${data.invoices.length} HĐĐT → CK ${primary.length}, TM dự phòng ${fallback.length} (${this.syncNote})`);
-      if (!this.bank) this.activeTab = 'multi';
-      this.computeRows();
-    } catch (e: any) {
-      console.error(`${LOG} Lấy HĐĐT ${this.fromDate} → ${this.toDate} lỗi: ${httpErrorText(e)}`);
-      this.error = `Không lấy được HĐĐT: ${e?.error?.detail || e?.message || httpErrorText(e)}`;
-    } finally {
-      this.loadingKv = false;
-      this.loadProgress = '';
-    }
-  }
-
-  /**
-   * Khoảng ngày lấy HĐ KiotViet bám theo NGÀY GIAO DỊCH thực tế trong file.
-   * TPBank lọc bảng kê theo NGÀY GIÁ TRỊ: GD Chủ Nhật có ngày giá trị = Thứ 2 nên nằm trong bảng kê kỳ Thứ 2.
-   * Cột A vẫn giữ ngày giờ thật của GD ⇒ lấy min/max cột A là ra đúng khoảng cần đối soát.
-   */
+  /** Khoảng ngày bám NGÀY GIAO DỊCH thực tế trong file (TPBank lọc bảng kê theo Ngày giá trị — GD Chủ Nhật nằm ở kỳ Thứ 2). */
   private applyBankDateRange(): void {
     this.dateNote = '';
-    const from = this.bank?.fromDate;
-    const to = this.bank?.toDate;
-    if (!from || !to) return;
-
-    this.fromDate = from;
-    this.toDate = to;
-
-    const b = this.bank!;
+    const b = this.bank;
+    if (!b?.fromDate || !b.toDate) return;
+    this.fromDate = b.fromDate;
+    this.toDate = b.toDate;
     const period = b.periodFrom && b.periodTo
       ? `Kỳ sao kê ${this.viDate(b.periodFrom)} → ${this.viDate(b.periodTo)} (lọc theo Ngày giá trị) · ` : '';
-    const span = from === to
-      ? `GD thực tế ngày ${this.viDate(from)}`
+    const span = b.fromDate === b.toDate ? `GD thực tế ngày ${this.viDate(b.fromDate)}`
       : `GD thực tế ${this.viStamp(b.firstTxnAt)} → ${this.viStamp(b.lastTxnAt)}`;
-    this.dateNote = `${period}${span} · đã đặt khoảng lấy HĐĐT ${this.viDate(from)} → ${this.viDate(to)}.`;
+    this.dateNote = `${period}${span} · đối soát với HĐ lập ${this.viDate(b.fromDate)} → ${this.viDate(b.toDate)}`
+      + ` (+ ${EINVOICE_PUBLISH_LAG_DAYS} ngày sau cho HĐĐT phát hành trễ).`;
   }
 
-  viDate(iso: string): string {
-    const [y, m, d] = iso.split('-');
-    return `${d}/${m}/${y}`;
+  onDatesChanged(): void {
+    if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) return;
+    console.log(`${LOG} Khoảng ngày → ${this.fromDate} → ${this.toDate}`);
+    this.computeRows();
   }
 
-  private viStamp(stamp: string): string {
-    return `${this.viDate(stamp.slice(0, 10))} ${stamp.slice(11, 16)}`;
-  }
+  // ===== đối soát =====
+  get sourceReady(): boolean { return !!this.xmlRaw; }
+  get canCompare(): boolean { return !!this.bank && this.sourceReady; }
 
-  /** ISO UTC → "dd/mm HH:mm" giờ máy */
-  viSync(iso: string | null | undefined): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
-  }
-
-  get rangeChanged(): boolean {
-    return this.kvLoaded && (this.fromDate !== this.loadedFrom || this.toDate !== this.loadedTo);
-  }
-
-  /** Khớp theo số tiền (xem transfer-reconcile.util.ts), dựng dữ liệu cho 3 tab. */
-  private computeRows() {
-    this.pairs = reconcileWithFallback(expandInvoiceItems(this.invoices), expandInvoiceItems(this.fallbackInvoices),
-      this.bank?.transactions ?? [], {
-        periodFrom: this.loadedFrom || this.fromDate, periodTo: this.loadedTo || this.toDate, amountTolerance: EINVOICE_AMOUNT_TOLERANCE
+  private computeRows(): void {
+    if (!this.canCompare || !this.fromDate || !this.toDate) {
+      this.pairs = [];
+      this.viewRows = [];
+      this.invoices = this.fallbackInvoices = [];
+      this.computeStats();
+      return;
+    }
+    const t0 = performance.now();
+    const lastDay = this.addDays(this.toDate, EINVOICE_PUBLISH_LAG_DAYS);
+    const all = this.xmlSales.filter(i => i.tdlap >= this.fromDate && i.tdlap <= lastDay).map(SaleInvoiceSourceService.toRecon);
+    this.invoices = all.filter(i => i.paymentMethod !== 'TM');
+    this.fallbackInvoices = all.filter(i => i.paymentMethod === 'TM');
+    const pairs = reconcileWithFallback(expandInvoiceItems(this.invoices), expandInvoiceItems(this.fallbackInvoices),
+      this.bank!.transactions, {
+        windowBeforeMin: 0, windowAfterMin: DAY - 1,   // cùng ngày lập (giờ HĐ = 00:00)
+        lateWindow: { beforeMin: EINVOICE_PUBLISH_LAG_DAYS * DAY, afterMin: 2 * DAY - 1 },
+        periodFrom: this.fromDate, periodTo: this.toDate, amountTolerance: EINVOICE_AMOUNT_TOLERANCE,
       });
-    this.buildMultiRows();
-    this.buildExcessRows();
+    // HĐ lập sau kỳ (lấy thêm cho HĐĐT phát hành trễ) mà không khớp GD → thuộc kỳ sau, không báo "HĐ thiếu GD"
+    const toKey = this.viKey(this.toDate);
+    const outside = (p: ReconPair) => p.kind === 'invoice_only' && this.viKey(p.item!.invoice.time) > toKey;
+    this.outsideUnmatched = pairs.filter(outside).length;
+    this.pairs = pairs.filter(p => !outside(p));
+    this.viewRows = saleViewRows(this.pairs, id => {
+      const x = this.xmlById.get(id);
+      return x ? { party: x.nmten || x.nmhvten || '', mst: x.nmmst, payment: x.httt || '' } : undefined;
+    });
     this.computeStats();
-    this.buildAlignedRows();
-    this.logCompare();
+    console.log(`${LOG} Đối soát ${this.fromDate} → ${this.toDate}: ${this.invoices.length} HĐ CK/TMCK + ${this.fallbackInvoices.length} HĐ TM`
+      + ` (đến ${lastDay}) ⇄ ${this.bankCount} GD — khớp ${this.matchedCount}, khác ngày ${this.lateCount}, HĐ thiếu GD ${this.invoiceUnmatched},`
+      + ` GD thừa ${this.bankUnmatched}, HĐ sau kỳ bỏ ${this.outsideUnmatched} · khớp ${this.matchRate}% (${(performance.now() - t0).toFixed(0)} ms)`);
   }
 
-  private buildAlignedRows(): void {
-    const rows: AlignedRow[] = this.pairs.map(p => {
-      const it = p.item;
-      return {
-        amount: p.amount,
-        kind: p.kind,
-        kindLabel: RECON_KIND_LABEL[p.kind],
-        code: it?.invoice.code ?? '',
-        einvoiceNo: it?.invoice.einvoiceNumber || '',
-        einvoiceStatus: it?.invoice.einvoiceStatus || '',
-        time: it?.invoice.time ?? '',
-        total: it ? it.invoice.total : null,
-        note: it?.invoice.note ?? '',
-        part: !it ? '' : it.partCount > 1 ? `${it.partIndex}/${it.partCount}`
-          : it.excess?.refund ? `CK dư, trả lại ${this.formatVnd(it.excess.refund)}` : '—',
-        issue: isEInvoiceIssuePair(p),
-        txnText: p.txn ? [payerLabel(p.txn), p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
-        hint: reconPairHint(p)
-      };
-    });
-
-    const rank: Record<ReconKind, number> = { invoice_only: 0, bank_only: 0, matched_late: 1, matched: 2 };
-    if (this.sortMode === 'unmatched') {
-      const r = (x: AlignedRow) => x.issue ? 0 : rank[x.kind];
-      rows.sort((a, b) => (r(a) - r(b)) || (b.amount - a.amount));
-    } else {
-      const dir = this.sortMode === 'amountAsc' ? 1 : -1;
-      rows.sort((a, b) => (a.amount - b.amount) * dir);
-    }
-    this.alignedRows = this.viewFilter === 'all' ? rows
-      : rows.filter(r => this.viewFilter === 'late' ? r.kind === 'matched_late' : r.issue || rank[r.kind] === 0);
-    this.page = 1;
+  /** Dữ liệu cho file Excel tổng hợp của trang gộp (utils/bank-recon-export.util.ts). null = chưa đối soát được. */
+  exportData(): { pairs: ReconPair[] | null; view: ReconViewRow[]; withBank: boolean; from: string; to: string } {
+    return { pairs: this.canCompare ? this.pairs : null, view: this.viewRows, withBank: !!this.bank, from: this.fromDate, to: this.toDate };
   }
 
-  // ===== Phân trang bảng khớp (cả quý ~25k cặp) =====
-  get pageCount(): number { return Math.max(1, Math.ceil(this.alignedRows.length / this.pageSize)); }
-  get pageRows(): AlignedRow[] {
-    const start = (this.page - 1) * this.pageSize;
-    return this.alignedRows.slice(start, start + this.pageSize);
-  }
-  goPage(p: number): void { this.page = Math.min(Math.max(1, p), this.pageCount); }
-  onPageSize(): void { this.page = 1; }
-
-  setViewFilter(f: 'all' | 'issues' | 'late'): void {
-    this.viewFilter = f;
-    this.buildAlignedRows();
-  }
-
-  private buildMultiRows(): void {
-    let prev = '';
-    this.multiRows = multiTransferPairs(this.pairs).map(p => {
-      const it = p.item!;
-      const first = it.invoice.code !== prev;
-      prev = it.invoice.code;
-      return {
-        first,
-        code: it.invoice.code,
-        einvoiceNo: it.invoice.einvoiceNumber || '',
-        einvoiceStatus: it.invoice.einvoiceStatus || '',
-        time: it.invoice.time,
-        total: it.invoice.total,
-        note: it.invoice.note,
-        noteStatus: it.note ? NOTE_STATUS_LABEL[it.note.status] : '',
-        noteOk: it.note?.status === 'ok',
-        part: it.partCount > 1 ? `${it.partIndex}/${it.partCount}` : '—',
-        amount: it.partCount > 1 ? it.amount : null,
-        kind: p.kind,
-        kindLabel: RECON_KIND_LABEL[p.kind],
-        txnText: p.txn ? [payerLabel(p.txn), p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
-        hint: reconPairHint(p)
-      };
-    });
-  }
-
-  private buildExcessRows(): void {
-    this.excessRows = excessTransferPairs(this.pairs).map(p => {
-      const it = p.item!;
-      const ex = it.excess!;
-      return {
-        code: it.invoice.code,
-        einvoiceNo: it.invoice.einvoiceNumber || '',
-        einvoiceStatus: it.invoice.einvoiceStatus || '',
-        time: it.invoice.time,
-        total: it.invoice.total,
-        note: it.invoice.note,
-        noteStatus: NOTE_STATUS_LABEL[ex.status],
-        noteOk: ex.status === 'ok',
-        transferred: ex.transferred || null,
-        refund: ex.refund,
-        kind: p.kind,
-        kindLabel: RECON_KIND_LABEL[p.kind],
-        txnText: p.txn ? [payerLabel(p.txn), p.txn.date, p.txn.code].filter(Boolean).join(' · ') : '',
-        hint: reconPairHint(p)
-      };
-    });
-  }
-
-  /** Xoay vòng: Lệch lên đầu → Số tiền giảm → Số tiền tăng → Lệch lên đầu */
-  toggleSort(): void {
-    this.sortMode = this.sortMode === 'unmatched' ? 'amountDesc'
-      : this.sortMode === 'amountDesc' ? 'amountAsc' : 'unmatched';
-    this.buildAlignedRows();
-  }
-
-  get sortIcon(): string {
-    return this.sortMode === 'unmatched' ? 'fa-triangle-exclamation'
-      : this.sortMode === 'amountAsc' ? 'fa-caret-up' : 'fa-caret-down';
-  }
-
-  get sortLabel(): string {
-    return this.sortMode === 'unmatched' ? 'Lệch lên đầu' : 'Số tiền';
-  }
-
-  /** Log các mệnh giá lệch số lượng giữa 2 bên. */
-  private logCompare(): void {
-    if (!this.canCompare) return;
-    const diff = new Map<number, { kv: number; bank: number }>();
-    for (const p of this.pairs) {
-      if (p.kind !== 'invoice_only' && p.kind !== 'bank_only') continue;
-      const d = diff.get(p.amount) || { kv: 0, bank: 0 };
-      if (p.kind === 'invoice_only') d.kv++; else d.bank++;
-      diff.set(p.amount, d);
-    }
-    const table = [...diff.entries()]
-      .map(([a, d]) => ({ 'Số tiền': a.toLocaleString('vi-VN'), 'HĐ dư': d.kv, 'GD dư': d.bank }))
-      .sort((a, b) => (b['HĐ dư'] + b['GD dư']) - (a['HĐ dư'] + a['GD dư']));
-
-    console.group(`${LOG} Kết quả đối soát`);
-    console.log(`HĐĐT CK: ${this.invoices.length} HĐ (${this.itemCount} khoản, gồm ${this.fallbackMatched} HĐ ghi TM khớp GD), tổng ${this.kvTotal.toLocaleString('vi-VN')} ₫`);
-    console.log(`GD TPBank (Ghi có): ${this.bankCount} GD, tổng ${this.bankTotal.toLocaleString('vi-VN')} ₫ · khớp ${this.matchRate}%`);
-    console.log(`Khớp lệch giờ: ${this.lateCount} | HĐ dư: ${this.invoiceUnmatched} | GD dư: ${this.bankUnmatched} | HĐĐT nháp / phát hành trễ: ${this.einvoiceIssueCount}`);
-    if (table.length > 0) console.table(table.slice(0, 50));
-    console.groupEnd();
-  }
-
-  // ===== Xuất CSV =====
+  /** CSV Đối soát như trước (doi-soat-ck_*.csv) — tool VietDA bản hiện tại đọc cột Mã GD / Số HĐĐT / Ký hiệu HĐĐT / Trạng thái */
   exportCsv(): void {
-    this.download(buildReconCsv(this.pairs), `doi-soat-ck_${this.loadedFrom}_${this.loadedTo}.csv`);
-  }
-
-  /** Xuất được cả khi CHƯA import sao kê (chỉ danh sách HĐ nhiều lần, không có cột khớp GD). */
-  exportMultiCsv(): void {
-    this.download(buildMultiTransferCsv(this.pairs, { withBank: !!this.bank }), `ck-nhieu-lan_${this.loadedFrom}_${this.loadedTo}.csv`);
-  }
-
-  exportExcessCsv(): void {
-    this.download(buildExcessTransferCsv(this.pairs, { withBank: !!this.bank }), `ck-du_${this.loadedFrom}_${this.loadedTo}.csv`);
-  }
-
-  exportActiveCsv(): void {
-    if (this.activeTab === 'all') this.exportCsv();
-    else if (this.activeTab === 'multi') this.exportMultiCsv();
-    else this.exportExcessCsv();
-  }
-
-  get csvDisabled(): boolean {
-    return this.activeTab === 'all' ? !this.canCompare
-      : this.activeTab === 'multi' ? !this.multiRows.length : !this.excessRows.length;
-  }
-
-  private download(content: string, fileName: string): void {
-    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+    const name = `doi-soat-ck_${this.fromDate}_${this.toDate}.csv`;
+    const url = URL.createObjectURL(new Blob([buildReconCsv(this.pairs)], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName;
+    a.download = name;
     a.click();
     URL.revokeObjectURL(url);
-    console.log(`${LOG} Xuất ${fileName}`);
+    console.log(`${LOG} Xuất ${name}`);
   }
 
-  // ===== Tổng hợp (tính 1 lần trong computeRows) =====
+  // ===== tổng hợp =====
   get bankTotal(): number { return this.bank?.totalCredit ?? 0; }
   get bankCount(): number { return this.bank?.transactions.length ?? 0; }
-  get invoiceCount(): number { return this.invoices.length; }
-  kvTotal = 0;
-  itemCount = 0;
-  fallbackMatched = 0;    // HĐĐT ghi Tiền mặt đã khớp GD (tính như HĐ CK)
+  kvTotal = 0;          // Σ HĐ CK trong kỳ + HĐ khớp GD (kể cả HĐ TM / HĐ lập sau kỳ đã khớp)
+  invoiceCount = 0;
+  fallbackMatched = 0;
+  matchedCount = 0;
   lateCount = 0;
   invoiceUnmatched = 0;
-  einvoiceIssueCount = 0;   // cặp đã khớp GD nhưng HĐĐT nháp / phát hành trễ ngày
   bankUnmatched = 0;
-  multiInvoiceCount = 0;
-  multiIssueCount = 0;
-  multiUnmatchedCount = 0;
-  excessIssueCount = 0;
-  excessUnmatchedCount = 0;
-  excessExtraTotal = 0;   // Σ (khách chuyển − tổng HĐ) của HĐ CK dư = tiền vào NH nhiều hơn HĐ, đã trả lại khách
 
   private computeStats(): void {
-    this.kvTotal = this.invoices.reduce((s, r) => s + r.total, 0);
-    this.itemCount = this.lateCount = this.invoiceUnmatched = this.bankUnmatched = this.excessExtraTotal = this.fallbackMatched = this.einvoiceIssueCount = 0;
+    this.kvTotal = this.invoiceCount = this.fallbackMatched = this.matchedCount = this.lateCount = this.invoiceUnmatched = this.bankUnmatched = 0;
     const fallback = new Set(this.fallbackInvoices);
     for (const p of this.pairs) {
-      if (p.item) this.itemCount++;
-      if (p.item && fallback.has(p.item.invoice)) {
-        this.fallbackMatched++;
+      if (p.item) {
         this.kvTotal += p.item.amount;
+        this.invoiceCount++;
+        if (fallback.has(p.item.invoice)) this.fallbackMatched++;
       }
-      if (p.item?.excess) this.excessExtraTotal += p.item.amount - p.item.invoice.total;
-      if (p.kind === 'matched_late') this.lateCount++;
+      if (p.kind === 'matched') this.matchedCount++;
+      else if (p.kind === 'matched_late') this.lateCount++;
       else if (p.kind === 'invoice_only') this.invoiceUnmatched++;
-      if (isEInvoiceIssuePair(p)) this.einvoiceIssueCount++;
-      else if (p.kind === 'bank_only') this.bankUnmatched++;
+      else this.bankUnmatched++;
     }
-    this.multiInvoiceCount = this.multiRows.filter(r => r.first).length;
-    this.multiIssueCount = this.multiRows.filter(r => r.first && !r.noteOk).length;
-    this.multiUnmatchedCount = this.multiRows.filter(r => r.kind === 'invoice_only').length;
-    this.excessIssueCount = this.excessRows.filter(r => !r.noteOk).length;
-    this.excessUnmatchedCount = this.excessRows.filter(r => r.kind === 'invoice_only').length;
   }
 
-  // Trừ phần CK dư đã trả lại khách: GD NH lớn hơn HĐ nhưng không phải chênh lệch thật
-  get difference(): number { return this.bankTotal - this.kvTotal - this.excessExtraTotal; }
-  get canCompare(): boolean { return !!this.bank && this.kvLoaded; }
-  get isBalanced(): boolean {
-    return this.canCompare && this.invoiceUnmatched === 0 && this.bankUnmatched === 0 && this.einvoiceIssueCount === 0;
-  }
-  /** % GD ghi có đã khớp HĐĐT (mục tiêu > 90%) */
+  get difference(): number { return this.bankTotal - this.kvTotal; }
+  get isBalanced(): boolean { return this.canCompare && this.invoiceUnmatched === 0 && this.bankUnmatched === 0; }
+  /** % GD ghi có đã khớp HĐ */
   get matchRate(): string {
     return this.bankCount ? ((100 * (this.bankCount - this.bankUnmatched)) / this.bankCount).toFixed(1) : '0';
   }
 
+  // ===== định dạng =====
+  private addDays(iso: string, n: number): string {
+    return new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+  }
+  /** 'dd/mm/yyyy' | 'yyyy-mm-dd' → 'yyyymmdd' để so sánh */
+  private viKey(s: string): string {
+    const vi = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(s);
+    return vi ? `${vi[3]}${vi[2]}${vi[1]}` : s.slice(0, 10).replace(/-/g, '');
+  }
+  viDate(iso: string): string {
+    const [y, m, d] = (iso || '').slice(0, 10).split('-');
+    return d ? `${d}/${m}/${y}` : iso;
+  }
+  private viStamp(stamp: string): string {
+    return `${this.viDate(stamp.slice(0, 10))} ${stamp.slice(11, 16)}`;
+  }
+  viTime(ms: number | null): string {
+    return ms ? new Date(ms).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  }
   formatVnd(n: number | null | undefined): string {
-    if (n === null || n === undefined) return '—';
-    return n.toLocaleString('vi-VN') + ' ₫';
+    return n === null || n === undefined ? '—' : n.toLocaleString('vi-VN') + ' ₫';
   }
 }

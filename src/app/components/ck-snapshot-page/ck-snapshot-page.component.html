@@ -1,0 +1,80 @@
+<!-- ĐỐI SOÁT CK → CK nhiều lần / CK dư do BanHang lưu (13/11/2026) -->
+<div class="page">
+  <header class="page-head">
+    <h1><i class="fa-solid fa-layer-group"></i> CK nhiều lần / CK dư (từ BanHang)</h1>
+    <p class="sub">Nhân viên chạy <b>Đối soát CK</b> ở BanHang (có sao kê + HĐĐT) thì 2 tab <b>CK nhiều lần</b> và <b>CK dư</b> tự lưu lên máy chủ
+      theo ngày bán (lần chạy sau ghi đè). Trang này chỉ đọc lại — dùng cho các HĐ "chuyển khoản N lần a + b" / "chuyển khoản dư X, trả lại Y"
+      mà XML không ghi.</p>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <span>Kỳ <b>{{ periodLabel() }}</b> (đổi ở thanh chọn kỳ)</span>
+      <button type="button" class="btn btn-primary" (click)="load()" [disabled]="loading">
+        <i class="fa-solid" [ngClass]="loading ? 'fa-spinner fa-spin' : 'fa-rotate'"></i> {{ loading ? 'Đang tải...' : 'Tải lại' }}
+      </button>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-excel" (click)="exportExcel()" [disabled]="!days.length">
+        <i class="fa-solid fa-file-excel"></i> Xuất Excel
+      </button>
+    </div>
+    @if (loaded) {
+      <div class="row hint">
+        <span><b>{{ days.length }}</b> / {{ days.length + missing.length }} ngày có bản lưu@if (days.length) { · lưu lúc {{ savedRange }} }</span>
+        @if (missing.length) { <span class="warn">· chưa có: {{ missingText }} (BanHang chưa chạy đối soát có sao kê ngày đó)</span> }
+      </div>
+    }
+    @if (error) { <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div> }
+  </section>
+
+  @if (loading && !loaded) {
+    <app-table-loading text="Đang tải bản lưu..."></app-table-loading>
+  } @else if (loaded) {
+    <nav class="tabs">
+      <button type="button" [class.active]="tab === 'multi'" (click)="setTab('multi')"><i class="fa-solid fa-layer-group"></i> CK nhiều lần ({{ countOf('multi') }})</button>
+      <button type="button" [class.active]="tab === 'excess'" (click)="setTab('excess')"><i class="fa-solid fa-money-bill-transfer"></i> CK dư ({{ countOf('excess') }})</button>
+    </nav>
+    <div class="filter-chips">
+      <button type="button" [class.active]="filter === ''" (click)="setFilter('')">Tất cả</button>
+      <button type="button" [class.active]="filter === 'bad'" (click)="setFilter('bad')">Lệch ({{ badCount }})</button>
+      <button type="button" [class.active]="filter === 'note'" (click)="setFilter('note')">Ghi chú lệch ({{ noteCount }})</button>
+      <span class="search"><i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" [(ngModel)]="q" (ngModelChange)="rebuild()" placeholder="Mã HĐ, số HĐĐT, ghi chú, người chuyển, số tiền..."></span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ngày bán</th><th>Mã HĐ</th><th>Số HĐĐT</th><th>Giờ HĐ</th><th class="num">Tổng HĐ</th><th>Ghi chú</th>
+            @if (tab === 'multi') { <th>Khoản</th><th class="num">Số tiền</th> } @else { <th class="num">Khách chuyển</th><th class="num">Trả lại</th> }
+            <th>Giao dịch khớp</th><th>Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of view; track $index) {
+            <tr [ngClass]="'tone-' + r.tone" [class.group-start]="r.first">
+              <td>{{ r.first ? viDate(r.day) : '' }}</td>
+              <td class="code">{{ r.first ? r.code : '' }}</td>
+              <td class="code" [title]="r.einvoiceStatus">{{ r.first ? r.einvoiceNo : '' }}</td>
+              <td>{{ r.first ? r.time : '' }}</td>
+              <td class="num">{{ r.first ? vnd(r.total) : '' }}</td>
+              <td>@if (r.first) { {{ r.note }} <span class="note-status" [class.bad]="!r.noteOk">{{ r.noteStatus }}</span> }</td>
+              @if (tab === 'multi') {
+                <td>{{ r.part || '—' }}</td><td class="num">{{ vnd(r.amount) }}</td>
+              } @else {
+                <td class="num">{{ vnd(r.amount || null) }}</td><td class="num">{{ vnd(r.refund) }}</td>
+              }
+              <td class="txn">@if (r.txnCode) { {{ r.txnPayer }} · {{ r.txnDate }} <small>{{ r.txnCode }}</small> } @else { — }</td>
+              <td><span class="kind">{{ kindLabel[r.kind] }}</span>@if (r.hint) { <small class="hint-inline">{{ r.hint }}</small> }</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (!view.length) {
+        <div class="empty">{{ (tab === 'multi' ? countOf('multi') : countOf('excess')) ? 'Không có dòng nào khớp bộ lọc.'
+          : 'Không có HĐ ' + (tab === 'multi' ? '"chuyển khoản N lần"' : '"chuyển khoản dư"') + ' trong các ngày đã lưu.' }}</div>
+      }
+    </div>
+  }
+</div>

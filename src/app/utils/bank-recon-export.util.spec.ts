@@ -3,6 +3,7 @@ import { EXPORT_SCHEMA, VIETDA_HEADER, buildBankReconWorkbook, vietdaRows, BankR
 import { expandInvoiceItems, reconcileByAmount, ReconInvoice } from './transfer-reconcile.util';
 import { PurchaseMatchRow } from './purchase-transfer-reconcile.util';
 import { DebitTxn } from './tpbank-debit.util';
+import { purchaseViewRows, saleViewRows } from './recon-view.util';
 
 const inv = (code: string, total: number, time: string, o: Partial<ReconInvoice> = {}): ReconInvoice =>
   ({ id: code, code, total, time, note: 'chuyển khoản', einvoiceSerial: 'C26MSM', einvoiceNumber: '33427',
@@ -28,7 +29,8 @@ function input(): BankReconExportInput {
     ], txns: [debit('D1', 500000, '2026-11-04 09:00:00')], amount: 500000, days: 2, confidence: 'cao', hint: '' },
     { kind: 'bank_only', invoices: [], txns: [debit('D2', 1000000, '2026-11-04 12:00:00')], amount: 1000000, days: null, confidence: '', hint: '' },
   ];
-  return { from: '2026-11-04', to: '2026-11-04', statementFiles: ['sk.xlsx'], salePairs, saleWithBank: true, purchaseRows, debitTxns: [] };
+  return { from: '2026-11-04', to: '2026-11-04', statementFiles: ['sk.xlsx'], salePairs, saleWithBank: true, purchaseRows, debitTxns: [],
+    saleView: saleViewRows(salePairs, () => undefined), purchaseView: purchaseViewRows(purchaseRows) };
 }
 
 describe('bank-recon-export.util', () => {
@@ -55,7 +57,7 @@ describe('bank-recon-export.util', () => {
     const files = unzipSync(bytes);
     const wb = strFromU8(files['xl/workbook.xml']);
     const names = [...wb.matchAll(/<sheet name="([^"]+)"/g)].map(m => m[1]);
-    expect(names).toEqual(['Nhap-VietDA', 'Ban-ra_Doi-soat', 'Ban-ra_CK-nhieu-lan', 'Ban-ra_CK-du', 'Mua-vao', 'Thong-tin']);
+    expect(names).toEqual(['Nhap-VietDA', 'Ban-ra', 'Mua-vao', 'Thong-tin']);
     const s1 = strFromU8(files['xl/worksheets/sheet1.xml']);
     for (const h of VIETDA_HEADER) expect(s1).toContain(`<t xml:space="preserve">${h}</t>`);
     // màu dòng: style = 2 + tone×3 + (0 chữ | 1 số | 2 chữ đậm) — tone 1 = ok (xanh), 3 = bad (đỏ)
@@ -63,6 +65,11 @@ describe('bank-recon-export.util', () => {
     expect(s1).toMatch(/<c r="E3" s="6"><v>500000<\/v><\/c>/);   // D1 khớp → xanh
     expect(s1).toMatch(/<c r="J3" t="inlineStr" s="7">/);         // cột "Lập phiếu theo HĐ" đậm xanh
     expect(strFromU8(files['xl/styles.xml'])).toContain('FFE2F0D9');
-    expect(strFromU8(files['xl/worksheets/sheet6.xml'])).toContain(EXPORT_SCHEMA);
+    expect(strFromU8(files['xl/worksheets/sheet4.xml'])).toContain(EXPORT_SCHEMA);
+    // Ban-ra / Mua-vao cùng cột
+    const head = (n: number) => [...strFromU8(files[`xl/worksheets/sheet${n}.xml`]).split('</row>')[0].matchAll(/<t xml:space="preserve">([^<]*)<\/t>/g)].map(m => m[1]);
+    expect(head(2).length).toBe(head(3).length);
+    expect(head(2)[0]).toBe('Kết quả');
+    expect(head(3)[4]).toBe('Nhà cung cấp');
   });
 });

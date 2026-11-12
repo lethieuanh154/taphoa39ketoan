@@ -4,10 +4,10 @@
  * đầu vào" (PurchaseInvoiceSourceService, IndexedDB, chạy nền). 28/10/2026: bỏ nguồn Gmail (portal-links + scrape cổng NCC đã gỡ).
  * HĐ: theo KỲ ở thanh chọn kỳ (XML: dùng cả HĐ ngoài kỳ để ghép tiền trả HĐ cũ, nhưng chỉ báo "HĐ chưa thấy CK" cho HĐ trong kỳ).
  * Sao kê: mọi GD tiền ra trong file đã chọn (lưu IndexedDB `tpbank-debit`). Ghép: utils/purchase-transfer-reconcile.util.ts.
+ * 13/11/2026: bảng kết quả = app-recon-table dùng chung tab Bán ra (utils/recon-view.util.ts purchaseViewRows).
  */
 import { Component, Input, effect, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { PeriodService } from '../../services/period.service';
 import { CompanyService } from '../../services/company.service';
 import { TienIchCacheService } from '../../services/tien-ich-cache.service';
@@ -15,10 +15,11 @@ import { BgJob } from '../../services/background-job.service';
 import { CachedXml, PurchaseInvoiceSourceService } from '../../services/purchase-invoice-source.service';
 import { DebitStatement, mergeDebitStatements, parseTpBankDebitFiles } from '../../utils/tpbank-debit.util';
 import {
-  PURCHASE_KIND_LABEL, PurchaseInv, PurchaseMatchKind, PurchaseMatchRow, PurchaseReconResult, buildPurchaseReconCsv,
-  reconcilePurchaseTransfers, MAX_DAYS_AFTER, MAX_DAYS_BEFORE
+  PurchaseInv, PurchaseReconResult, buildPurchaseReconCsv, reconcilePurchaseTransfers, MAX_DAYS_AFTER, MAX_DAYS_BEFORE
 } from '../../utils/purchase-transfer-reconcile.util';
+import { PURCHASE_CHIPS, ReconViewRow, purchaseViewRows } from '../../utils/recon-view.util';
 import { TableLoadingComponent } from '../shared/table-loading/table-loading.component';
+import { ReconTableComponent } from '../shared/recon-table/recon-table.component';
 
 const LOG = '[BankReconIn]';
 const BANK_KEY = 'tpbank-debit';
@@ -26,7 +27,7 @@ const BANK_KEY = 'tpbank-debit';
 @Component({
   selector: 'app-bank-reconciliation-in-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TableLoadingComponent],
+  imports: [CommonModule, TableLoadingComponent, ReconTableComponent],
   templateUrl: './bank-reconciliation-in-page.component.html',
   styleUrl: './bank-reconciliation-in-page.component.css'
 })
@@ -40,7 +41,7 @@ export class BankReconciliationInPageComponent implements OnInit {
   @Input() embedded = false;
 
   readonly periodLabel = this.periodService.label;
-  readonly kindLabel = PURCHASE_KIND_LABEL;
+  readonly chips = PURCHASE_CHIPS;
   readonly window = { before: MAX_DAYS_BEFORE, after: MAX_DAYS_AFTER };
   from = '';
   to = '';
@@ -62,16 +63,8 @@ export class BankReconciliationInPageComponent implements OnInit {
 
   // Kết quả
   result: PurchaseReconResult | null = null;
-  filter: '' | PurchaseMatchKind | 'low' = '';
-  q = '';
-  page = 1;
-  readonly pageSize = 100;
+  viewRows: ReconViewRow[] = [];
   error = '';
-
-  readonly chips: { value: '' | PurchaseMatchKind | 'low'; label: string }[] = [
-    { value: '', label: 'Tất cả' }, { value: 'invoice_only', label: 'HĐ chưa thấy CK' }, { value: 'bank_only', label: 'CK không có HĐ' },
-    { value: 'low', label: 'Khớp — cần xem' }, { value: 'matched', label: 'Khớp 1–1' }, { value: 'matched_group', label: '1 CK trả nhiều HĐ' },
-    { value: 'matched_split', label: '1 HĐ trả nhiều lần' }];
 
   constructor() {
     effect(() => {
@@ -262,58 +255,28 @@ export class BankReconciliationInPageComponent implements OnInit {
   private recompute(): void {
     if (!this.bank || !this.sourceReady) {
       this.result = null;
+      this.viewRows = [];
       return;
     }
     const t0 = performance.now();
     this.result = reconcilePurchaseTransfers(this.invoices, this.bank.transactions, { from: this.from, to: this.to });
-    this.page = 1;
+    this.viewRows = purchaseViewRows(this.result.rows);
     const c = this.result.counts;
     console.log(`${LOG} Đối soát ${this.invoices.length} HĐ ⇄ ${this.bank.transactions.length} GD: khớp ${c.matched}, `
       + `gộp ${c.matched_group}, tách ${c.matched_split}, HĐ chưa thấy CK ${c.invoice_only}, CK không có HĐ ${c.bank_only} `
       + `(${(performance.now() - t0).toFixed(0)} ms)`);
   }
 
-  countOf(v: '' | PurchaseMatchKind | 'low'): number {
-    if (!this.result) return 0;
-    if (!v) return this.result.rows.length;
-    if (v === 'low') return this.result.rows.filter(r => r.kind.startsWith('matched') && r.confidence !== 'cao').length;
-    return this.result.counts[v];
-  }
-
-  get filteredRows(): PurchaseMatchRow[] {
-    if (!this.result) return [];
-    let rows = this.result.rows;
-    if (this.filter === 'low') rows = rows.filter(r => r.kind.startsWith('matched') && r.confidence !== 'cao');
-    else if (this.filter) rows = rows.filter(r => r.kind === this.filter);
-    const q = this.q.trim().toLowerCase();
-    if (q) {
-      rows = rows.filter(r => [...r.invoices.map(i => `${i.symbol}-${i.no} ${i.sellerName} ${i.sellerMst} ${i.total}`),
-        ...r.txns.map(t => `${t.counterparty} ${t.desc} ${t.amount} ${t.code}`)].join(' ').toLowerCase().includes(q));
-    }
-    return rows;
-  }
-
-  get pageRows(): PurchaseMatchRow[] {
-    const s = (this.page - 1) * this.pageSize;
-    return this.filteredRows.slice(s, s + this.pageSize);
-  }
-
-  get pageCount(): number { return Math.max(1, Math.ceil(this.filteredRows.length / this.pageSize)); }
-
-  setFilter(f: '' | PurchaseMatchKind | 'low'): void {
-    this.filter = f;
-    this.page = 1;
-  }
-
   exportCsv(): void {
     const name = `ck-hd-dau-vao_${this.from}_${this.to}.csv`;
-    const url = URL.createObjectURL(new Blob(['﻿' + buildPurchaseReconCsv(this.filteredRows)], { type: 'text/csv;charset=utf-8' }));
+    const rows = this.result?.rows ?? [];
+    const url = URL.createObjectURL(new Blob(['﻿' + buildPurchaseReconCsv(rows)], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = name;
     a.click();
     URL.revokeObjectURL(url);
-    console.log(`${LOG} Xuất ${name} (${this.filteredRows.length} dòng)`);
+    console.log(`${LOG} Xuất ${name} (${rows.length} dòng)`);
   }
 
   vnd(n: number | null | undefined): string {

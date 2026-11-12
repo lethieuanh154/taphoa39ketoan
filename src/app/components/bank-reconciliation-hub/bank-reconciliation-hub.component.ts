@@ -1,6 +1,7 @@
 /**
  * ĐỐI SOÁT CK — 1 trang cho cả BÁN RA + MUA VÀO (06/11/2026, user: "gộp 2 phần mua vào và bán ra vào chung 1 trang").
- * Chọn sao kê TPBank 1 lần ở đầu trang: .xlsx → bán ra (Ghi có ⇄ HĐĐT) + mua vào (Ghi nợ ⇄ HĐ XML); .pdf chỉ đọc được tiền ra.
+ * Chọn sao kê TPBank 1 lần ở đầu trang: .xlsx → bán ra (Ghi có ⇄ HĐ XML đầu ra) + mua vào (Ghi nợ ⇄ HĐ XML đầu vào); .pdf chỉ tiền ra.
+ * 13/11/2026: bán ra lấy HĐ từ thư mục XML (không còn einvoiceapp); mỗi tab tự chọn thư mục XML của mình.
  * 2 tab dùng lại 2 trang cũ ở chế độ nhúng ([embedded]): BankReconciliationPageComponent / BankReconciliationInPageComponent.
  * "Xuất Excel" = 1 file .xlsx cho tool VietDA (utils/bank-recon-export.util.ts) thay các CSV riêng từng bảng.
  * Route cũ /bank-reconciliation-in-page chuyển về đây (?tab=mua-vao).
@@ -105,7 +106,7 @@ export class BankReconciliationHubComponent implements OnInit, AfterViewInit {
   }
   get creditCount(): number { return this.sale?.bank?.count ?? 0; }
   get debitCount(): number { return this.purchase?.bank?.transactions.length ?? 0; }
-  get canExport(): boolean { return !!this.sale?.kvLoaded || !!this.purchase?.result || !!this.purchase?.bank; }
+  get canExport(): boolean { return !!this.sale?.canCompare || !!this.purchase?.result || !!this.purchase?.bank; }
 
   /** 1 file .xlsx: Nhap-VietDA (Thu + Chi) + các bảng bán ra / mua vào (bank-recon-export.util.ts) */
   exportExcel(): void {
@@ -114,8 +115,9 @@ export class BankReconciliationHubComponent implements OnInit, AfterViewInit {
     try {
       const { bytes, summary } = buildBankReconWorkbook({
         from: s.from, to: s.to, statementFiles: this.files.map(f => f.name),
-        salePairs: s.pairs, saleWithBank: s.withBank,
-        purchaseRows: this.purchase.result?.rows ?? null, debitTxns: this.purchase.bank?.transactions ?? [],
+        salePairs: s.pairs, saleWithBank: s.withBank, saleView: s.view,
+        purchaseRows: this.purchase.result?.rows ?? null, purchaseView: this.purchase.viewRows,
+        debitTxns: this.purchase.bank?.transactions ?? [],
       });
       const url = URL.createObjectURL(new Blob([bytes as BlobPart],
         { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));

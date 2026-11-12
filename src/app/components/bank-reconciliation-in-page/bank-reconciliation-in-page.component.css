@@ -40,31 +40,6 @@ label.pick.disabled { opacity: 0.6; pointer-events: none; }
 .stat.good { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
 
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.75rem; }
-.chips { display: inline-flex; gap: 0.25rem; flex-wrap: wrap; }
-.chip { border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 12px; padding: 0.1rem 0.55rem; font-size: 0.72rem; cursor: pointer; }
-.chip.active { background: #2c5282; border-color: #2c5282; color: #fff; }
-.search { position: relative; flex: 1 1 220px; max-width: 360px; }
-.search i { position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: #9ca3af; }
-.search input { width: 100%; height: 30px; padding: 0 0.6rem 0 1.8rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.8rem; }
-
-.table-wrap { overflow: auto; max-height: calc(100vh - 300px); border: 1px solid #e5e7eb; border-radius: 8px; }
-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 0.75rem; }
-thead th { position: sticky; top: 0; z-index: 1; background: #1f4e78; color: #fff; font-weight: 600; text-align: left; padding: 0.45rem 0.5rem; white-space: nowrap; }
-tbody td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-td .inv, td .txn { margin-bottom: 2px; }
-td .inv small, td .txn small { display: block; color: #6b7280; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-td.hint-cell { color: #92400e; max-width: 280px; }
-tr.k-invoice_only td, tr.k-bank_only td { background: #fffbeb; }
-.badge { font-size: 0.7rem; font-weight: 600; padding: 0.05rem 0.45rem; border-radius: 8px; white-space: nowrap; }
-.b-matched, .b-matched_group, .b-matched_split { background: #dcfce7; color: #15803d; }
-.b-invoice_only, .b-bank_only { background: #fef3c7; color: #b45309; }
-.conf { display: block; font-size: 0.68rem; color: #b45309; margin-top: 2px; }
-
-.pager { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; }
-.pager button { border: 1px solid #d1d5db; background: #fff; border-radius: 6px; padding: 2px 9px; cursor: pointer; }
-.pager button:disabled { opacity: 0.4; cursor: default; }
-
 @media (max-width: 768px) { .page { padding: 0.75rem; } }
 
 /* vòng xoay đang tải (app-table-loading overlay) */

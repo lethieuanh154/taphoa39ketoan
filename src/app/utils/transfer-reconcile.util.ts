@@ -29,7 +29,9 @@ export interface ReconInvoice {
   einvoiceNumber?: string;  // Số HĐĐT (bill_number) — chỉ khi CQT đã chấp nhận
   einvoiceStatus?: string;  // Nhãn trạng thái HĐĐT (xem readKvEInvoice)
   paymentMethod?: string;   // HĐĐT: 'CK' | 'TM' | 'TMCK'
-  einvoiceIssue?: string;   // HĐĐT chưa đạt: nháp / chưa được CQT chấp nhận / phát hành trễ ngày — '' = ổn (readEInvoiceBills)
+  einvoiceIssue?: string;   // HĐĐT chưa có số CQT: nháp / chưa được CQT chấp nhận — '' = ổn (readEInvoiceBills)
+  einvoiceLate?: string;    // HĐĐT phát hành sau ngày bán (chỉ ghi chú, KHÔNG phải lỗi — 11/11/2026)
+  einvoiceDuplicate?: string; // 1 HĐ KiotViet có ≥ 2 HĐĐT (chuyển trùng, vd HD447316 12/11/2026) — chỉ có khi trùng
 }
 
 export interface ReconEInvoiceInfo {
@@ -81,6 +83,12 @@ export interface EInvoiceBill {
   note: string | null;                  // = Description HĐ KiotViet
 }
 
+/**
+ * HĐĐT thường phát hành trễ 1–2 ngày sau ngày bán, `bill_date` đổi sang ngày phát hành → lấy HĐĐT dư thêm N ngày sau kỳ
+ * rồi lọc theo NGÀY BÁN (readEInvoiceBills `period`). Vd HĐ bán 09/11 phát hành 10/11: đối soát 09/11 vẫn có, 10/11 không có.
+ */
+export const EINVOICE_PUBLISH_LAG_DAYS = 3;
+
 /** Dung sai tiền lẻ khi khớp HĐĐT (HĐ lập tay lệch 1–2 ₫ do làm tròn thuế, mẫu 03/2026) */
 export const EINVOICE_AMOUNT_TOLERANCE = 10;
 
@@ -90,18 +98,29 @@ const EINVOICE_STATUS_LABEL: Record<string, string> = { DA_TIEP_NHAN: 'CQT chấ
  * HĐĐT → HĐ đối soát. `primary` = HĐ CK / TMCK, hoặc ghi chú có "chuyển khoản"/"ck" (ghi nhầm TM); `fallback` = HĐ còn lại
  * (Tiền mặt) — chỉ dùng khớp GD còn dư (reconcileWithFallback). Bỏ HĐ đã bị thay thế (có HĐ adjustment_type 3 trỏ origin_id
  * tới nó, cùng số tiền → không bỏ thì dư 1 HĐ) và HĐ tổng tiền ≤ 0. Số HĐĐT chỉ điền khi CQT đã chấp nhận (như readKvEInvoice).
- * `einvoiceIssue` (05/11/2026): HĐ nháp / chưa được CQT chấp nhận, hoặc phát hành SAU ngày bán (ngày `bill_date` > ngày
- * `created_at`) — vẫn ghép cặp được nhưng page tô đỏ + tính vào "Lệch". Mẫu thật HD445996: khách CK 04/11 16:01, bán 04/11 21:24
- * (nháp, bill_date 04/11) → tối 04/11 khớp xanh; phát hành 05/11 08:28 → bill_date thành 05/11.
+ * `einvoiceIssue`: HĐ nháp / chưa được CQT chấp nhận (chưa có số CQT) — vẫn ghép cặp, BanHang tô vàng (11/11/2026).
+ * `einvoiceLate`: phát hành SAU ngày bán (ngày `bill_date` > ngày `created_at`) — chỉ ghi chú.
+ * `einvoiceDuplicate` (12/11/2026): ≥ 2 HĐĐT (không bị thay thế) cùng mã HĐ KiotViet — chuyển HĐĐT trùng (vd bấm chuyển lại
+ * trên KiotViet khi HĐ vừa chuyển chưa kịp có dấu "đã chuyển"). Ghi vào MỌI bản trùng; bản không khớp GD thành "HĐ thiếu GD".
+ * Giờ HĐ = `created_at` (giờ bán; thiếu thì `bill_date`) vì `bill_date` đổi sang giờ phát hành. Mẫu thật HD445996: khách CK
+ * 04/11 16:01, bán 04/11 21:24 (nháp), phát hành 05/11 08:28 → bill_date 05/11, created_at vẫn 04/11.
+ * `period` ('yyyy-mm-dd'): chỉ giữ HĐ có NGÀY BÁN trong kỳ (gọi BE với khoảng dư EINVOICE_PUBLISH_LAG_DAYS ngày sau kỳ).
  */
-export function readEInvoiceBills(bills: EInvoiceBill[]): { primary: ReconInvoice[]; fallback: ReconInvoice[] } {
+export function readEInvoiceBills(
+  bills: EInvoiceBill[],
+  period?: { from: string; to: string }
+): { primary: ReconInvoice[]; fallback: ReconInvoice[] } {
   const replaced = new Set(bills.filter(b => Number(b.adjustment_type) === 3 && b.origin_id).map(b => b.origin_id));
   const primary: ReconInvoice[] = [];
   const fallback: ReconInvoice[] = [];
   let skipped = 0;
+  let outOfPeriod = 0;
+  const day = (s: string | null | undefined) => (s || '').slice(0, 10);
   for (const b of bills) {
     if (replaced.has(b.id) || !(Number(b.total_payment) > 0)) { skipped++; continue; }
-    const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}:\d{2}:\d{2})/.exec(b.bill_date || '');
+    const soldAt = b.created_at || b.bill_date;
+    if (period && (day(soldAt) < period.from || day(soldAt) > period.to)) { outOfPeriod++; continue; }
+    const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}:\d{2}:\d{2})/.exec(soldAt || '');
     const accepted = b.status === 'DA_TIEP_NHAN';
     const note = b.note || '';
     const inv: ReconInvoice = {
@@ -115,17 +134,28 @@ export function readEInvoiceBills(bills: EInvoiceBill[]): { primary: ReconInvoic
       einvoiceStatus: EINVOICE_STATUS_LABEL[b.status || ''] || b.status || '',
       paymentMethod: b.payment_method_code || '',
     };
-    const day = (s: string | null | undefined) => (s || '').slice(0, 10);
     const dm = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
     inv.einvoiceIssue = b.status === 'GHI_TAM' ? 'HĐĐT chưa phát hành (nháp)'
       : !accepted ? `HĐĐT chưa được CQT chấp nhận (${inv.einvoiceStatus || '?'})`
-      : b.created_at && day(b.created_at) < day(b.bill_date) ? `HĐĐT phát hành trễ: bán ${dm(b.created_at)}, phát hành ${dm(b.bill_date)}`
       : '';
+    inv.einvoiceLate = accepted && b.created_at && day(b.created_at) < day(b.bill_date)
+      ? `HĐĐT phát hành trễ: bán ${dm(b.created_at)}, phát hành ${dm(b.bill_date)}` : '';
     const saysTransfer = /chuyen\s*khoan|\bck\b/.test(normalizeVi(note));
     (b.payment_method_code !== 'TM' || saysTransfer ? primary : fallback).push(inv);
   }
+  const byCode = new Map<string, ReconInvoice[]>();
+  for (const i of [...primary, ...fallback]) {
+    if (!/^HĐĐT( |$)/.test(i.code)) byCode.set(i.code, [...(byCode.get(i.code) || []), i]);
+  }
+  for (const [code, dup] of byCode) {
+    if (dup.length < 2) continue;
+    const label = `HĐĐT trùng: ${code} có ${dup.length} HĐĐT (${dup.map(i => i.einvoiceNumber || 'nháp').sort().join(', ')}) — cần xử lý bản thừa`;
+    dup.forEach(i => { i.einvoiceDuplicate = label; });
+    console.warn(`[TransferReconcile] ${label}`);
+  }
   const issues = primary.filter(i => i.einvoiceIssue).length;
-  console.debug(`[TransferReconcile] HĐĐT ${bills.length}: CK ${primary.length} (${issues} nháp / phát hành trễ), TM dự phòng ${fallback.length}, bỏ ${skipped} (bị thay thế / tiền ≤ 0)`);
+  console.debug(`[TransferReconcile] HĐĐT ${bills.length}: CK ${primary.length} (${issues} chưa có số CQT), TM dự phòng ${fallback.length}, bỏ ${skipped} (bị thay thế / tiền ≤ 0)` +
+    (period ? `, bỏ ${outOfPeriod} ngày bán ngoài ${period.from}→${period.to}` : ''));
   return { primary, fallback };
 }
 
@@ -179,6 +209,11 @@ export interface ReconOptions {
   periodFrom?: string;      // 'yyyy-mm-dd' — kỳ đối soát, để gợi ý phần dư sát biên kỳ
   periodTo?: string;
   amountTolerance?: number; // > 0: phần dư lệch ≤ X ₫ trong khung giờ vẫn ghép cặp (HĐĐT: EINVOICE_AMOUNT_TOLERANCE)
+  /**
+   * Bước 2 chỉ ghép 'matched_late' khi GD nằm trong [HĐ − beforeMin, HĐ + afterMin] (13/11/2026, KeToan HĐ từ XML chỉ có NGÀY lập).
+   * Không đặt = ghép mọi phần dư cùng số tiền theo thứ tự thời gian (BanHang).
+   */
+  lateWindow?: { beforeMin: number; afterMin: number };
 }
 
 export const DEFAULT_RECON_OPTIONS: ReconOptions = { windowBeforeMin: 24 * 60, windowAfterMin: 30, amountTolerance: 0 };
@@ -365,24 +400,36 @@ export function reconcileByAmount(
       }
     }
 
-    // Bước 2: cùng số tiền nhưng ngoài khung giờ
+    // Bước 2: cùng số tiền nhưng ngoài khung giờ (lateWindow: chỉ trong khung rộng hơn, lấy GD sớm nhất còn trống)
     const freeBank = g.bank.filter(b => !b.used);
-    const n = Math.min(leftover.length, freeBank.length);
-    for (let i = 0; i < n; i++) {
-      freeBank[i].used = true;
-      const delta = freeBank[i].t - leftover[i].t;
-      pairs.push({ amount, item: leftover[i].item, txn: freeBank[i].txn, kind: 'matched_late',
+    const restInv: I[] = [];
+    const late = (inv: I, b: T) => {
+      b.used = true;
+      const delta = b.t - inv.t;
+      pairs.push({ amount, item: inv.item, txn: b.txn, kind: 'matched_late',
         deltaMinutes: Number.isFinite(delta) ? delta : null, edgeHint: null });
+    };
+    if (opt.lateWindow) {
+      const { beforeMin, afterMin } = opt.lateWindow;
+      for (const inv of leftover) {
+        const hit = Number.isFinite(inv.t) ? freeBank.find(b => !b.used && b.t >= inv.t - beforeMin && b.t <= inv.t + afterMin) : undefined;
+        if (hit) late(inv, hit); else restInv.push(inv);
+      }
+    } else {
+      const n = Math.min(leftover.length, freeBank.length);
+      for (let i = 0; i < n; i++) late(leftover[i], freeBank[i]);
+      restInv.push(...leftover.slice(n));
     }
+    const restBank = freeBank.filter(b => !b.used);
 
     // Bước 3: phần dư. HĐ dư: GD có thể nằm trước đầu kỳ (khách chuyển trước ≤ 24h) hoặc sau cuối kỳ (≤ 30').
     // GD dư: HĐ có thể xuất sau cuối kỳ (≤ 24h) hoặc trước đầu kỳ (≤ 30').
-    for (const inv of leftover.slice(n)) {
+    for (const inv of restInv) {
       const edgeHint = inv.t < pFrom + opt.windowBeforeMin ? 'prev'
         : inv.t > pTo - opt.windowAfterMin ? 'next' : null;
       pairs.push({ amount, item: inv.item, txn: null, kind: 'invoice_only', deltaMinutes: null, edgeHint });
     }
-    for (const b of freeBank.slice(n)) {
+    for (const b of restBank) {
       const edgeHint = b.t > pTo - opt.windowBeforeMin ? 'next'
         : b.t < pFrom + opt.windowAfterMin ? 'prev' : null;
       pairs.push({ amount, item: null, txn: b.txn, kind: 'bank_only', deltaMinutes: null, edgeHint });
@@ -557,16 +604,18 @@ export function edgeHintLabel(hint: 'prev' | 'next' | null): string {
   return hint === 'prev' ? 'Có thể thuộc kỳ trước hoặc chuyển khoản dư' : hint === 'next' ? 'Có thể thuộc kỳ sau hoặc chuyển khoản dư' : '';
 }
 
-/** Ghi chú thêm của cặp: HĐĐT chưa đạt (einvoiceIssue), khớp lệch tiền lẻ, khớp với HĐĐT ghi Tiền mặt. */
+/** Ghi chú thêm của cặp: HĐĐT trùng / chưa có số CQT / phát hành trễ, khớp lệch tiền lẻ, khớp với HĐĐT ghi Tiền mặt. */
 export function pairFlags(p: ReconPair): string[] {
   const flags: string[] = [];
+  if (p.item?.invoice.einvoiceDuplicate) flags.push(p.item.invoice.einvoiceDuplicate);
   if (p.item?.invoice.einvoiceIssue) flags.push(p.item.invoice.einvoiceIssue);
+  if (p.item?.invoice.einvoiceLate) flags.push(p.item.invoice.einvoiceLate);
   if (p.amountDiff) flags.push(`lệch tiền lẻ ${p.amountDiff > 0 ? '+' : '−'}${Math.abs(p.amountDiff).toLocaleString('vi-VN')} ₫`);
   if (p.txn && p.item?.invoice.paymentMethod === 'TM') flags.push('HĐĐT ghi Tiền mặt');
   return flags;
 }
 
-/** Cặp đã ghép GD nhưng HĐĐT chưa đạt (nháp / phát hành trễ ngày) — page tô đỏ, tính vào "Lệch". */
+/** Cặp đã ghép GD nhưng HĐĐT chưa có số CQT (nháp / CQT chưa chấp nhận) — BanHang tô vàng; phát hành trễ KHÔNG tính. */
 export function isEInvoiceIssuePair(p: ReconPair): boolean {
   return !!p.txn && !!p.item?.invoice.einvoiceIssue;
 }
@@ -738,4 +787,71 @@ export function excessTransferPairs(pairs: ReconPair[]): ReconPair[] {
     .sort((a, b) =>
       (viStampToMinutes(a.item!.invoice.time) - viStampToMinutes(b.item!.invoice.time)) ||
       a.item!.invoice.code.localeCompare(b.item!.invoice.code));
+}
+
+// ===== Bản lưu "CK nhiều lần" / "CK dư" (13/11/2026) =====
+// BanHang chạy đối soát (có sao kê + HĐĐT) → tự lưu 2 tab này lên Firestore (Flask POST /api/bank-recon-snapshots,
+// project taphoa39-supplies-invoices, collection `bank_recon_snapshots`, 1 doc / ngày bán) → KeToan đọc lại qua KeToanBackEnd
+// (KeToan đối soát theo XML, không có ghi chú KiotViet nên không tự tách được). Đổi field = tăng RECON_SNAPSHOT_SCHEMA.
+
+export const RECON_SNAPSHOT_SCHEMA = 'taphoa39-ck-snapshot/1';
+
+export interface ReconSnapshotRow {
+  code: string;            // mã HĐ KiotViet (HDxxxx) hoặc "HĐĐT <số>"
+  einvoiceSerial: string;
+  einvoiceNo: string;      // số HĐĐT CQT đã chấp nhận ('' nếu chưa)
+  einvoiceStatus: string;
+  time: string;            // giờ bán 'dd/mm/yyyy HH:mm:ss'
+  total: number;           // tổng HĐ
+  note: string;            // ghi chú KiotViet
+  noteStatus: string;      // nhãn NOTE_STATUS_LABEL
+  noteOk: boolean;
+  part: string;            // CK nhiều lần: "1/2"; CK dư: ''
+  amount: number;          // CK nhiều lần: số tiền khoản; CK dư: số khách chuyển
+  refund: number | null;   // CK dư: số trả lại khách
+  kind: ReconKind;
+  txnDate: string;         // GD khớp ('' nếu không có)
+  txnPayer: string;
+  txnCode: string;
+  hint: string;
+}
+
+export interface ReconSnapshotDay {
+  day: string;             // yyyy-mm-dd (ngày bán)
+  multi: ReconSnapshotRow[];
+  excess: ReconSnapshotRow[];
+}
+
+/** Ngày 'dd/mm/yyyy …' → 'yyyy-mm-dd' */
+const isoOfVi = (vi: string) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(vi || '');
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+};
+
+function snapshotRow(p: ReconPair, excess: boolean): ReconSnapshotRow {
+  const it = p.item!;
+  const inv = it.invoice;
+  const status = excess ? it.excess!.status : it.note?.status;
+  return {
+    code: inv.code, einvoiceSerial: inv.einvoiceSerial || '', einvoiceNo: inv.einvoiceNumber || '', einvoiceStatus: inv.einvoiceStatus || '',
+    time: inv.time, total: inv.total, note: inv.note, noteStatus: status ? NOTE_STATUS_LABEL[status] : '', noteOk: status === 'ok',
+    part: !excess && it.partCount > 1 ? `${it.partIndex}/${it.partCount}` : '',
+    amount: excess ? it.excess!.transferred : it.amount, refund: excess ? it.excess!.refund : null,
+    kind: p.kind, txnDate: p.txn?.date || '', txnPayer: p.txn ? payerLabel(p.txn) : '', txnCode: p.txn?.code || '', hint: reconPairHint(p),
+  };
+}
+
+/**
+ * Tách 2 tab theo NGÀY BÁN của HĐ — mọi ngày trong [from, to] đều có mặt (mảng rỗng = đã chạy, không có HĐ nào) để lần chạy sau
+ * ghi đè đúng ngày. HĐ ngoài [from, to] bỏ qua.
+ */
+export function buildReconSnapshotDays(pairs: ReconPair[], from: string, to: string): ReconSnapshotDay[] {
+  const days = new Map<string, ReconSnapshotDay>();
+  for (let t = Date.parse(`${from}T00:00:00Z`), end = Date.parse(`${to}T00:00:00Z`); t <= end; t += 86400000) {
+    const day = new Date(t).toISOString().slice(0, 10);
+    days.set(day, { day, multi: [], excess: [] });
+  }
+  for (const p of multiTransferPairs(pairs)) days.get(isoOfVi(p.item!.invoice.time))?.multi.push(snapshotRow(p, false));
+  for (const p of excessTransferPairs(pairs)) days.get(isoOfVi(p.item!.invoice.time))?.excess.push(snapshotRow(p, true));
+  return [...days.values()];
 }

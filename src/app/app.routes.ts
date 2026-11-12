@@ -97,6 +97,11 @@ export const routes: Routes = [
           .then(m => m.TaxFiguresPageComponent)
       },
       // Đối soát CK — HĐ đầu vào: 06/11/2026 gộp vào trang Đối soát CK (tab Mua vào); giữ link cũ
+      // Đối soát CK → CK nhiều lần / CK dư do BanHang lưu (13/11/2026) — chỉ đọc
+      {
+        path: 'ck-snapshot-page',
+        loadComponent: () => import('./components/ck-snapshot-page/ck-snapshot-page.component').then(m => m.CkSnapshotPageComponent)
+      },
       { path: 'bank-reconciliation-in-page', redirectTo: () => inject(Router).createUrlTree(['/bank-reconciliation-page'], { queryParams: { tab: 'mua-vao' } }) },
       // Đối soát hóa đơn XML (Pha 1 bước 3) — tải riêng khi mở trang (kèm thư viện nén ZIP fflate)
       {

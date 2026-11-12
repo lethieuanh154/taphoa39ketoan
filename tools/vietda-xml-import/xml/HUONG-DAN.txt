@@ -1,2 +1,3 @@
 Bo XML hoa don vao day: sold\ = hoa don ban ra, purchase\ = hoa don mua vao (tao 2 thu muc con nay).
 Tool tu quet ca thu muc con, tu tach mua vao / ban ra theo MST cong ty. Khong can chon thu muc khi chay.
+Kiem phieu XH (Kiem-PhieuXH-VietDA.bat): bo XML QUY DOI (trang Doi soat hoa don) vao sold\ - dung ban da Hoi nhap VietDA.

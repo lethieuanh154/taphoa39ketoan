@@ -132,3 +132,169 @@ Bảng kê VietDA xuất Excel không có cột TK → Kiểm tra VietDA không 
 
 Số CT VietDA đánh theo tháng (vd `TG006/08`). Nhập Ngày khác tháng (30/10) rồi rời ô → VietDA hỏi "Bạn có muốn điền lại Số chứng từ tự động không?" → tool chọn **Yes** (Số CT theo tháng của ngày GD, vd `TG001/09`) rồi điền tiếp. Hộp khác sau khi nhập Ngày → DỪNG.
 Bấm Excel trên bảng kê mà VietDA báo 1 nút (vd bảng kê trống) → OK, coi như 0 phiếu. Quá 120 giây không thấy Excel → lỗi, dừng phần kiểm tra.
+
+---
+
+# Cửa sổ VietDA Tools — `VietDA-Tools.bat` (10/11/2026)
+
+`vietda-tools-ui.ps1`: WinForms trong PowerShell (không cần cài thêm), làm **theo từng bước** — mỗi bước là 1 khung "Bước N — …" có
+trạng thái ✔ / ✘ / ⚠ / ○ góc phải; nút chạy chỉ bật khi các bước bắt buộc đã ✔. Chạy 2 tool ở tiến trình powershell riêng, đọc stdout hiện
+log có màu + tiến độ; 2 script và các file .bat cũ giữ nguyên. Log cửa sổ: `_vietda-ui.log`; thư mục XML đã chọn nhớ ở `_vietda-ui.json`.
+
+| Tab | Bước | Nút nhập liệu |
+|---|---|---|
+| Kiểm / sửa XH | 1 XML bán ra | chọn **thư mục của tool** (`xml\sold`) hoặc **thư mục khác** (→ `-XmlFolder`); *Thêm file XML…* copy vào `xml\sold`; *Dọn XML cũ…* |
+| | 2 Danh mục VTHH (tùy chọn) | *Chọn file danh mục…* → copy vào `Input\danh-muc-vthh\` (file cũ / file đặt nhầm trong `Input\` chuyển vào `_cu\`) |
+| | 3 VietDA · 4 Kiểm tra · 5 Sửa + Lưu | xem bảng dưới |
+| Sao kê | 1 Sao kê · 2 Đối soát CK · 3 Danh mục Đối tượng | danh sách file trong `Input\` + *Thêm…* (copy vào `Input\`; đối soát / đối tượng không đúng tên thì thêm tiền tố `doi-soat-ck_` / `DANH SACH_`) + *Bỏ file đã chọn* |
+| | 4 XML | thư mục của tool (`xml\sold` + `xml\purchase`, *Thêm XML bán ra / mua vào…*) hoặc thư mục khác |
+| | 5 VietDA (loại phiếu, số phiếu) · 6 Chạy | xem bảng dưới |
+
+"Bỏ file" / "Dọn" = **chuyển** vào `<thư mục>\_cu\<ngày-giờ>\`, không xóa. File `.xlsx` giống danh mục VTHH nằm thẳng trong `Input\` → bước
+sao kê báo ⚠ và trước khi chạy hỏi chuyển sang `Input\danh-muc-vthh\`.
+| Tab | Nút | Chạy |
+|---|---|---|
+| Kiểm / sửa phiếu XH | **1. Kiểm tra** | `vietda-sales-check.ps1 -NoOpen [-From -To] [-Limit]` |
+| | **2. Sửa + Lưu đầu phiếu** | cùng điều kiện + `-Fix -Yes` (hộp xác nhận thay cho gõ Y) |
+| Sao kê → phiếu thu/chi | Xem trước / Chỉ kiểm tra VietDA / Tạo phiếu | `vietda-bank-import.ps1 [-Mode Thu\|Chi] [-Limit] -DryRun / -VerifyOnly / (tạo)` + `-Yes` |
+
+Nút **Sửa** (user chốt 10/11/2026): xám cho tới khi Kiểm tra xong. Đọc `tom-tat.txt` của lần kiểm: **ĐẠT** (Cần sửa đầu phiếu,
+Lỗi dòng, Chưa nhập, Không có XML, Sửa lỗi đều 0) → Sửa **xám**; **KHÔNG ĐẠT** và `Phiếu có đầu phiếu tool sửa được` > 0 → Sửa
+**bật**. Không đạt mà chỉ có lỗi dòng hàng (tool không sửa được) → Sửa vẫn xám + ghi "lỗi còn lại chỉ sửa tay". Đổi khoảng ngày /
+số phiếu sau khi kiểm → Sửa xám lại, phải Kiểm tra lại (sửa đúng phạm vi đã kiểm).
+
+Nút **Kết quả kiểm tra** (tab XH) / **Kết quả chạy** (tab sao kê): mở file Excel kết quả **mới nhất** trong `Output\`
+(`*_kiem-xh\ket-qua-kiem-xh.xlsx` / `<ngày-giờ>\ket-qua-chay.xlsx`), kể cả của lần chạy trước khi mở cửa sổ; chưa có file → nút xám,
+rê chuột xem tên file + giờ. Tool sao kê dùng chuột + bàn phím thật → cửa sổ tự thu nhỏ khi chạy, mở lại khi xong. Nút **Dừng** = taskkill cả cây tiến trình
+(cảnh báo nếu đang sửa / tạo phiếu: có thể còn phiếu mở chưa Lưu trên VietDA). Đóng cửa sổ khi đang chạy → hỏi rồi dừng.
+
+---
+
+# vietda-sales-check — kiểm phiếu XH sau Hội nhập XML (09/11/2026)
+
+`vietda-sales-check.ps1` / double-click **`Kiem-PhieuXH-VietDA.bat`**. Sau khi Hội nhập XML hóa đơn bán ra vào VietDA, tool **mở
+từng phiếu XH** (Hóa đơn bán và phiếu xuất kho) như kế toán double-click, đọc phiếu rồi so với XML + danh mục Vật tư hàng hóa.
+**Chỉ đọc, không sửa phiếu.**
+
+### Đầu vào
+
+| File | Lấy ở đâu | Bắt buộc |
+|---|---|---|
+| XML bán ra trong `xml\sold\` | **XML quy đổi** (trang Đối soát hóa đơn) — đúng bản đã Hội nhập VietDA | có |
+| Danh mục Vật tư hàng hóa `.xlsx` trong **`Input\danh-muc-vthh\`** (để thẳng trong `Input\` thì tool sao kê coi là sao kê; tool XH vẫn đọc được nhưng cảnh báo) | VietDA > Hệ thống > Cập nhật danh mục > Vật tư, hàng hóa > Excel (file có dòng "DANH MỤC VẬT TƯ - HÀNG HÓA") | nên có — thiếu thì không kiểm mã theo danh mục |
+
+XML gốc (chưa quy đổi) vẫn chạy được nhưng chỉ so tiền / thuế; SL, mã khác là chuyện bình thường → chỉ ghi Cảnh báo.
+Trùng 1 HĐ có cả XML gốc lẫn quy đổi → dùng bản quy đổi (nhận theo chú thích "Bản QUY ĐỔI ĐVT" đầu file).
+Khoảng ngày = ngày HĐ nhỏ nhất → lớn nhất trong XML (`-From` / `-To` dd/MM/yyyy để tự chọn).
+
+### Tool làm gì trên VietDA
+
+1. **Danh sách chứng từ**: tab "Tìm kiếm chứng từ" (Bảng kê chứng từ nhập xuất) **đang mở sẵn** → dùng luôn (đọc MỌI dòng của danh sách
+   đó, lọc theo lúc kế toán tìm; không cần chuột). Chưa mở → tool tự vào Nhập xuất > Tìm kiếm chứng từ > Loại `XH`, khoảng ngày XML
+   (xóa lọc VietDA còn nhớ) > Hiển thị — bước này dùng chuột ~5 giây. Danh sách mở nhưng nằm sau tab khác → dừng, nhắc bấm tab đó.
+2. **Từng dòng**: chọn dòng > **Sửa phiếu** (= double-click) → chờ phiếu nạp xong → đọc → bấm vào lưới → **Thoát** → ↓ dòng kế.
+   - Đầu phiếu (ô EDIT/COMBO, đọc bằng WM_GETTEXT theo nhãn bên trái): Số CT, Ngày, Đối tượng, Đơn vị, MST/CC, Lý do, Loại thuế,
+     Ký hiệu, Số hóa đơn, Ghi nợ, Ghi có, Phương thức TT, Tiền hàng, Tiền thuế.
+   - Ô tick "Hiển thị thuế suất từng mặt hàng", "Hóa đơn": control tự vẽ (BM_GETCHECK luôn 0, UIA tắt) → chụp phiếu bằng PrintWindow,
+     đếm điểm tối trong ô vuông (tick ≈ 7, trống = 0).
+   - Lưới dòng hàng (tự vẽ, UIA/clipboard không đọc được): mỗi ô F2 → VietDA mở ô sửa (TextBox) → WM_GETTEXT → Esc vào chính ô sửa
+     (không lưu). Cột đọc: Mã hàng, Tên, SL, Đơn giá, Tiền hàng, TK Nợ, TK Có, Tiền CK, Tiền vốn, Nợ GV, Có GV, Tiền VAT, Tổng tiền
+     (thứ tự cột ở `$GridCols`; Tiền hàng + VAT ≠ Tổng tiền ở mọi dòng → dừng, VietDA đổi cột). ĐVT là ô chọn, F2 không mở → không đọc.
+     Phiếu đã tick "Hiển thị thuế suất từng mặt hàng" → VietDA chèn cột **Loại thuế** sau "Giá đích danh" → tool dùng `$GridColsRate`
+     (Tiền VAT / Tổng tiền lùi 1 cột) và so Loại thuế từng dòng với TSuat XML.
+   - "Sửa phiếu" nạp bản **đã Lưu** — tick / sửa trên tab đang mở mà chưa Lưu thì tool vẫn thấy bản cũ.
+   - **Windows Scale 125% / 150%** (10/11/2026): tool (powershell.exe) và VietDA đều DPI-unaware → tọa độ cửa sổ / message là pixel
+     logic, giống 100%. Không còn click tọa độ cố định có rủi ro: danh sách chọn dòng 1 bằng **F5** (không click — lệch thì trúng tiêu đề
+     cột = sắp xếp lại); lưới phiếu click cột tiêu đề dòng rồi ←/↑ về ô đầu; ô "Hiển thị thuế suất từng mặt hàng" suy từ **cột Loại thuế**
+     trên lưới (đọc cột 18–20, Tiền hàng + c18 = c19 → không có / + c19 = c20 → có); ô "Hóa đơn" dò **hình vuông viền đen** trên ảnh
+     PrintWindow quanh vị trí dự kiến, thử tỉ lệ 1 và Scale màn hình (đã thử ảnh ×1 / ×1,25 / ×1,5) — không thấy → "kiểm tay", không đoán.
+   - Bấm vào lưới trước khi Thoát: con trỏ còn ở ô Số CT thì lúc đóng VietDA báo "Chưa có Số cho chứng từ này !?" (tool vẫn tự OK).
+   - Hết danh sách = ↓ ra lại phiếu vừa đọc → chọn lại từ dòng 1 + ↓ để chắc rồi dừng.
+3. Mọi thao tác là **message gửi thẳng vào control** (PostMessage/SendMessage) → VietDA bị che vẫn chạy, dùng app khác được; chỉ
+   **không bấm vào VietDA**. VietDA thu nhỏ → tool khôi phục (không lấy focus). Đo 09/11/2026: ~3,5 giây / phiếu 1–6 dòng.
+4. Phiếu đã đọc lưu `Output\<ngày-giờ>_kiem-xh\phieu-vietda.json` → so lại không cần VietDA: `-FromForms "<file đó>"`.
+
+### Ghép phiếu ↔ XML
+
+1. Ký hiệu + Số hóa đơn trên phiếu = KHMSHDon+KHHDon + SHDon (ký hiệu lệch → chỉ Số HĐ, ghi "ký hiệu lệch").
+2. Cùng ngày + tiền hàng + thuế + số dòng (phiếu chưa có Số HĐ). Nhiều HĐ giống hệt nhau → ghép theo thứ tự.
+3. Cùng ngày + tiền hàng (số dòng / thuế lệch → hiện lỗi dòng).
+4. Cùng ngày + đúng 1 cặp cùng tên khách (không phải khách lẻ) → tiền lệch.
+
+### Kết quả `ket-qua-kiem-xh.xlsx`
+
+Sheet **Phieu** (mỗi HĐ / phiếu 1 dòng, cột Kết quả): `OK` (xanh) · `Cần sửa đầu phiếu` / `Cảnh báo` (vàng) · `Lỗi dòng` ·
+`Chưa nhập VietDA` · `Phiếu không có XML` (đỏ). Cột **So với XML** (10/11/2026, thay 3 cột cũ) — mỗi chỗ lệch 1 dòng trong ô:
+
+```
+VietDA: Ký hiệu '1C26MMQ' | XML: Ký hiệu 'C26TMV'
+VietDA: Ghi nợ '1111' | Đúng (chuyển khoản): Ghi nợ '131'
+Dòng 1 (HH014): VietDA: Mã hàng 'HH014' | XML: Mã hàng 'HH003'
+VietDA: MST '0304762338' | XML: MST '0499000002' (cảnh báo)
+```
+
+`Đúng:` = ô không có trong XML, so theo quy tắc kế toán (TK). Không lệch gì → `Khớp XML`. Sheet Loi-dong vẫn giữ (lọc theo loại lỗi). Đầu phiếu đúng là:
+
+| Ô | Đúng là |
+|---|---|
+| Lý do | `Doanh thu bán hàng` |
+| Ký hiệu / Số hóa đơn | theo XML — Ký hiệu = KHHDon (`C26MFD`, số mẫu `1` nằm ô Mã\|Mẫu HĐ như ảnh kế toán 10/11/2026); `1C26MFD` cũng tính đúng |
+| Phương thức TT | cùng loại với XML (`CK`/`Chuyển khoản`, `TM`/`Tiền mặt`); tool sửa thì chọn đúng chữ XML nếu ô có mục đó |
+| Ghi nợ / Ghi có | CK (công nợ) → `131` / `33311`; TM → `1111` (111x đều đúng) / `33311`. Dòng hàng Có `5111` |
+| Tick | "Hóa đơn" (sửa tay). **Không kiểm** "Hiển thị thuế suất từng mặt hàng": VietDA không lưu ô này theo phiếu (tick tay + Lưu, mở lại vẫn mất — user thử 10/11/2026) |
+
+Loại thuế đầu phiếu để trống — không kiểm. Mẫu không kiểm.
+
+Sheet **Loi-dong** (mỗi lỗi 1 dòng, Mức Lỗi = đỏ / Cảnh báo = vàng):
+
+| Lỗi | Khi nào |
+|---|---|
+| Dòng 0 đ | Tiền hàng VietDA = 0, XML ≠ 0 |
+| Tổng thanh toán (hàng + thuế) lệch | VietDA ≠ TgTTTBSo — gợi ý chỉnh Tiền hàng ±N đ ở 1 dòng |
+| Tiền hàng lệch XML | lệch > 10 đ (`$RoundAdjMax`). Quy tắc kế toán 10/11/2026: tổng chẵn thì **chỉnh tiền hàng, không chỉnh thuế** → lệch ≤ 10 đ + tổng thanh toán khớp = OK; tổng chưa khớp → Cảnh báo |
+| Thuế suất / tiền thuế sai | Tiền VAT trên lưới lệch > 1 đ so với Tiền hàng XML × TSuat |
+| Loại thuế dòng ≠ XML | chỉ khi phiếu đã tick "Hiển thị thuế suất từng mặt hàng" (mới có cột này) |
+| Số lượng lệch XML | XML quy đổi: Lỗi; XML gốc: Cảnh báo |
+| XML còn mã KiotViet | XML quy đổi mà MHHDVu không phải HH… / KM… |
+| Mã hàng VietDA X ≠ XML Y | VietDA nhận sai mã — gợi ý mã + tên theo danh mục |
+| Mã … chưa có trong danh mục VietDA | mã trên phiếu không có trong danh mục |
+| ĐVT XML ≠ ĐVT danh mục | Cảnh báo — kiểm hệ số quy đổi |
+| Hàng khuyến mãi nhưng mã không phải KM | TChat = 2 hoặc thành tiền 0 |
+| Thiếu / Thừa dòng | số dòng khác XML (ghép dòng theo mã + tiền) |
+| Tổng tiền hàng / Tổng thuế / Chiết khấu lệch | so TgTCThue / TgTThue / TTCKTMai |
+| TK Nợ dòng / TK Có dòng / TK giá vốn | Cảnh báo — Nợ theo PTTT (131 / 111x), Có 511x, GV 632 / 156x |
+| Giá vốn 0 | Cảnh báo — kiểm tồn kho / nhập kho mã đó |
+| Ngày HĐ / MST lệch | Cảnh báo — ngày HĐ trên phiếu ≠ NLap; MST/CC ≠ MST người mua XML |
+
+| Tham số | Ý nghĩa |
+|---|---|
+| `-From` / `-To` | khoảng ngày dd/MM/yyyy khi tool tự mở danh sách (mặc định theo XML) |
+| `-XmlFolder` | thư mục XML khác `xml\sold` |
+| `-Catalog` | file danh mục Vật tư hàng hóa khác |
+| `-Limit N` | chỉ đọc N phiếu đầu (chạy thử) |
+| `-Fix` | **sửa + Lưu** đầu phiếu (xem "Tự sửa đầu phiếu" dưới) — `Sua-PhieuXH-VietDA.bat` = chạy với `-Fix` |
+| `-Yes` | với `-Fix`: không hỏi Y (chạy tự động) |
+| `-FromForms <phieu-vietda.json>` | so lại từ phiếu đã đọc, không mở VietDA |
+| `-FormTimeoutSec` | chờ phiếu mở / nạp / đóng tối đa (mặc định 60 giây) |
+| `-NoOpen` | không mở thư mục kết quả |
+
+Log: `_vietda-xh-check.log`. Phần Win32 / OCR menu / xlsx / click-gõ phím **chép nguyên văn** từ `vietda-bank-import.ps1` (ghi số dòng
+nguồn trong script) — sửa bên kia thì xem lại bên này. PowerShell 5.1: `@()` lên `List[object]` tạo bằng `New-Object` lỗi
+"Argument types do not match" → code mới dùng `[List[object]]::new()`.
+Bản đầu (09/11 sáng) đọc bằng nút Excel của bảng kê — bỏ: Excel không có Mã hàng / TK / Phương thức TT / ô tick.
+
+### Tự sửa đầu phiếu `-Fix` / `Sua-PhieuXH-VietDA.bat` (10/11/2026)
+
+Hỏi **Y** trước khi sửa. Mỗi phiếu đang mở để đọc: tìm XML khớp **hẳn** (Ký hiệu + Số HĐ, hoặc ngày + tiền hàng + thuế + số dòng —
+ghép yếu hơn thì chỉ báo, không sửa) → điền các ô sai: Lý do, Ký hiệu, Số hóa đơn, Phương thức TT, Ghi nợ, Ghi có (ô chọn có sẵn
+mục đúng chữ → chọn mục; không thì gõ chữ WM_SETTEXT) → bấm vào lưới (rời ô) → bấm **Lưu** → phải có "Lưu dữ liệu thành công !" →
+Thoát → mở lại đúng dòng đó (Sửa phiếu, không ↓) đọc kiểm. Cột **Tool đã sửa + Lưu** / **Lỗi khi sửa** trong sheet Phieu.
+
+| VietDA hỏi | Tool làm |
+|---|---|
+| "Bạn có muốn điền tự động cho cột TK Có và Nợ CK không ?" (sau khi đổi Ghi nợ) | **Yes** (user chốt 10/11/2026) — dòng hàng thành Nợ 131 / Có 5111 |
+| thông báo 1 nút | ghi lại + OK |
+| hỏi khác nhiều nút / không báo "lưu thành công" / điền xong đọc lại khác | **hủy**: Thoát → "Bạn có muốn lưu dữ liệu không ?" → **No** (phiếu giữ nguyên), ghi "Lỗi khi sửa"; 3 phiếu liền lỗi → dừng |
+
+VietDA chỉ Lưu khi giá trị ô khác lúc mở phiếu ("Dữ liệu không thay đổi !" nếu không). Không sửa dòng hàng (mã, tiền làm tròn) —
+vẫn làm tay theo Loi-dong. Đã thử trên data test MINH QUY XH1002/03: TM/1111 → Chuyển khoản/131 (Lưu, mở lại đúng) rồi trả về TM/1111.

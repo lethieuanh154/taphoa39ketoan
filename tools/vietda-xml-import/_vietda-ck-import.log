@@ -4790,3 +4790,524 @@
 2026-11-05 20:08:56 [INFO] Kết quả chạy: Đã tạo ở lần chạy trước: 1; Thành công: 4; Lỗi: 1; Chưa chạy (tool dừng trước): 154; Bỏ qua: 2
 2026-11-05 20:08:56 [OK] Kết quả chạy → E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\Output\2026-11-05_200743\ket-qua-chay.csv (162 dòng) + tom-tat.txt
 2026-11-05 20:08:56 [INFO] ===== Kết thúc → E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\Output\2026-11-05_200743
+2026-11-10 10:26:30 [INFO] ===== Bắt đầu (DRY RUN)
+2026-11-10 10:26:30 [WARN] Thư mục XML E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\xml không có thư mục con 'purchase' (vẫn quét mọi XML trong đó)
+2026-11-10 10:26:30 [INFO] Sao kê TPBANK_HISTORY69586928888_30102026_211213745.xlsx: 162 GD, Ghi có 159, Ghi nợ 3.
+2026-11-10 10:26:30 [WARN] CSV đối soát doi-soat-ck_2026-10-30_2026-10-30.csv: 159 Mã GD — định dạng cũ, sắp bỏ; dùng Excel từ trang Đối soát CK (Xuất Excel).
+2026-11-10 10:26:30 [INFO] Thư mục XML E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\xml: 24 hóa đơn — MST công ty 0400000000 (24 XML): mua vào 0, bán ra 24.
+2026-11-10 10:26:30 [INFO] Danh mục Đối tượng: 161 mã từ DANH SACH.xlsx (có MST 152 mã).
+2026-11-10 10:26:30 [INFO] Đối tượng Khách lẻ (HĐ không có MST người mua): KH010 Bán cho người tiêu dùng
+2026-11-10 10:26:30 [INFO] [Thu] Bỏ qua 5 GD đã tạo phiếu ở lần chạy trước (_vietda-ck-da-nhap.txt; -Force để làm lại).
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:15:03 34.000 371V602263034745 — không có XML HĐ bán ra số 32577 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:14:44 85.000 371V602263034743 — không có XML HĐ bán ra số 32602 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:13:31 52.000 371V602263034735 — không có XML HĐ bán ra số 32570 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:13:13 91.000 371V602263034734 — không có XML HĐ bán ra số 32578 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:12:52 36.000 371V602263034731 — không có XML HĐ bán ra số 32603 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:11:35 217.000 371V602263034725 — không có XML HĐ bán ra số 32605 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:11:12 55.000 371V602263034724 — không có XML HĐ bán ra số 32570 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:10:19 468.000 371V602263034716 — không có XML HĐ bán ra số 32570 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:57:36 268.000 371V602263034637 — không có XML HĐ bán ra số 32579 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:56:43 202.000 371V602263034633 — không có XML HĐ bán ra số 32580 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:54:05 33.000 371V602263034615 — không có XML HĐ bán ra số 32582 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:48:44 43.000 371V602263034583 — không có XML HĐ bán ra số 32612 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:46:05 170.000 371ITC1263037422 — không có XML HĐ bán ra số 32584 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:44:00 30.000 371V602263034552 — không có XML HĐ bán ra số 32607 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:43:27 133.000 371V602263034545 — không có XML HĐ bán ra số 32607 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:42:03 80.000 371V602263034540 — không có XML HĐ bán ra số 32585 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:38:00 94.000 371V602263034524 — không có XML HĐ bán ra số 32587 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:32:48 134.500 371V602263034488 — không có XML HĐ bán ra số 32608 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:30 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:31:34 42.000 371V602263034479 — không có XML HĐ bán ra số 32601 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:30:45 86.000 371V602263034473 — không có XML HĐ bán ra số 32548 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:30:29 20.000 371V602263034472 — không có XML HĐ bán ra số 32548 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:29:59 77.000 371ITC1263037310 — không có XML HĐ bán ra số 32589 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:29:52 510.000 371ITC1263037307 — không có XML HĐ bán ra số 32590 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:29:45 155.000 371V602263034458 — không có XML HĐ bán ra số 32550 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:21:20 47.000 371V602263034403 — không có XML HĐ bán ra số 32591 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:20:39 43.000 371ITC1263037250 — không có XML HĐ bán ra số 32583 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:18:54 319.000 371V602263034389 — không có XML HĐ bán ra số 32594 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:11:09 97.000 371V602263034342 — không có XML HĐ bán ra số 32596 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:10:46 400.000 371V602263034338 — không có XML HĐ bán ra số 32595 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:05:36 233.000 371V602263034292 — không có XML HĐ bán ra số 32551 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:04:14 36.000 371ITC1263037123 — không có XML HĐ bán ra số 32598 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:04:15 49.000 373V501263030277 — không có XML HĐ bán ra số 32599 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:55:24 31.000 371V602263034232 — không có XML HĐ bán ra số 32600 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:53:31 42.000 371V602263034221 — không có XML HĐ bán ra số 32588 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:51:54 306.000 371V602263034205 — không có XML HĐ bán ra số 32527 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:47:00 44.000 371V602263034177 — không có XML HĐ bán ra số 32528 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:37:14 137.000 371V602263034116 — không có XML HĐ bán ra số 32529 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:35:58 36.000 371ITC1263036879 — không có XML HĐ bán ra số 32540 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:30:32 48.000 371V602263034083 — không có XML HĐ bán ra số 32532 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:29:03 95.000 371V602263034069 — không có XML HĐ bán ra số 32552 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:27:51 103.000 371ITC1263036795 — không có XML HĐ bán ra số 32533 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:27:30 30.000 371V602263034059 — không có XML HĐ bán ra số 32553 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:24:29 56.000 371ITC1263036769 — không có XML HĐ bán ra số 32534 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:24:04 155.000 371V602263034036 — không có XML HĐ bán ra số 32535 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:13:31 270.000 371V602263033957 — không có XML HĐ bán ra số 32537 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:09:26 232.000 371ITC1263036603 — không có XML HĐ bán ra số 32538 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:00:44 157.000 371V602263033871 — không có XML HĐ bán ra số 32539 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:59:57 36.000 373V501263030256 — không có XML HĐ bán ra số 32531 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:59:26 34.000 371ITC1263036452 — không có XML HĐ bán ra số 32555 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:58:10 58.000 371V602263033859 — không có XML HĐ bán ra số 32556 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:56:49 32.000 371ITC1263036411 — không có XML HĐ bán ra số 32541 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:56:04 390.000 371ITC1263036397 — không có XML HĐ bán ra số 32557 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:55:46 88.000 371V602263033835 — không có XML HĐ bán ra số 32542 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:54:42 42.000 371V602263033825 — không có XML HĐ bán ra số 32558 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:53:48 211.000 371V602263033815 — không có XML HĐ bán ra số 32560 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:52:38 932.000 373V501263030254 — không có XML HĐ bán ra số 32563 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:51:12 400.000 371ITC1263036317 — không có XML HĐ bán ra số 32562 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:50:52 268.000 371V602263033796 — không có XML HĐ bán ra số 32561 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:45:01 32.000 371V602263033745 — không có XML HĐ bán ra số 32544 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:44:00 185.000 371V602263033738 — không có XML HĐ bán ra số 32565 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:43:51 30.000 371V602263033736 — không có XML HĐ bán ra số 32566 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:41:56 47.000 371ITC1263036119 — không có XML HĐ bán ra số 32545 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:39:37 68.000 371ITC1263036078 — không có XML HĐ bán ra số 32566 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:38:27 129.000 371V602263033705 — không có XML HĐ bán ra số 32546 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:34:08 30.000 371V602263033675 — không có XML HĐ bán ra số 32567 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:33:39 239.000 371ITC1263035979 — không có XML HĐ bán ra số 32610 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:29:33 133.000 371ITC1263035949 — không có XML HĐ bán ra số 32611 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:23:28 43.000 371ITC1263035907 — không có XML HĐ bán ra số 32592 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:07:35 153.000 371ITC1263035796 — không có XML HĐ bán ra số 32616 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:04:08 45.000 371ITC1263035733 — không có XML HĐ bán ra số 32576 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:03:40 752.000 371ITC1263035724 — không có XML HĐ bán ra số 32618 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:57:35 145.000 371ITC1263035617 — không có XML HĐ bán ra số 32619 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:55:49 43.000 371V602263033420 — không có XML HĐ bán ra số 32568 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:48:43 88.000 371V602263033388 — không có XML HĐ bán ra số 32483 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:44:42 113.000 371V602263033362 — không có XML HĐ bán ra số 32484 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:41:35 136.000 371ITC1263035338 — không có XML HĐ bán ra số 32485 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:40:13 34.000 371V602263033332 — không có XML HĐ bán ra số 32525 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:35:35 36.000 371ITC1263035232 — không có XML HĐ bán ra số 32524 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:31:29 46.000 371V602263033282 — không có XML HĐ bán ra số 32489 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:29:54 35.000 371V602263033268 — không có XML HĐ bán ra số 32490 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:29:37 40.000 371ITC1263035156 — không có XML HĐ bán ra số 32491 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:16:45 38.000 371ITC1263035012 — không có XML HĐ bán ra số 32507 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:13:27 75.000 371ITC1263034981 — không có XML HĐ bán ra số 32493 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:09:05 36.000 661V501263031402 — không có XML HĐ bán ra số 32488 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:02:16 104.000 371ITC1263034822 — không có XML HĐ bán ra số 32497 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:01:07 33.000 371ITC1263034818 — không có XML HĐ bán ra số 32522 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:59:46 210.000 371V602263033100 — không có XML HĐ bán ra số 32499 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:58:54 95.000 371V602263033096 — không có XML HĐ bán ra số 32500 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:58:39 143.000 371V602263033094 — không có XML HĐ bán ra số 32482 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:47:34 36.000 371ITC1263034652 — không có XML HĐ bán ra số 32495 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:41:57 94.000 371ITC1263034591 — không có XML HĐ bán ra số 32502 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:27:35 30.000 371V602263032916 — không có XML HĐ bán ra số 32504 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:26:19 40.000 371V602263032913 — không có XML HĐ bán ra số 32505 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:19:24 56.000 371V602263032865 — không có XML HĐ bán ra số 32506 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:10:52 1.468.000 371V602263032803 — không có XML HĐ bán ra số 32547 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:08:54 38.000 371ITC1263034297 — không có XML HĐ bán ra số 32510 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:42:47 30.000 371ITC1263032754 — không có XML HĐ bán ra số 32461 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:41:39 111.000 371ITC1263032742 — không có XML HĐ bán ra số 32432 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:38:25 95.000 371V602263031893 — không có XML HĐ bán ra số 32434 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:36:19 56.000 371V602263031882 — không có XML HĐ bán ra số 32435 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:34:49 32.000 371ITC1263032684 — không có XML HĐ bán ra số 32436 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:31:10 36.000 371V602263031858 — không có XML HĐ bán ra số 32501 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:30:17 35.000 371V602263031854 — không có XML HĐ bán ra số 32439 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:24:54 298.000 371ITC1263032620 — không có XML HĐ bán ra số 32440 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:20:11 78.000 371ITC1263032591 — không có XML HĐ bán ra số 32441 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:18:18 32.000 371V602263031782 — không có XML HĐ bán ra số 32442 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:10:40 49.000 371V602263031752 — không có XML HĐ bán ra số 32443 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:06:35 50.000 371ITC1263032412 — không có XML HĐ bán ra số 32521 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:04:12 197.000 371V602263031720 — không có XML HĐ bán ra số 32446 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:58:46 57.000 371ITC1263032361 — không có XML HĐ bán ra số 32468 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:52:42 427.000 371V602263031660 — không có XML HĐ bán ra số 32448 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:50:27 45.000 662V501263030629 — không có XML HĐ bán ra số 32449 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:38:05 348.000 371V602263031587 — không có XML HĐ bán ra số 32450 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:25:39 251.000 370V501263030549 — không có XML HĐ bán ra số 32451 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:24:48 821.000 371V602263031528 — không có XML HĐ bán ra số 32452 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:21:59 350.000 371V602263031514 — không có XML HĐ bán ra số 32455 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:19:41 47.000 371ITC1263032041 — không có XML HĐ bán ra số 32458 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:11:03 112.000 371V602263031469 — không có XML HĐ bán ra số 32456 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:09:14 135.000 371ITC1263031966 — không có XML HĐ bán ra số 32457 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:08:37 47.000 371V602263031454 — không có XML HĐ bán ra số 32454 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:08:31 128.000 371V602263031451 — không có XML HĐ bán ra số 32459 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:48:06 30.000 371ITC1263031765 — không có XML HĐ bán ra số 32433 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:35:54 210.000 371ITC1263031658 — không có XML HĐ bán ra số 32462 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:27:41 36.000 371V602263031239 — không có XML HĐ bán ra số 32463 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:16:25 33.000 371V602263031186 — không có XML HĐ bán ra số 32498 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:11:37 60.000 371ITC1263031494 — không có XML HĐ bán ra số 32509 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:57:22 83.000 371V602263031069 — không có XML HĐ bán ra số 32467 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:40:10 57.000 371V602263030973 — không có XML HĐ bán ra số 32447 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:37:10 36.000 371V602263030952 — không có XML HĐ bán ra số 32469 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:30:49 48.000 371V602263030921 — không có XML HĐ bán ra số 32470 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:29:49 61.000 371ITC1263031174 — không có XML HĐ bán ra số 32471 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:26:01 36.000 371ITC1263031141 — không có XML HĐ bán ra số 32473 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:25:13 72.000 371V602263030897 — không có XML HĐ bán ra số 32474 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:16:32 42.000 371ITC1263031038 — không có XML HĐ bán ra số 32475 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:16:00 155.000 371ITC1263031035 — không có XML HĐ bán ra số 32476 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:13:53 39.000 371V602263030825 — không có XML HĐ bán ra số 32478 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:12:12 54.000 371V602263030813 — không có XML HĐ bán ra số 32479 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:05:11 37.000 371V602263030780 — không có XML HĐ bán ra số 32480 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:00:45 580.000 371V602263030752 — không có XML HĐ bán ra số 32481 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:59:15 38.000 371ITC1263030943 — không có XML HĐ bán ra số 32492 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:55:51 291.000 371ITC1263030922 — không có XML HĐ bán ra số 32512 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:55:07 60.000 371ITC1263030918 — không có XML HĐ bán ra số 32466 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:50:05 121.000 371V602263030673 — không có XML HĐ bán ra số 32513 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:40:28 258.000 371ITC1263030840 — không có XML HĐ bán ra số 32514 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:34:03 126.000 371V602263030572 — không có XML HĐ bán ra số 32515 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:25:42 68.000 371V602263030524 — không có XML HĐ bán ra số 32518 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:22:14 84.000 371V602263030508 — không có XML HĐ bán ra số 32519 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:20:51 50.000 371V602263030502 — không có XML HĐ bán ra số 32444 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:10:48 33.000 371ITC1263030716 — không có XML HĐ bán ra số 32465 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:06:31 44.000 371V602263030440 — không có XML HĐ bán ra số 32523 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:54:26 36.000 371V602263030387 — không có XML HĐ bán ra số 32437 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:50:06 34.000 371ITC1263030614 — không có XML HĐ bán ra số 32486 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:44:27 65.000 371V602263030352 — không có XML HĐ bán ra số 32613 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:43:32 875.000 371V602263030349 — không có XML HĐ bán ra số 32516 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:31 [INFO] [Thu] Sẽ tạo 0 phiếu, bỏ qua 154 GD.
+2026-11-10 10:26:31 [WARN] [Chi] Không tạo phiếu: 30/10/2026 18:15:59 16.479.000 371ITC3263030149 'Cong ty SONG MINH thanh toan tien hang theo HD 40978' — không có XML hóa đơn số 40978 trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Chi] Không tạo phiếu: 30/10/2026 17:36:15 4.396.500 371ITC3263030142 'Cong ty SONG MINH thanh toan tien hang theo HD 19050' — không có XML hóa đơn số 19050 trong thư mục XML
+2026-11-10 10:26:31 [WARN] [Chi] Không tạo phiếu: 30/10/2026 11:04:33 19.370.000 371ITC3263030048 'Cong ty SONG MINH thanh toan tien hang theo HD 6332' — không có XML hóa đơn số 6332 trong thư mục XML
+2026-11-10 10:26:31 [INFO] [Chi] Sẽ tạo 0 phiếu, bỏ qua 3 GD.
+2026-11-10 10:26:31 [INFO] ===== DRY RUN xong, chưa tạo phiếu nào.
+2026-11-10 10:26:31 [INFO] Kết quả chạy: Đã tạo ở lần chạy trước: 5; Bỏ qua: 157
+2026-11-10 10:26:31 [OK] Kết quả chạy → E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\Output\2026-11-10_102630\ket-qua-chay.xlsx (162 dòng) + tom-tat.txt
+2026-11-10 10:26:31 [INFO] ===== Kết thúc → E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\Output\2026-11-10_102630
+2026-11-10 10:26:49 [INFO] ===== Bắt đầu (DRY RUN)
+2026-11-10 10:26:49 [WARN] Thư mục XML E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\xml không có thư mục con 'purchase' (vẫn quét mọi XML trong đó)
+2026-11-10 10:26:50 [INFO] Sao kê TPBANK_HISTORY69586928888_30102026_211213745.xlsx: 162 GD, Ghi có 159, Ghi nợ 3.
+2026-11-10 10:26:50 [WARN] CSV đối soát doi-soat-ck_2026-10-30_2026-10-30.csv: 159 Mã GD — định dạng cũ, sắp bỏ; dùng Excel từ trang Đối soát CK (Xuất Excel).
+2026-11-10 10:26:50 [INFO] Thư mục XML E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\xml: 24 hóa đơn — MST công ty 0400000000 (24 XML): mua vào 0, bán ra 24.
+2026-11-10 10:26:50 [INFO] Danh mục Đối tượng: 161 mã từ DANH SACH.xlsx (có MST 152 mã).
+2026-11-10 10:26:50 [INFO] Đối tượng Khách lẻ (HĐ không có MST người mua): KH010 Bán cho người tiêu dùng
+2026-11-10 10:26:50 [INFO] [Thu] Bỏ qua 5 GD đã tạo phiếu ở lần chạy trước (_vietda-ck-da-nhap.txt; -Force để làm lại).
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:15:03 34.000 371V602263034745 — không có XML HĐ bán ra số 32577 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:14:44 85.000 371V602263034743 — không có XML HĐ bán ra số 32602 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:13:31 52.000 371V602263034735 — không có XML HĐ bán ra số 32570 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:13:13 91.000 371V602263034734 — không có XML HĐ bán ra số 32578 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:12:52 36.000 371V602263034731 — không có XML HĐ bán ra số 32603 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:11:35 217.000 371V602263034725 — không có XML HĐ bán ra số 32605 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:11:12 55.000 371V602263034724 — không có XML HĐ bán ra số 32570 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:10:19 468.000 371V602263034716 — không có XML HĐ bán ra số 32570 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:57:36 268.000 371V602263034637 — không có XML HĐ bán ra số 32579 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:56:43 202.000 371V602263034633 — không có XML HĐ bán ra số 32580 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:54:05 33.000 371V602263034615 — không có XML HĐ bán ra số 32582 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:48:44 43.000 371V602263034583 — không có XML HĐ bán ra số 32612 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:46:05 170.000 371ITC1263037422 — không có XML HĐ bán ra số 32584 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:44:00 30.000 371V602263034552 — không có XML HĐ bán ra số 32607 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:43:27 133.000 371V602263034545 — không có XML HĐ bán ra số 32607 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:42:03 80.000 371V602263034540 — không có XML HĐ bán ra số 32585 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:38:00 94.000 371V602263034524 — không có XML HĐ bán ra số 32587 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:32:48 134.500 371V602263034488 — không có XML HĐ bán ra số 32608 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:31:34 42.000 371V602263034479 — không có XML HĐ bán ra số 32601 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:30:45 86.000 371V602263034473 — không có XML HĐ bán ra số 32548 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:30:29 20.000 371V602263034472 — không có XML HĐ bán ra số 32548 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:29:59 77.000 371ITC1263037310 — không có XML HĐ bán ra số 32589 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:29:52 510.000 371ITC1263037307 — không có XML HĐ bán ra số 32590 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:29:45 155.000 371V602263034458 — không có XML HĐ bán ra số 32550 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:21:20 47.000 371V602263034403 — không có XML HĐ bán ra số 32591 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:20:39 43.000 371ITC1263037250 — không có XML HĐ bán ra số 32583 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:18:54 319.000 371V602263034389 — không có XML HĐ bán ra số 32594 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:11:09 97.000 371V602263034342 — không có XML HĐ bán ra số 32596 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:10:46 400.000 371V602263034338 — không có XML HĐ bán ra số 32595 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:05:36 233.000 371V602263034292 — không có XML HĐ bán ra số 32551 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:04:14 36.000 371ITC1263037123 — không có XML HĐ bán ra số 32598 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:04:15 49.000 373V501263030277 — không có XML HĐ bán ra số 32599 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:55:24 31.000 371V602263034232 — không có XML HĐ bán ra số 32600 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:53:31 42.000 371V602263034221 — không có XML HĐ bán ra số 32588 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:51:54 306.000 371V602263034205 — không có XML HĐ bán ra số 32527 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:47:00 44.000 371V602263034177 — không có XML HĐ bán ra số 32528 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:37:14 137.000 371V602263034116 — không có XML HĐ bán ra số 32529 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:35:58 36.000 371ITC1263036879 — không có XML HĐ bán ra số 32540 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:30:32 48.000 371V602263034083 — không có XML HĐ bán ra số 32532 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:29:03 95.000 371V602263034069 — không có XML HĐ bán ra số 32552 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:27:51 103.000 371ITC1263036795 — không có XML HĐ bán ra số 32533 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:27:30 30.000 371V602263034059 — không có XML HĐ bán ra số 32553 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:24:29 56.000 371ITC1263036769 — không có XML HĐ bán ra số 32534 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:24:04 155.000 371V602263034036 — không có XML HĐ bán ra số 32535 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:13:31 270.000 371V602263033957 — không có XML HĐ bán ra số 32537 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:09:26 232.000 371ITC1263036603 — không có XML HĐ bán ra số 32538 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:00:44 157.000 371V602263033871 — không có XML HĐ bán ra số 32539 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:59:57 36.000 373V501263030256 — không có XML HĐ bán ra số 32531 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:59:26 34.000 371ITC1263036452 — không có XML HĐ bán ra số 32555 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:58:10 58.000 371V602263033859 — không có XML HĐ bán ra số 32556 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:56:49 32.000 371ITC1263036411 — không có XML HĐ bán ra số 32541 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:56:04 390.000 371ITC1263036397 — không có XML HĐ bán ra số 32557 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:55:46 88.000 371V602263033835 — không có XML HĐ bán ra số 32542 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:54:42 42.000 371V602263033825 — không có XML HĐ bán ra số 32558 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:53:48 211.000 371V602263033815 — không có XML HĐ bán ra số 32560 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:52:38 932.000 373V501263030254 — không có XML HĐ bán ra số 32563 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:51:12 400.000 371ITC1263036317 — không có XML HĐ bán ra số 32562 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:50:52 268.000 371V602263033796 — không có XML HĐ bán ra số 32561 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:45:01 32.000 371V602263033745 — không có XML HĐ bán ra số 32544 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:44:00 185.000 371V602263033738 — không có XML HĐ bán ra số 32565 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:43:51 30.000 371V602263033736 — không có XML HĐ bán ra số 32566 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:41:56 47.000 371ITC1263036119 — không có XML HĐ bán ra số 32545 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:39:37 68.000 371ITC1263036078 — không có XML HĐ bán ra số 32566 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:38:27 129.000 371V602263033705 — không có XML HĐ bán ra số 32546 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:34:08 30.000 371V602263033675 — không có XML HĐ bán ra số 32567 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:33:39 239.000 371ITC1263035979 — không có XML HĐ bán ra số 32610 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:29:33 133.000 371ITC1263035949 — không có XML HĐ bán ra số 32611 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:23:28 43.000 371ITC1263035907 — không có XML HĐ bán ra số 32592 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:07:35 153.000 371ITC1263035796 — không có XML HĐ bán ra số 32616 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:04:08 45.000 371ITC1263035733 — không có XML HĐ bán ra số 32576 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:03:40 752.000 371ITC1263035724 — không có XML HĐ bán ra số 32618 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:57:35 145.000 371ITC1263035617 — không có XML HĐ bán ra số 32619 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:55:49 43.000 371V602263033420 — không có XML HĐ bán ra số 32568 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:48:43 88.000 371V602263033388 — không có XML HĐ bán ra số 32483 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:44:42 113.000 371V602263033362 — không có XML HĐ bán ra số 32484 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:41:35 136.000 371ITC1263035338 — không có XML HĐ bán ra số 32485 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:40:13 34.000 371V602263033332 — không có XML HĐ bán ra số 32525 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:35:35 36.000 371ITC1263035232 — không có XML HĐ bán ra số 32524 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:31:29 46.000 371V602263033282 — không có XML HĐ bán ra số 32489 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:29:54 35.000 371V602263033268 — không có XML HĐ bán ra số 32490 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:29:37 40.000 371ITC1263035156 — không có XML HĐ bán ra số 32491 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:16:45 38.000 371ITC1263035012 — không có XML HĐ bán ra số 32507 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:13:27 75.000 371ITC1263034981 — không có XML HĐ bán ra số 32493 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:09:05 36.000 661V501263031402 — không có XML HĐ bán ra số 32488 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:02:16 104.000 371ITC1263034822 — không có XML HĐ bán ra số 32497 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:01:07 33.000 371ITC1263034818 — không có XML HĐ bán ra số 32522 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:59:46 210.000 371V602263033100 — không có XML HĐ bán ra số 32499 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:58:54 95.000 371V602263033096 — không có XML HĐ bán ra số 32500 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:58:39 143.000 371V602263033094 — không có XML HĐ bán ra số 32482 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:47:34 36.000 371ITC1263034652 — không có XML HĐ bán ra số 32495 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:41:57 94.000 371ITC1263034591 — không có XML HĐ bán ra số 32502 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:27:35 30.000 371V602263032916 — không có XML HĐ bán ra số 32504 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:26:19 40.000 371V602263032913 — không có XML HĐ bán ra số 32505 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:19:24 56.000 371V602263032865 — không có XML HĐ bán ra số 32506 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:10:52 1.468.000 371V602263032803 — không có XML HĐ bán ra số 32547 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:08:54 38.000 371ITC1263034297 — không có XML HĐ bán ra số 32510 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:42:47 30.000 371ITC1263032754 — không có XML HĐ bán ra số 32461 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:41:39 111.000 371ITC1263032742 — không có XML HĐ bán ra số 32432 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:38:25 95.000 371V602263031893 — không có XML HĐ bán ra số 32434 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:36:19 56.000 371V602263031882 — không có XML HĐ bán ra số 32435 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:34:49 32.000 371ITC1263032684 — không có XML HĐ bán ra số 32436 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:31:10 36.000 371V602263031858 — không có XML HĐ bán ra số 32501 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:30:17 35.000 371V602263031854 — không có XML HĐ bán ra số 32439 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:24:54 298.000 371ITC1263032620 — không có XML HĐ bán ra số 32440 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:20:11 78.000 371ITC1263032591 — không có XML HĐ bán ra số 32441 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:18:18 32.000 371V602263031782 — không có XML HĐ bán ra số 32442 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:10:40 49.000 371V602263031752 — không có XML HĐ bán ra số 32443 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:06:35 50.000 371ITC1263032412 — không có XML HĐ bán ra số 32521 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:04:12 197.000 371V602263031720 — không có XML HĐ bán ra số 32446 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:58:46 57.000 371ITC1263032361 — không có XML HĐ bán ra số 32468 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:52:42 427.000 371V602263031660 — không có XML HĐ bán ra số 32448 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:50:27 45.000 662V501263030629 — không có XML HĐ bán ra số 32449 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:38:05 348.000 371V602263031587 — không có XML HĐ bán ra số 32450 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:25:39 251.000 370V501263030549 — không có XML HĐ bán ra số 32451 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:24:48 821.000 371V602263031528 — không có XML HĐ bán ra số 32452 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:21:59 350.000 371V602263031514 — không có XML HĐ bán ra số 32455 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:19:41 47.000 371ITC1263032041 — không có XML HĐ bán ra số 32458 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:11:03 112.000 371V602263031469 — không có XML HĐ bán ra số 32456 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:09:14 135.000 371ITC1263031966 — không có XML HĐ bán ra số 32457 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:08:37 47.000 371V602263031454 — không có XML HĐ bán ra số 32454 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:08:31 128.000 371V602263031451 — không có XML HĐ bán ra số 32459 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:48:06 30.000 371ITC1263031765 — không có XML HĐ bán ra số 32433 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:35:54 210.000 371ITC1263031658 — không có XML HĐ bán ra số 32462 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:27:41 36.000 371V602263031239 — không có XML HĐ bán ra số 32463 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:16:25 33.000 371V602263031186 — không có XML HĐ bán ra số 32498 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:11:37 60.000 371ITC1263031494 — không có XML HĐ bán ra số 32509 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:57:22 83.000 371V602263031069 — không có XML HĐ bán ra số 32467 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:40:10 57.000 371V602263030973 — không có XML HĐ bán ra số 32447 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:37:10 36.000 371V602263030952 — không có XML HĐ bán ra số 32469 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:30:49 48.000 371V602263030921 — không có XML HĐ bán ra số 32470 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:29:49 61.000 371ITC1263031174 — không có XML HĐ bán ra số 32471 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:26:01 36.000 371ITC1263031141 — không có XML HĐ bán ra số 32473 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:25:13 72.000 371V602263030897 — không có XML HĐ bán ra số 32474 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:16:32 42.000 371ITC1263031038 — không có XML HĐ bán ra số 32475 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:16:00 155.000 371ITC1263031035 — không có XML HĐ bán ra số 32476 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:13:53 39.000 371V602263030825 — không có XML HĐ bán ra số 32478 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:12:12 54.000 371V602263030813 — không có XML HĐ bán ra số 32479 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:05:11 37.000 371V602263030780 — không có XML HĐ bán ra số 32480 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:00:45 580.000 371V602263030752 — không có XML HĐ bán ra số 32481 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:59:15 38.000 371ITC1263030943 — không có XML HĐ bán ra số 32492 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:55:51 291.000 371ITC1263030922 — không có XML HĐ bán ra số 32512 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:55:07 60.000 371ITC1263030918 — không có XML HĐ bán ra số 32466 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:50:05 121.000 371V602263030673 — không có XML HĐ bán ra số 32513 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:40:28 258.000 371ITC1263030840 — không có XML HĐ bán ra số 32514 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:34:03 126.000 371V602263030572 — không có XML HĐ bán ra số 32515 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:25:42 68.000 371V602263030524 — không có XML HĐ bán ra số 32518 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:22:14 84.000 371V602263030508 — không có XML HĐ bán ra số 32519 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:20:51 50.000 371V602263030502 — không có XML HĐ bán ra số 32444 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:10:48 33.000 371ITC1263030716 — không có XML HĐ bán ra số 32465 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:06:31 44.000 371V602263030440 — không có XML HĐ bán ra số 32523 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:54:26 36.000 371V602263030387 — không có XML HĐ bán ra số 32437 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:50:06 34.000 371ITC1263030614 — không có XML HĐ bán ra số 32486 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:44:27 65.000 371V602263030352 — không có XML HĐ bán ra số 32613 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:43:32 875.000 371V602263030349 — không có XML HĐ bán ra số 32516 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:26:50 [INFO] [Thu] Sẽ tạo 0 phiếu, bỏ qua 154 GD.
+2026-11-10 10:26:50 [WARN] [Chi] Không tạo phiếu: 30/10/2026 18:15:59 16.479.000 371ITC3263030149 'Cong ty SONG MINH thanh toan tien hang theo HD 40978' — không có XML hóa đơn số 40978 trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Chi] Không tạo phiếu: 30/10/2026 17:36:15 4.396.500 371ITC3263030142 'Cong ty SONG MINH thanh toan tien hang theo HD 19050' — không có XML hóa đơn số 19050 trong thư mục XML
+2026-11-10 10:26:50 [WARN] [Chi] Không tạo phiếu: 30/10/2026 11:04:33 19.370.000 371ITC3263030048 'Cong ty SONG MINH thanh toan tien hang theo HD 6332' — không có XML hóa đơn số 6332 trong thư mục XML
+2026-11-10 10:26:50 [INFO] [Chi] Sẽ tạo 0 phiếu, bỏ qua 3 GD.
+2026-11-10 10:26:50 [INFO] ===== DRY RUN xong, chưa tạo phiếu nào.
+2026-11-10 10:26:50 [INFO] Kết quả chạy: Đã tạo ở lần chạy trước: 5; Bỏ qua: 157
+2026-11-10 10:26:51 [OK] Kết quả chạy → E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\Output\2026-11-10_102649\ket-qua-chay.xlsx (162 dòng) + tom-tat.txt
+2026-11-10 10:26:51 [INFO] ===== Kết thúc → E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\Output\2026-11-10_102649
+2026-11-10 10:27:06 [INFO] ===== Bắt đầu (-VerifyOnly: không tạo phiếu, chỉ xuất bảng kê + kiểm tra)
+2026-11-10 10:27:06 [WARN] Thư mục XML E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\xml không có thư mục con 'purchase' (vẫn quét mọi XML trong đó)
+2026-11-10 10:27:06 [INFO] Sao kê TPBANK_HISTORY69586928888_30102026_211213745.xlsx: 162 GD, Ghi có 159, Ghi nợ 3.
+2026-11-10 10:27:06 [WARN] CSV đối soát doi-soat-ck_2026-10-30_2026-10-30.csv: 159 Mã GD — định dạng cũ, sắp bỏ; dùng Excel từ trang Đối soát CK (Xuất Excel).
+2026-11-10 10:27:06 [INFO] Thư mục XML E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\xml: 24 hóa đơn — MST công ty 0400000000 (24 XML): mua vào 0, bán ra 24.
+2026-11-10 10:27:06 [INFO] Danh mục Đối tượng: 161 mã từ DANH SACH.xlsx (có MST 152 mã).
+2026-11-10 10:27:06 [INFO] Đối tượng Khách lẻ (HĐ không có MST người mua): KH010 Bán cho người tiêu dùng
+2026-11-10 10:27:07 [INFO] [Thu] Bỏ qua 5 GD đã tạo phiếu ở lần chạy trước (_vietda-ck-da-nhap.txt; -Force để làm lại).
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:15:03 34.000 371V602263034745 — không có XML HĐ bán ra số 32577 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:14:44 85.000 371V602263034743 — không có XML HĐ bán ra số 32602 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:13:31 52.000 371V602263034735 — không có XML HĐ bán ra số 32570 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:13:13 91.000 371V602263034734 — không có XML HĐ bán ra số 32578 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:12:52 36.000 371V602263034731 — không có XML HĐ bán ra số 32603 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:11:35 217.000 371V602263034725 — không có XML HĐ bán ra số 32605 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:11:12 55.000 371V602263034724 — không có XML HĐ bán ra số 32570 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 20:10:19 468.000 371V602263034716 — không có XML HĐ bán ra số 32570 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:57:36 268.000 371V602263034637 — không có XML HĐ bán ra số 32579 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:56:43 202.000 371V602263034633 — không có XML HĐ bán ra số 32580 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:54:05 33.000 371V602263034615 — không có XML HĐ bán ra số 32582 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:48:44 43.000 371V602263034583 — không có XML HĐ bán ra số 32612 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:46:05 170.000 371ITC1263037422 — không có XML HĐ bán ra số 32584 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:44:00 30.000 371V602263034552 — không có XML HĐ bán ra số 32607 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:43:27 133.000 371V602263034545 — không có XML HĐ bán ra số 32607 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:42:03 80.000 371V602263034540 — không có XML HĐ bán ra số 32585 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:38:00 94.000 371V602263034524 — không có XML HĐ bán ra số 32587 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:32:48 134.500 371V602263034488 — không có XML HĐ bán ra số 32608 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:31:34 42.000 371V602263034479 — không có XML HĐ bán ra số 32601 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:30:45 86.000 371V602263034473 — không có XML HĐ bán ra số 32548 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:30:29 20.000 371V602263034472 — không có XML HĐ bán ra số 32548 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:29:59 77.000 371ITC1263037310 — không có XML HĐ bán ra số 32589 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:29:52 510.000 371ITC1263037307 — không có XML HĐ bán ra số 32590 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:29:45 155.000 371V602263034458 — không có XML HĐ bán ra số 32550 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:21:20 47.000 371V602263034403 — không có XML HĐ bán ra số 32591 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:20:39 43.000 371ITC1263037250 — không có XML HĐ bán ra số 32583 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:18:54 319.000 371V602263034389 — không có XML HĐ bán ra số 32594 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:11:09 97.000 371V602263034342 — không có XML HĐ bán ra số 32596 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:10:46 400.000 371V602263034338 — không có XML HĐ bán ra số 32595 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:05:36 233.000 371V602263034292 — không có XML HĐ bán ra số 32551 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:04:14 36.000 371ITC1263037123 — không có XML HĐ bán ra số 32598 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 19:04:15 49.000 373V501263030277 — không có XML HĐ bán ra số 32599 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:55:24 31.000 371V602263034232 — không có XML HĐ bán ra số 32600 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:53:31 42.000 371V602263034221 — không có XML HĐ bán ra số 32588 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:51:54 306.000 371V602263034205 — không có XML HĐ bán ra số 32527 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:47:00 44.000 371V602263034177 — không có XML HĐ bán ra số 32528 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:37:14 137.000 371V602263034116 — không có XML HĐ bán ra số 32529 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:35:58 36.000 371ITC1263036879 — không có XML HĐ bán ra số 32540 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:30:32 48.000 371V602263034083 — không có XML HĐ bán ra số 32532 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:29:03 95.000 371V602263034069 — không có XML HĐ bán ra số 32552 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:27:51 103.000 371ITC1263036795 — không có XML HĐ bán ra số 32533 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:27:30 30.000 371V602263034059 — không có XML HĐ bán ra số 32553 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:24:29 56.000 371ITC1263036769 — không có XML HĐ bán ra số 32534 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:24:04 155.000 371V602263034036 — không có XML HĐ bán ra số 32535 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:13:31 270.000 371V602263033957 — không có XML HĐ bán ra số 32537 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:09:26 232.000 371ITC1263036603 — không có XML HĐ bán ra số 32538 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 18:00:44 157.000 371V602263033871 — không có XML HĐ bán ra số 32539 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:59:57 36.000 373V501263030256 — không có XML HĐ bán ra số 32531 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:59:26 34.000 371ITC1263036452 — không có XML HĐ bán ra số 32555 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:58:10 58.000 371V602263033859 — không có XML HĐ bán ra số 32556 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:56:49 32.000 371ITC1263036411 — không có XML HĐ bán ra số 32541 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:56:04 390.000 371ITC1263036397 — không có XML HĐ bán ra số 32557 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:55:46 88.000 371V602263033835 — không có XML HĐ bán ra số 32542 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:54:42 42.000 371V602263033825 — không có XML HĐ bán ra số 32558 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:53:48 211.000 371V602263033815 — không có XML HĐ bán ra số 32560 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:52:38 932.000 373V501263030254 — không có XML HĐ bán ra số 32563 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:51:12 400.000 371ITC1263036317 — không có XML HĐ bán ra số 32562 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:50:52 268.000 371V602263033796 — không có XML HĐ bán ra số 32561 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:45:01 32.000 371V602263033745 — không có XML HĐ bán ra số 32544 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:44:00 185.000 371V602263033738 — không có XML HĐ bán ra số 32565 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:43:51 30.000 371V602263033736 — không có XML HĐ bán ra số 32566 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:41:56 47.000 371ITC1263036119 — không có XML HĐ bán ra số 32545 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:39:37 68.000 371ITC1263036078 — không có XML HĐ bán ra số 32566 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:38:27 129.000 371V602263033705 — không có XML HĐ bán ra số 32546 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:34:08 30.000 371V602263033675 — không có XML HĐ bán ra số 32567 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:33:39 239.000 371ITC1263035979 — không có XML HĐ bán ra số 32610 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:29:33 133.000 371ITC1263035949 — không có XML HĐ bán ra số 32611 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:23:28 43.000 371ITC1263035907 — không có XML HĐ bán ra số 32592 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:07:35 153.000 371ITC1263035796 — không có XML HĐ bán ra số 32616 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:04:08 45.000 371ITC1263035733 — không có XML HĐ bán ra số 32576 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 17:03:40 752.000 371ITC1263035724 — không có XML HĐ bán ra số 32618 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:57:35 145.000 371ITC1263035617 — không có XML HĐ bán ra số 32619 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:55:49 43.000 371V602263033420 — không có XML HĐ bán ra số 32568 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:48:43 88.000 371V602263033388 — không có XML HĐ bán ra số 32483 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:44:42 113.000 371V602263033362 — không có XML HĐ bán ra số 32484 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:41:35 136.000 371ITC1263035338 — không có XML HĐ bán ra số 32485 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:40:13 34.000 371V602263033332 — không có XML HĐ bán ra số 32525 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:35:35 36.000 371ITC1263035232 — không có XML HĐ bán ra số 32524 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:31:29 46.000 371V602263033282 — không có XML HĐ bán ra số 32489 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:29:54 35.000 371V602263033268 — không có XML HĐ bán ra số 32490 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:29:37 40.000 371ITC1263035156 — không có XML HĐ bán ra số 32491 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:16:45 38.000 371ITC1263035012 — không có XML HĐ bán ra số 32507 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:13:27 75.000 371ITC1263034981 — không có XML HĐ bán ra số 32493 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:09:05 36.000 661V501263031402 — không có XML HĐ bán ra số 32488 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:02:16 104.000 371ITC1263034822 — không có XML HĐ bán ra số 32497 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 16:01:07 33.000 371ITC1263034818 — không có XML HĐ bán ra số 32522 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:59:46 210.000 371V602263033100 — không có XML HĐ bán ra số 32499 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:58:54 95.000 371V602263033096 — không có XML HĐ bán ra số 32500 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:58:39 143.000 371V602263033094 — không có XML HĐ bán ra số 32482 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:47:34 36.000 371ITC1263034652 — không có XML HĐ bán ra số 32495 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:41:57 94.000 371ITC1263034591 — không có XML HĐ bán ra số 32502 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:27:35 30.000 371V602263032916 — không có XML HĐ bán ra số 32504 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:26:19 40.000 371V602263032913 — không có XML HĐ bán ra số 32505 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:19:24 56.000 371V602263032865 — không có XML HĐ bán ra số 32506 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:10:52 1.468.000 371V602263032803 — không có XML HĐ bán ra số 32547 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 15:08:54 38.000 371ITC1263034297 — không có XML HĐ bán ra số 32510 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:42:47 30.000 371ITC1263032754 — không có XML HĐ bán ra số 32461 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:41:39 111.000 371ITC1263032742 — không có XML HĐ bán ra số 32432 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:38:25 95.000 371V602263031893 — không có XML HĐ bán ra số 32434 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:36:19 56.000 371V602263031882 — không có XML HĐ bán ra số 32435 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:34:49 32.000 371ITC1263032684 — không có XML HĐ bán ra số 32436 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:31:10 36.000 371V602263031858 — không có XML HĐ bán ra số 32501 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:30:17 35.000 371V602263031854 — không có XML HĐ bán ra số 32439 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:24:54 298.000 371ITC1263032620 — không có XML HĐ bán ra số 32440 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:20:11 78.000 371ITC1263032591 — không có XML HĐ bán ra số 32441 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:18:18 32.000 371V602263031782 — không có XML HĐ bán ra số 32442 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:10:40 49.000 371V602263031752 — không có XML HĐ bán ra số 32443 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:06:35 50.000 371ITC1263032412 — không có XML HĐ bán ra số 32521 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 11:04:12 197.000 371V602263031720 — không có XML HĐ bán ra số 32446 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:58:46 57.000 371ITC1263032361 — không có XML HĐ bán ra số 32468 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:52:42 427.000 371V602263031660 — không có XML HĐ bán ra số 32448 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:50:27 45.000 662V501263030629 — không có XML HĐ bán ra số 32449 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:38:05 348.000 371V602263031587 — không có XML HĐ bán ra số 32450 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:25:39 251.000 370V501263030549 — không có XML HĐ bán ra số 32451 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:24:48 821.000 371V602263031528 — không có XML HĐ bán ra số 32452 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:21:59 350.000 371V602263031514 — không có XML HĐ bán ra số 32455 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:19:41 47.000 371ITC1263032041 — không có XML HĐ bán ra số 32458 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:11:03 112.000 371V602263031469 — không có XML HĐ bán ra số 32456 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:09:14 135.000 371ITC1263031966 — không có XML HĐ bán ra số 32457 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:08:37 47.000 371V602263031454 — không có XML HĐ bán ra số 32454 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 10:08:31 128.000 371V602263031451 — không có XML HĐ bán ra số 32459 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:48:06 30.000 371ITC1263031765 — không có XML HĐ bán ra số 32433 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:35:54 210.000 371ITC1263031658 — không có XML HĐ bán ra số 32462 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:27:41 36.000 371V602263031239 — không có XML HĐ bán ra số 32463 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:16:25 33.000 371V602263031186 — không có XML HĐ bán ra số 32498 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 09:11:37 60.000 371ITC1263031494 — không có XML HĐ bán ra số 32509 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:57:22 83.000 371V602263031069 — không có XML HĐ bán ra số 32467 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:40:10 57.000 371V602263030973 — không có XML HĐ bán ra số 32447 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:37:10 36.000 371V602263030952 — không có XML HĐ bán ra số 32469 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:30:49 48.000 371V602263030921 — không có XML HĐ bán ra số 32470 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:29:49 61.000 371ITC1263031174 — không có XML HĐ bán ra số 32471 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:26:01 36.000 371ITC1263031141 — không có XML HĐ bán ra số 32473 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:25:13 72.000 371V602263030897 — không có XML HĐ bán ra số 32474 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:16:32 42.000 371ITC1263031038 — không có XML HĐ bán ra số 32475 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:16:00 155.000 371ITC1263031035 — không có XML HĐ bán ra số 32476 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:13:53 39.000 371V602263030825 — không có XML HĐ bán ra số 32478 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:12:12 54.000 371V602263030813 — không có XML HĐ bán ra số 32479 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:05:11 37.000 371V602263030780 — không có XML HĐ bán ra số 32480 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 08:00:45 580.000 371V602263030752 — không có XML HĐ bán ra số 32481 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:59:15 38.000 371ITC1263030943 — không có XML HĐ bán ra số 32492 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:55:51 291.000 371ITC1263030922 — không có XML HĐ bán ra số 32512 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:55:07 60.000 371ITC1263030918 — không có XML HĐ bán ra số 32466 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:50:05 121.000 371V602263030673 — không có XML HĐ bán ra số 32513 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:40:28 258.000 371ITC1263030840 — không có XML HĐ bán ra số 32514 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:34:03 126.000 371V602263030572 — không có XML HĐ bán ra số 32515 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:25:42 68.000 371V602263030524 — không có XML HĐ bán ra số 32518 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:22:14 84.000 371V602263030508 — không có XML HĐ bán ra số 32519 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:20:51 50.000 371V602263030502 — không có XML HĐ bán ra số 32444 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:10:48 33.000 371ITC1263030716 — không có XML HĐ bán ra số 32465 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 07:06:31 44.000 371V602263030440 — không có XML HĐ bán ra số 32523 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:54:26 36.000 371V602263030387 — không có XML HĐ bán ra số 32437 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:50:06 34.000 371ITC1263030614 — không có XML HĐ bán ra số 32486 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:44:27 65.000 371V602263030352 — không có XML HĐ bán ra số 32613 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Thu] Không tạo phiếu: 30/10/2026 06:43:32 875.000 371V602263030349 — không có XML HĐ bán ra số 32516 ký hiệu C26MSM trong thư mục XML
+2026-11-10 10:27:07 [INFO] [Thu] Sẽ tạo 0 phiếu, bỏ qua 154 GD.
+2026-11-10 10:27:07 [WARN] [Chi] Không tạo phiếu: 30/10/2026 18:15:59 16.479.000 371ITC3263030149 'Cong ty SONG MINH thanh toan tien hang theo HD 40978' — không có XML hóa đơn số 40978 trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Chi] Không tạo phiếu: 30/10/2026 17:36:15 4.396.500 371ITC3263030142 'Cong ty SONG MINH thanh toan tien hang theo HD 19050' — không có XML hóa đơn số 19050 trong thư mục XML
+2026-11-10 10:27:07 [WARN] [Chi] Không tạo phiếu: 30/10/2026 11:04:33 19.370.000 371ITC3263030048 'Cong ty SONG MINH thanh toan tien hang theo HD 6332' — không có XML hóa đơn số 6332 trong thư mục XML
+2026-11-10 10:27:07 [INFO] [Chi] Sẽ tạo 0 phiếu, bỏ qua 3 GD.
+2026-11-10 10:27:07 [INFO] ===== Không có phiếu nào cần tạo.
+2026-11-10 10:27:07 [INFO] [Thu] Tìm kiếm chứng từ TG từ 30/10/2026 đến 30/10/2026 → Excel — KHÔNG đụng chuột/bàn phím...
+2026-11-10 10:27:08 [INFO] Menu 'Thu chi' ở 2080,34 (Scale màn hình 100%)
+2026-11-10 10:27:20 [INFO] Đã đóng tab bảng kê.
+2026-11-10 10:27:20 [OK] [Thu] bảng kê VietDA TG 30/10/2026 → 30/10/2026: 161 phiếu (Từ ngày 30/10/2026 Đến ngày 30/10/2026 · Loại phiếu: Phiếu thu tiền gửi)
+2026-11-10 10:27:20 [INFO] [Chi] Tìm kiếm chứng từ CG từ 30/10/2026 đến 30/10/2026 → Excel — KHÔNG đụng chuột/bàn phím...
+2026-11-10 10:27:20 [INFO] Menu 'Thu chi' ở 2080,34 (Scale màn hình 100%)
+2026-11-10 10:27:31 [INFO] Đã đóng tab bảng kê.
+2026-11-10 10:27:32 [OK] [Chi] bảng kê VietDA CG 30/10/2026 → 30/10/2026: 3 phiếu (Từ ngày 30/10/2026 Đến ngày 30/10/2026 · Loại phiếu: Phiếu chi tiền gửi)
+2026-11-10 10:27:32 [INFO] Kết quả chạy: Đã tạo ở lần chạy trước: 5; Bỏ qua: 157 · Kiểm tra VietDA: SAI: Số tiền, Lý do: 5
+2026-11-10 10:27:32 [OK] Kết quả chạy → E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\Output\2026-11-10_102706\ket-qua-chay.xlsx (162 dòng) + tom-tat.txt
+2026-11-10 10:27:32 [INFO] ===== Kết thúc → E:\TapHoa39\Gemini\TapHoa39KeToan\tools\vietda-xml-import\Output\2026-11-10_102706

@@ -103,57 +103,10 @@
       <p class="hint">"HĐ chưa thấy CK": trả tiền mặt, trả sau kỳ sao kê, hoặc CK lệch số tiền (xem Ghi chú). "CK không có HĐ": lương, phí,
         hàng không lấy HĐ, trả HĐ ngoài kỳ… "Khớp — cần xem": chỉ khớp số tiền, tên người nhận khác tên NCC.</p>
 
-      <div class="toolbar">
-        <div class="chips">
-          @for (c of chips; track c.value) {
-            <button type="button" class="chip" [class.active]="filter === c.value" (click)="setFilter(c.value)">{{ c.label }} ({{ countOf(c.value) }})</button>
-          }
-        </div>
-        <div class="search"><i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" [(ngModel)]="q" (ngModelChange)="page = 1" placeholder="Số HĐ, NCC, người nhận, diễn giải, số tiền..."></div>
-        @if (!embedded) {
-          <button type="button" class="btn small" (click)="exportCsv()" [disabled]="!filteredRows.length"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button>
-        }
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Kết quả</th><th>Hóa đơn</th><th class="num">Tổng HĐ</th><th>Chuyển khoản</th><th class="num">Số tiền CK</th><th>Lệch ngày</th><th>Ghi chú</th></tr>
-          </thead>
-          <tbody>
-            @for (r of pageRows; track $index) {
-              <tr [class]="'k-' + r.kind">
-                <td><span class="badge" [class]="'b-' + r.kind">{{ kindLabel[r.kind] }}</span>
-                  @if (r.confidence && r.confidence !== 'cao') { <span class="conf">tin cậy {{ r.confidence }}</span> }</td>
-                <td>
-                  @for (i of r.invoices; track i.key) {
-                    <div class="inv"><b>{{ i.symbol }}-{{ i.no }}</b> · {{ viDate(i.date) }}
-                      <small>{{ i.sellerName }}@if (i.sellerMst) { · {{ i.sellerMst }} }@if (r.invoices.length > 1) { · {{ vnd(i.total) }} }</small></div>
-                  } @empty { <span class="muted">—</span> }
-                </td>
-                <td class="num">{{ r.invoices.length ? vnd(r.kind === 'matched_group' ? r.amount : r.invoices[0].total) : '' }}</td>
-                <td>
-                  @for (t of r.txns; track t.iso + t.amount) {
-                    <div class="txn"><b>{{ t.date }}</b> · {{ t.counterparty || '—' }}@if (r.txns.length > 1) { · {{ vnd(t.amount) }} }
-                      <small [title]="t.desc">{{ t.desc }}</small></div>
-                  } @empty { <span class="muted">—</span> }
-                </td>
-                <td class="num">{{ r.txns.length ? vnd(r.kind === 'matched_split' ? r.amount : r.txns[0].amount) : '' }}</td>
-                <td>{{ r.days === null ? '' : (r.days > 0 ? '+' + r.days : r.days) + ' ngày' }}</td>
-                <td class="hint-cell">{{ r.hint }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-      @if (pageCount > 1) {
-        <div class="pager">
-          <button type="button" (click)="page = page - 1" [disabled]="page === 1"><i class="fa-solid fa-angle-left"></i></button>
-          Trang {{ page }} / {{ pageCount }} ({{ filteredRows.length | number }} dòng)
-          <button type="button" (click)="page = page + 1" [disabled]="page === pageCount"><i class="fa-solid fa-angle-right"></i></button>
-        </div>
+      @if (!embedded) {
+        <div class="toolbar"><button type="button" class="btn small" (click)="exportCsv()" [disabled]="!result.rows.length"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button></div>
       }
+      <app-recon-table [rows]="viewRows" [chips]="chips" partyLabel="Nhà cung cấp"></app-recon-table>
     </section>
   }
 </div>

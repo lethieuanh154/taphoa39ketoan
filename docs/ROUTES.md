@@ -69,6 +69,7 @@ Thêm / bớt trang trong menu → sửa `menu.config.ts`, không sửa HTML. Nh
 | Tiện ích | `/invoice-check-page` | InvoiceCheckPageComponent (`loadComponent`) | Kiểm tra HĐ tự động (23/10/2026). `?run=<id>` = mở 1 lần kiểm. `noPeriodBar` |
 | Tiện ích (cuối nhóm link thẳng) | `/tools-download-page` | ToolsDownloadPageComponent (`loadComponent`) | Tải công cụ (02/11/2026): zip các thư mục `tools/` để chạy trên máy kế toán. `noPeriodBar` |
 | Tiện ích | nhóm **Đối soát CK** → `/bank-reconciliation-page` (`?tab=mua-vao`) | BankReconciliationHubComponent (lazy) | 06/11/2026: **1 trang bán ra + mua vào** — 1 sao kê, tab Bán ra / Mua vào (nhúng 2 trang cũ), 1 file Excel cho tool VietDA |
+| Tiện ích | nhóm **Đối soát CK** → `/ck-snapshot-page` | CkSnapshotPageComponent (lazy) | 13/11/2026: "CK nhiều lần / CK dư (BanHang)" — chỉ đọc bản lưu BanHang (theo kỳ) |
 | — | `/bank-reconciliation-in-page` | redirect → `/bank-reconciliation-page?tab=mua-vao` | link cũ "Chuyển khoản HĐ đầu vào" (23/10/2026) |
 | Tiện ích | `/invoice-reconciliation-page` | InvoiceReconciliationPageComponent (`loadComponent`, tải riêng) | Đối soát hóa đơn XML (23/10/2026). `?run=<id>` = mở 1 lần đối soát |
 | Tiện ích (mục cuối, sau các nhóm — `tailItems`) | `/tax-figures-page` | TaxFiguresPageComponent (`loadComponent`) | Số liệu khai thuế (bước 5, 23/10/2026): 01/GTGT, PL142, bảng kê bán ra / mua vào, 05/KK-TNCN. `?run=<id>` |

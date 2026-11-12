@@ -3,20 +3,17 @@
  * tools/vietda-xml-import"). KHÔNG phải vùng mirror (chỉ KeToan).
  *
  * Sheet (thứ tự cố định):
- *   Nhap-VietDA          mỗi GD sao kê 1 dòng — Thu (Ghi có, khớp HĐĐT bán ra) + Chi (Ghi nợ, khớp HĐ mua vào); CÙNG cột (VIETDA_HEADER)
- *   Ban-ra_Doi-soat      = CSV Đối soát cũ (doi-soat-ck_*.csv, buildReconCsv) — mỗi cặp HĐ ⇄ GD
- *   Ban-ra_CK-nhieu-lan  = CSV CK nhiều lần · Ban-ra_CK-du = CSV CK dư
- *   Mua-vao              = CSV Chuyển khoản HĐ đầu vào (buildPurchaseReconCsv)
+ *   Nhap-VietDA          mỗi GD sao kê 1 dòng — Thu (Ghi có, khớp HĐ XML bán ra) + Chi (Ghi nợ, khớp HĐ mua vào); CÙNG cột (VIETDA_HEADER)
+ *   Ban-ra · Mua-vao     = bảng trên 2 tab, CÙNG cột (recon-view.util reconViewTable) — 13/11/2026 thay Ban-ra_Doi-soat /
+ *                          Ban-ra_CK-nhieu-lan / Ban-ra_CK-du (HĐ bán ra lấy từ XML, không còn ghi chú "N lần" / "CK dư")
  *   Thong-tin            định dạng (EXPORT_SCHEMA), kỳ, file sao kê, thời điểm xuất, số dòng
  * Tool đọc sheet Nhap-VietDA theo TÊN CỘT (đổi tên / bỏ cột = tăng EXPORT_SCHEMA). Ngày giờ = chữ đúng định dạng sao kê TPBank.
  */
-import {
-  RECON_KIND_LABEL, ReconPair, excessTransferPairs, excessTransferTable, isEInvoiceIssuePair, multiTransferPairs, multiTransferTable,
-  payerLabel, reconPairHint, reconTable
-} from './transfer-reconcile.util';
-import { PURCHASE_KIND_LABEL, PurchaseMatchRow, purchaseReconTable } from './purchase-transfer-reconcile.util';
+import { ReconPair, payerLabel, reconPairHint } from './transfer-reconcile.util';
+import { PURCHASE_KIND_LABEL, PurchaseMatchRow } from './purchase-transfer-reconcile.util';
 import type { DebitTxn } from './tpbank-debit.util';
-import { XlsxCell, XlsxSheet, XlsxTone, buildXlsx } from './xlsx-writer.util';
+import { XlsxCell, XlsxSheet, buildXlsx } from './xlsx-writer.util';
+import { ReconViewRow, reconViewTable, saleStatus } from './recon-view.util';
 
 export const EXPORT_SCHEMA = 'taphoa39-doi-soat-ck/1';
 
@@ -30,9 +27,12 @@ export interface BankReconExportInput {
   from: string;                       // yyyy-mm-dd — kỳ / khoảng ngày đối soát
   to: string;
   statementFiles: string[];
-  /** Bán ra: các cặp HĐĐT ⇄ GD Ghi có (null = chưa lấy HĐĐT) */
+  /** Bán ra: các cặp HĐ XML ⇄ GD Ghi có (null = chưa đối soát được) */
   salePairs: ReconPair[] | null;
   saleWithBank: boolean;              // đã import sao kê cho bán ra
+  /** Dòng bảng tab Bán ra / Mua vào (sheet Ban-ra / Mua-vao) */
+  saleView?: ReconViewRow[];
+  purchaseView?: ReconViewRow[];
   /** Mua vào: kết quả ghép (null = chưa chọn thư mục XML) */
   purchaseRows: PurchaseMatchRow[] | null;
   /** GD Ghi nợ trên sao kê — dùng khi chưa có purchaseRows (vẫn liệt kê ở Nhap-VietDA, ghi "chưa đối soát") */
@@ -64,7 +64,7 @@ function saleRows(pairs: ReconPair[]): Row[] {
     return {
       'Loại': 'Thu', 'Mã GD': p.txn!.code, 'Thời gian GD': p.txn!.date, 'Ngày GD': isoDay(p.txn!.date), 'Số tiền': p.txn!.credit,
       'Diễn giải sao kê': p.txn!.desc, 'Người chuyển / nhận': payerLabel(p.txn!), 'TK đối ứng': p.txn!.account || '',
-      'Kết quả khớp': RECON_KIND_LABEL[p.kind], 'Lập phiếu theo HĐ': reason ? 'Không' : 'Có', 'Lý do không lập': reason, 'Độ tin cậy': '',
+      'Kết quả khớp': saleStatus(p).status, 'Lập phiếu theo HĐ': reason ? 'Không' : 'Có', 'Lý do không lập': reason, 'Độ tin cậy': '',
       'Số HĐ': inv?.einvoiceNumber || '', 'Ký hiệu HĐ': inv?.einvoiceSerial || '', 'Ngày HĐ': (inv?.time || '').slice(0, 10),
       'Tổng HĐ': inv ? inv.total : '', 'Mã HĐ KiotViet': inv && !inv.code.startsWith('HĐĐT') ? inv.code : '',
       'Khoản': p.item && p.item.partCount > 1 ? `${p.item.partIndex}/${p.item.partCount}` : '',
@@ -112,22 +112,6 @@ export function vietdaRows(input: BankReconExportInput): Row[] {
   return [...thu, ...chi].sort((a, b) => key(a).localeCompare(key(b)) || String(b['Loại']).localeCompare(String(a['Loại'])));
 }
 
-// ===== Màu dòng (06/11/2026): xanh = đúng / lập phiếu được · vàng = khớp nhưng cần xem · đỏ = không khớp / không lập =====
-
-/** Cặp bán ra: giống màu bảng trên trang (khớp xanh, lệch giờ vàng, thiếu / thừa / HĐĐT nháp - phát hành trễ đỏ). */
-function saleTone(p: ReconPair): XlsxTone {
-  if (isEInvoiceIssuePair(p) || p.kind === 'invoice_only' || p.kind === 'bank_only') return 'bad';
-  return p.kind === 'matched_late' ? 'warn' : 'ok';
-}
-
-/** CK nhiều lần / CK dư: ghi chú lệch (số lần / tổng / không tách được) → đỏ; còn lại theo trạng thái khớp GD (nếu có sao kê). */
-const noteTone = (noteOk: boolean, p: ReconPair, withBank: boolean): XlsxTone => !noteOk ? 'bad' : withBank ? saleTone(p) : 'ok';
-
-function purchaseTone(r: PurchaseMatchRow): XlsxTone {
-  if (r.kind === 'bank_only' || r.kind === 'invoice_only') return 'bad';
-  return r.confidence === 'thấp' ? 'warn' : 'ok';
-}
-
 /** Chỉ số các cột kết quả (in đậm cùng màu dòng) theo tên cột. */
 const colsOf = (header: string[], names: string[]) => names.map(n => header.indexOf(n)).filter(i => i >= 0);
 
@@ -142,19 +126,13 @@ export function buildBankReconWorkbook(input: BankReconExportInput): { bytes: Ui
     tones: rows.map(r => r['Lập phiếu theo HĐ'] === 'Có' ? 'ok' : 'bad'),
     emphasisCols: colsOf(header, ['Kết quả khớp', 'Lập phiếu theo HĐ', 'Lý do không lập']),
   }];
-  const withSheet = (name: string, t: { header: string[]; rows: XlsxCell[][] }, tones: XlsxTone[], emph: string[]) =>
-    sheets.push({ name, ...t, tones, emphasisCols: colsOf(t.header, emph) });
-  if (input.salePairs) {
-    const pairs = input.salePairs, wb = input.saleWithBank;
-    if (wb) withSheet('Ban-ra_Doi-soat', reconTable(pairs), pairs.map(saleTone), ['Trạng thái', 'Gợi ý']);
-    withSheet('Ban-ra_CK-nhieu-lan', multiTransferTable(pairs, { withBank: wb }),
-      multiTransferPairs(pairs).map(p => noteTone(p.item!.note!.status === 'ok', p, wb)), ['Tình trạng ghi chú', 'Trạng thái khớp']);
-    withSheet('Ban-ra_CK-du', excessTransferTable(pairs, { withBank: wb }),
-      excessTransferPairs(pairs).map(p => noteTone(p.item!.excess!.status === 'ok', p, wb)), ['Tình trạng ghi chú', 'Trạng thái khớp']);
-  }
-  if (input.purchaseRows) {
-    withSheet('Mua-vao', purchaseReconTable(input.purchaseRows), input.purchaseRows.map(purchaseTone), ['Kết quả', 'Độ tin cậy']);
-  }
+  // Ban-ra / Mua-vao: cùng cột, màu dòng như bảng trên trang (xanh khớp · vàng cần xem · đỏ lệch)
+  const viewSheet = (name: string, view: ReconViewRow[], party: string, txnParty: string) => {
+    const t = reconViewTable(view, party, txnParty);
+    sheets.push({ name, ...t, emphasisCols: colsOf(t.header, ['Kết quả', 'Ghi chú']) });
+  };
+  if (input.salePairs && input.saleView?.length) viewSheet('Ban-ra', input.saleView, 'Người mua', 'Người chuyển');
+  if (input.purchaseRows && input.purchaseView?.length) viewSheet('Mua-vao', input.purchaseView, 'Nhà cung cấp', 'Người nhận');
   const summary = `Thu ${count('Thu')} GD (lập phiếu ${count('Thu', 'Có')}) · Chi ${count('Chi')} GD (lập phiếu ${count('Chi', 'Có')})`;
   sheets.push({
     name: 'Thong-tin', header: ['Mục', 'Giá trị'], rows: [
@@ -162,10 +140,10 @@ export function buildBankReconWorkbook(input: BankReconExportInput): { bytes: Ui
       ['Khoảng ngày', `${viDay(input.from)} → ${viDay(input.to)}`],
       ['File sao kê', input.statementFiles.join(', ')],
       ['Xuất lúc', new Date().toLocaleString('vi-VN')],
-      ['Bán ra (Thu)', input.salePairs ? (input.saleWithBank ? '' : 'chưa import sao kê') : 'chưa lấy HĐĐT'],
+      ['Bán ra (Thu)', input.salePairs ? (input.saleWithBank ? 'HĐ từ thư mục XML đầu ra' : 'chưa import sao kê') : 'chưa chọn thư mục XML HĐ đầu ra / sao kê'],
       ['Mua vào (Chi)', input.purchaseRows ? '' : 'chưa chọn thư mục XML HĐ đầu vào'],
       ['Nhap-VietDA', summary],
-      ['Màu dòng', 'Xanh = khớp / lập phiếu theo HĐ · Vàng = khớp nhưng cần xem (lệch giờ, tin cậy thấp) · Đỏ = không khớp / không lập phiếu'],
+      ['Màu dòng', 'Xanh = khớp / lập phiếu theo HĐ · Vàng = khớp nhưng cần xem (GD sau ngày HĐ, tin cậy thấp) · Đỏ = không khớp / không lập phiếu'],
     ],
   });
   return { bytes: buildXlsx(sheets), summary };

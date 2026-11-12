@@ -1,0 +1,67 @@
+<!-- Bảng đối soát CK dùng chung Bán ra / Mua vào (13/11/2026) -->
+<div class="filter-chips">
+  @for (c of chips; track c.key) {
+    <button type="button" [class.active]="filter === c.key" (click)="setFilter(c.key)">{{ c.label }} ({{ countOf(c.key) | number }})</button>
+  }
+  <span class="search"><i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" [(ngModel)]="q" (ngModelChange)="onSearch()" placeholder="Số HĐ, đối tác, người chuyển / nhận, diễn giải, số tiền..."></span>
+  <button type="button" class="sort-chip" (click)="toggleSort()" title="Đổi cách sắp xếp: Lệch lên đầu → Số tiền ↓ → Số tiền ↑">
+    <i class="fa-solid" [ngClass]="sortIcon"></i> {{ sortLabel }}
+  </button>
+</div>
+
+<div class="table-wrap">
+  <table class="recon-table">
+    <thead>
+      <tr>
+        <th>Số HĐ</th><th>Ngày HĐ</th><th>{{ partyLabel }}</th><th class="num">Tổng HĐ</th>
+        <th class="num">Số tiền GD</th><th>Giao dịch khớp</th><th>Lệch ngày</th><th>Trạng thái</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (r of pageRows; track $index) {
+        <tr [ngClass]="'tone-' + r.tone">
+          <td class="code">
+            @for (i of r.invoices; track $index) { <div>{{ i.symbol }}-{{ i.no }}</div> } @empty { — }
+          </td>
+          <td>@for (i of r.invoices; track $index) { <div>{{ i.date }}</div> }</td>
+          <td>
+            @for (i of r.invoices; track $index) {
+              <div>{{ i.party || '—' }}@if (r.invoices.length > 1) { · {{ vnd(i.total) }} }
+                @if (i.mst || i.note) { <small>{{ i.mst }}@if (i.mst && i.note) { · }{{ i.note }}</small> }</div>
+            }
+          </td>
+          <td class="num">{{ vnd(r.invoiceTotal) }}</td>
+          <td class="num">{{ vnd(r.txnTotal) }}</td>
+          <td class="txn">
+            @for (t of r.txns; track $index) {
+              <div>{{ t.party || '—' }} · {{ t.time }}@if (r.txns.length > 1) { · {{ vnd(t.amount) }} }
+                <small [title]="t.desc">{{ t.code }}@if (t.code && t.desc) { · }{{ t.desc }}</small></div>
+            } @empty { — }
+          </td>
+          <td class="nowrap">{{ daysText(r.days) }}</td>
+          <td>
+            <span class="kind">{{ r.status }}</span>
+            @if (r.hint) { <small class="hint-inline">{{ r.hint }}</small> }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+  @if (view.length === 0) { <div class="empty">{{ emptyText }}</div> }
+</div>
+
+@if (view.length > pageSize) {
+  <div class="pager">
+    <button type="button" (click)="goPage(1)" [disabled]="page === 1" title="Trang đầu"><i class="fa-solid fa-angles-left"></i></button>
+    <button type="button" (click)="goPage(page - 1)" [disabled]="page === 1"><i class="fa-solid fa-angle-left"></i></button>
+    <span>Trang {{ page }} / {{ pageCount }} · {{ view.length | number }} dòng</span>
+    <button type="button" (click)="goPage(page + 1)" [disabled]="page === pageCount"><i class="fa-solid fa-angle-right"></i></button>
+    <button type="button" (click)="goPage(pageCount)" [disabled]="page === pageCount" title="Trang cuối"><i class="fa-solid fa-angles-right"></i></button>
+    <label>Mỗi trang
+      <select [(ngModel)]="pageSize" (ngModelChange)="page = 1">
+        @for (n of pageSizes; track n) { <option [ngValue]="n">{{ n }}</option> }
+      </select>
+    </label>
+  </div>
+}

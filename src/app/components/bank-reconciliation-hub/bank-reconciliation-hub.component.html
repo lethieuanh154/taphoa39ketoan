@@ -2,7 +2,7 @@
 <div class="hub">
   <header class="page-head">
     <h1><i class="fa-solid fa-money-bill-transfer"></i> Đối soát chuyển khoản</h1>
-    <p class="sub">Sao kê TPBank ⇄ hóa đơn: tiền <b>vào</b> ⇄ HĐĐT <b>bán ra</b> · tiền <b>ra</b> ⇄ HĐ <b>mua vào</b>.
+    <p class="sub">Sao kê TPBank ⇄ hóa đơn XML: tiền <b>vào</b> ⇄ HĐ <b>bán ra</b> · tiền <b>ra</b> ⇄ HĐ <b>mua vào</b> (mỗi tab chọn thư mục XML riêng).
       Xuất <b>1 file Excel</b> (sheet <code>Nhap-VietDA</code> cho tool nhập phiếu thu / chi tiền gửi vào VietDA + các bảng chi tiết).</p>
   </header>
 
@@ -24,7 +24,7 @@
       }
       <span class="spacer"></span>
       <button type="button" class="btn btn-excel" (click)="exportExcel()" [disabled]="!canExport"
-        title="1 file .xlsx: Nhap-VietDA (Thu + Chi) · Ban-ra_Doi-soat · Ban-ra_CK-nhieu-lan · Ban-ra_CK-du · Mua-vao · Thong-tin">
+        title="1 file .xlsx: Nhap-VietDA (Thu + Chi) · Ban-ra · Mua-vao (cùng cột) · Thong-tin">
         <i class="fa-solid fa-file-excel"></i> Xuất Excel
       </button>
       @if (sale.canCompare) {
