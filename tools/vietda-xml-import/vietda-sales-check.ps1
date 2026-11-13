@@ -1119,13 +1119,27 @@ function Close-VoucherForm([IntPtr]$Form) {
     if (-not $quit) { throw "phiếu không có nút Thoát" }
     [Vdb]::ClickButton($quit.H)
     $note = ''
+    # Đóng phiếu mà VietDA hỏi "Bạn có muốn lưu dữ liệu không ?" (Yes/No/Cancel) → No: tool không sửa gì (hoặc đã Lưu xong ở -Fix),
+    # VietDA tự đổi phiếu lúc mở (thấy 13/11/2026 trên máy kế toán: phiếu Hội nhập XML có "Ngày giờ" = hôm nay) → không lưu, giữ bản cũ
+    $answer = {
+        $d = @([Vdb]::Dialogs($script:vda.Pid)) | Select-Object -First 1
+        if (-not $d) { return $null }
+        $text = [Vdb]::MessageText($d)
+        if ($text -like '*muốn lưu*' -and [Vdb]::GetDlgItem($d, 7) -ne [IntPtr]::Zero) {
+            [Vdb]::Press($d, 7)
+            Start-Sleep -Milliseconds 400
+            Write-Log WARN "  VietDA hỏi lưu khi đóng phiếu (VietDA tự đổi phiếu lúc mở) → chọn No, không lưu"
+            return "VietDA hỏi 'Bạn có muốn lưu dữ liệu không?' khi đóng → No (không lưu)"
+        }
+        return (Take-Dialog 'đóng phiếu')
+    }
     $deadline = (Get-Date).AddSeconds($FormTimeoutSec)
     while ([VdForm]::IsWindow($Form) -and [Vdb]::IsWindowVisible($Form) -and (Get-Date) -lt $deadline) {
         Start-Sleep -Milliseconds 150
-        if ([Vdb]::Dialogs($script:vda.Pid).Count) { $note = Take-Dialog 'đóng phiếu' }
+        if ([Vdb]::Dialogs($script:vda.Pid).Count) { $note = & $answer }
     }
     Start-Sleep -Milliseconds 200
-    if ([Vdb]::Dialogs($script:vda.Pid).Count) { $note = Take-Dialog 'đóng phiếu' }
+    if ([Vdb]::Dialogs($script:vda.Pid).Count) { $note = & $answer }
     if ([VdForm]::IsWindow($Form) -and [Vdb]::IsWindowVisible($Form)) { throw "không đóng được phiếu (bấm Thoát quá $FormTimeoutSec giây)" }
     return $note
 }

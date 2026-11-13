@@ -903,3 +903,93 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* === THÔNG BÁO / LỊCH SỬ (spec 001 T09) === */
+.page-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.page-alert span {
+  flex: 1;
+}
+
+.alert-error {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+.alert-success {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.nature-none {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+
+.form-hint {
+  display: block;
+  margin: -8px 0 16px;
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.history-section {
+  margin-top: 20px;
+  border-top: 1px solid var(--gray-200);
+  padding-top: 16px;
+}
+
+.history-section h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--gray-700);
+}
+
+.history-empty {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.history-item {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--gray-200);
+  font-size: 13px;
+}
+
+.history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  color: var(--gray-600);
+}
+
+.history-user {
+  color: var(--gray-500);
+}
+
+.history-action {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--gray-100);
+}
+
+.action-INSERT { background: var(--success-light); color: var(--success); }
+.action-UPDATE { background: var(--warning-light); color: var(--warning); }
+.action-DELETE { background: var(--danger-light); color: var(--danger); }
+
+.history-changes {
+  margin: 6px 0 0 18px;
+  padding: 0;
+  color: var(--gray-700);
+}

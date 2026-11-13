@@ -26,6 +26,7 @@ export const environment = {
   domainUrl: '',
   apiUrl: '',
   ketoanBackendUrl: '',
+  ledgerUrl: '',          // ledger-rs: nginx proxy /api/ledger/ cung origin
   appName: 'Kế Toán Doanh Nghiệp',
   version: '1.0.0'
 };

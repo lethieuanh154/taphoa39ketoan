@@ -7,7 +7,7 @@ import { AuthService, httpErrorText } from '../services/auth.service';
 
 const LOG = '[AuthInterceptor]';
 
-/** Gắn Firebase ID token (header X-Id-Token) cho mọi request lên TapHoa39KeToanBackEnd. */
+/** Gắn Firebase ID token (header X-Id-Token) cho mọi request lên TapHoa39KeToanBackEnd (FastAPI + ledger-rs). */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (!isBackendUrl(req.url)) {
     return next(req);
@@ -37,6 +37,6 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 };
 
 function isBackendUrl(url: string): boolean {
-  const bases = [environment.ketoanBackendUrl, environment.apiUrl, environment.domainUrl].filter(Boolean);
+  const bases = [environment.ketoanBackendUrl, environment.apiUrl, environment.domainUrl, environment.ledgerUrl].filter(Boolean);
   return url.startsWith('/') || bases.some(base => url.startsWith(base));
 }

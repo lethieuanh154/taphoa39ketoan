@@ -202,6 +202,8 @@ Khoảng ngày = ngày HĐ nhỏ nhất → lớn nhất trong XML (`-From` / `-
      (thứ tự cột ở `$GridCols`; Tiền hàng + VAT ≠ Tổng tiền ở mọi dòng → dừng, VietDA đổi cột). ĐVT là ô chọn, F2 không mở → không đọc.
      Phiếu đã tick "Hiển thị thuế suất từng mặt hàng" → VietDA chèn cột **Loại thuế** sau "Giá đích danh" → tool dùng `$GridColsRate`
      (Tiền VAT / Tổng tiền lùi 1 cột) và so Loại thuế từng dòng với TSuat XML.
+   - Thoát mà VietDA hỏi **"Bạn có muốn lưu dữ liệu không ?"** → tool chọn **No** (không lưu), ghi vào Ghi chú. Gặp trên máy kế toán
+     13/11/2026 với phiếu Hội nhập XML (VietDA tự đổi phiếu lúc mở — "Ngày giờ" hiện ngày hôm nay); trước đó tool dừng hẳn.
    - "Sửa phiếu" nạp bản **đã Lưu** — tick / sửa trên tab đang mở mà chưa Lưu thì tool vẫn thấy bản cũ.
    - **Windows Scale 125% / 150%** (10/11/2026): tool (powershell.exe) và VietDA đều DPI-unaware → tọa độ cửa sổ / message là pixel
      logic, giống 100%. Không còn click tọa độ cố định có rủi ro: danh sách chọn dòng 1 bằng **F5** (không click — lệch thì trúng tiêu đề

@@ -25,6 +25,7 @@ export const environment = {
   domainUrl: 'http://127.0.0.1:5000',        // TapHoa39KeToanBackEnd API (FastAPI)
   apiUrl: 'http://127.0.0.1:5000',           // TapHoa39KeToanBackEnd API (FastAPI)
   ketoanBackendUrl: 'http://127.0.0.1:5000', // TapHoa39KeToanBackEnd API (FastAPI)
+  ledgerUrl: 'http://127.0.0.1:8002',        // ledger-rs (Rust/Axum) — /api/ledger/*
   appName: 'Kế Toán Doanh Nghiệp',
   version: '1.0.0'
 };
