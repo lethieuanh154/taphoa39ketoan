@@ -532,7 +532,8 @@ $ShowRateBox = 'Hiển thị thuế suất từng mặt hàng'
 # Tick "Hiển thị thuế suất từng mặt hàng" → VietDA chèn cột "Loại thuế" sau "Giá đích danh" (thấy 10/11/2026) → Tiền VAT / Tổng tiền lùi 1 cột.
 # → đọc cả cột 18, 19, 20 rồi tự nhận: Tiền hàng + c18 = c19 (không có cột Loại thuế) hay Tiền hàng + c19 = c20 (có) — vừa đúng cột,
 #   vừa biết ô tick đó (không phụ thuộc Scale màn hình như cách đọc pixel).
-$GridCols = [ordered]@{ Code = 0; Name = 1; Qty = 3; Price = 4; Goods = 6; TkNo = 7; TkCo = 8; Disc = 10; Cost = 14; NoGv = 15; CoGv = 16; C18 = 18; C19 = 19; C20 = 20 }
+# Cột "Số hóa đơn" của dòng hàng (sau Tổng tiền) = cột 20, có cột Loại thuế thì 21 — phiếu kế toán làm đúng ghi Số HĐ ở mọi dòng (13/11/2026)
+$GridCols = [ordered]@{ Code = 0; Name = 1; Qty = 3; Price = 4; Goods = 6; TkNo = 7; TkCo = 8; Disc = 10; Cost = 14; NoGv = 15; CoGv = 16; C18 = 18; C19 = 19; C20 = 20; C21 = 21 }
 # Quy tắc kế toán (10/11/2026): tổng thanh toán (tiền hàng + thuế) phải đúng XML; lệch làm tròn thì CHỈNH TIỀN HÀNG, không chỉnh thuế
 # → tiền hàng lệch XML tối đa $RoundAdjMax đ được coi là chỉnh làm tròn nếu tổng thanh toán khớp
 $RoundAdjMax = 10
@@ -1026,6 +1027,7 @@ function Read-FormGrid([IntPtr]$Grid) {
             Vat = Round-Money (Parse-Vn $(if ($rateCol) { $c.C19 } else { $c.C18 }))
             Total = Round-Money (Parse-Vn $(if ($rateCol) { $c.C20 } else { $c.C19 })); Cost = Parse-Vn $c.Cost
             TkNo = ([string]$c.TkNo).Trim(); TkCo = ([string]$c.TkCo).Trim(); NoGv = ([string]$c.NoGv).Trim(); CoGv = ([string]$c.CoGv).Trim()
+            InvNo = $(if ($rateCol) { $inv = $c.C21 } else { $inv = $c.C20 }; if ($null -eq $inv) { $null } else { ([string]$inv).Trim() })   # $null = ô không mở được (F2) → không kiểm
             Rate = $(if ($rateCol -and $null -ne $c.C18) { ([string]$c.C18).Trim() } else { $null })
         })
     }
@@ -1054,7 +1056,14 @@ function Read-VoucherForm([IntPtr]$Form) {
         $f = @($kids | Where-Object { (& $isField $_) -and $_.L -ge $lb.R - 4 -and [Math]::Abs($_.CY - $lb.CY) -le 8 } | Sort-Object L) | Select-Object -First 1
         if ($f) { ([Vdb]::TextOf($f.H)).Trim() } else { $null }
     }
-    $need = 'Số CT', 'Lý do', 'Ký hiệu', 'Số hóa đơn', 'Ghi nợ', 'Ghi có', 'Phương thức TT'
+    $bval = {
+        param([string]$Label)
+        $lb = @($kids | Where-Object { $_.Cls -like '*BUTTON*' -and $_.Text -eq $Label } | Sort-Object T) | Select-Object -Last 1
+        if (-not $lb) { return $null }
+        $f = @($kids | Where-Object { $_.Cls -clike 'WindowsForms10.EDIT*' -and $_.L -ge $lb.R - 4 -and [Math]::Abs($_.CY - $lb.CY) -le 8 } | Sort-Object L) | Select-Object -First 1
+        if ($f) { Round-Money (Parse-Vn ([Vdb]::TextOf($f.H))) } else { $null }
+    }
+    $need ='Số CT', 'Lý do', 'Ký hiệu', 'Số hóa đơn', 'Ghi nợ', 'Ghi có', 'Phương thức TT'
     $miss = @($need | Where-Object { $null -eq (& $val $_) })
     if ($miss.Count) { throw "phiếu thiếu ô: $($miss -join ', ') (VietDA đổi giao diện?)" }
     # ô tick
@@ -1070,6 +1079,12 @@ function Read-VoucherForm([IntPtr]$Form) {
     $grid = @($kids | Where-Object { $_.Cls -like '*Window.8*' -and -not $_.Text -and ($_.R - $_.L) -gt 600 -and ($_.B - $_.T) -gt 120 } | Sort-Object { ($_.B - $_.T) } -Descending) | Select-Object -First 1
     if (-not $grid) { throw 'không thấy lưới dòng hàng trên phiếu' }
     $g = Read-FormGrid $grid.H
+    # lưới nạp chậm hơn đầu phiếu (máy kế toán 13/11/2026: XH1374 lần đọc ra 0 dòng, lần trước 3 dòng) → đọc lại
+    for ($k = 1; $k -le 2 -and -not $g.Lines.Count; $k++) {
+        Write-Log WARN "  lưới dòng hàng trống — chờ rồi đọc lại (lần $k)"
+        Start-Sleep -Milliseconds 1500; Wait-Idle $Form
+        $g = Read-FormGrid $grid.H
+    }
     $lines = $g.Lines
     # ô "Hiển thị thuế suất từng mặt hàng": cột Loại thuế trên lưới là chắc chắn nhất; không xác định (phiếu toàn dòng 0 đ) → theo ảnh
     $showRate = if ($null -ne $g.RateCol) { $g.RateCol } else { $pixRate }
@@ -1089,6 +1104,8 @@ function Read-VoucherForm([IntPtr]$Form) {
         TkNo = & $val 'Ghi nợ'; TkCo = & $val 'Ghi có'; Pay = & $val 'Phương thức TT'
         HGoods = Round-Money (Parse-Vn (& $val 'Tiền hàng')); HVat = Round-Money (Parse-Vn (& $val 'Tiền thuế'))
         ShowRate = $showRate; HasInvoice = $hasInv
+        # góc dưới phiếu (nhãn là nút bấm): mẫu kế toán 13/11/2026 — tiền mặt Thanh toán = Tổng hóa đơn, chuyển khoản Thanh toán 0 / Còn nợ = tổng
+        Paid = & $bval 'Thanh toán'; Debt = & $bval 'Còn nợ'; InvTotal = & $bval 'Tổng hóa đơn'
         Lines = $lines
     }
     Complete-Voucher $v
@@ -1176,7 +1193,13 @@ function Undo-VoucherForm([IntPtr]$Form) {
     $end = (Get-Date).AddSeconds(10)
     while ([VdForm]::IsWindow($Form) -and [Vdb]::IsWindowVisible($Form) -and (Get-Date) -lt $end) {
         $d = @([Vdb]::Dialogs($script:vda.Pid)) | Select-Object -First 1
-        if ($d) { if ([Vdb]::GetDlgItem($d, 7) -ne [IntPtr]::Zero) { [Vdb]::Press($d, 7) } else { [Vdb]::Press($d, 2) }; Write-Log WARN "Hủy sửa: $([Vdb]::MessageText($d)) → No/OK" }
+        if ($d) {
+            $btns = @([Vdb]::Descendants($d) | Where-Object { [Vdb]::ClassOf($_) -eq 'Button' } | ForEach-Object { [Vdb]::TextOf($_) }) -join '/'
+            $txt = @([Vdb]::Descendants($d) | Where-Object { [Vdb]::ClassOf($_) -eq 'Static' } | ForEach-Object { [Vdb]::TextOf($_) } | Where-Object { $_ }) -join ' '
+            $hasNo = [Vdb]::GetDlgItem($d, 7) -ne [IntPtr]::Zero
+            if ($hasNo) { [Vdb]::Press($d, 7) } else { [Vdb]::Press($d, 2) }
+            Write-Log WARN "Hủy sửa: hộp '$([Vdb]::TextOf($d))' [$txt] nút [$btns] → $(if ($hasNo) { 'No' } else { 'OK/Cancel' })"
+        }
         Start-Sleep -Milliseconds 300
     }
     if ([VdForm]::IsWindow($Form) -and [Vdb]::IsWindowVisible($Form)) { throw 'sửa lỗi và không đóng được phiếu — kiểm phiếu đang mở trên VietDA (KHÔNG lưu)' }
@@ -1189,21 +1212,33 @@ function Set-HeaderField($Kids, [IntPtr]$Grid, [string]$Label, [string]$Value) {
     if (-not $lb) { throw "không thấy nhãn '$Label'" }
     $c = @($Kids | Where-Object { ($_.Cls -clike 'WindowsForms10.EDIT*' -or $_.Cls -clike 'WindowsForms10.COMBOBOX*') -and $_.L -ge $lb.R - 4 -and [Math]::Abs($_.CY - $lb.CY) -le 8 } | Sort-Object L) | Select-Object -First 1
     if (-not $c) { throw "không thấy ô '$Label'" }
-    $how = ''
+    $how = ''; $diag = ''
     if ($c.Cls -clike 'WindowsForms10.COMBOBOX*') {
         $items = @([Vdb]::ComboItems($c.H))
-        $idx = -1; for ($i = 0; $i -lt $items.Count -and $idx -lt 0; $i++) { if ($items[$i] -eq $Value) { $idx = $i } }
-        if ($idx -ge 0) { [Vdb]::SelectCombo($c.H, $idx); $how = "chọn mục $idx" }
+        # ô chọn nạp mục lúc xổ xuống (Lý do, Ghi nợ… 0 mục khi mới mở phiếu) → xổ xuống rồi đóng (CB_SHOWDROPDOWN) cho VietDA nạp
+        if (-not $items.Count) {
+            [void][VdForm]::Send($c.H, 0x14F, [IntPtr]1, [IntPtr]::Zero); Start-Sleep -Milliseconds 400
+            [void][VdForm]::Send($c.H, 0x14F, [IntPtr]::Zero, [IntPtr]::Zero); Start-Sleep -Milliseconds 200
+            $items = @([Vdb]::ComboItems($c.H))
+        }
+        $want = Normalize-Name $Value
+        $idx = -1; for ($i = 0; $i -lt $items.Count -and $idx -lt 0; $i++) { if ($items[$i] -eq $Value -or (Normalize-Name $items[$i]) -eq $want) { $idx = $i } }
+        $near = @($items | Where-Object { (Normalize-Name $_) -like "*$((Normalize-Name ($Value -split ' ')[0]))*" } | Select-Object -First 5)
+        $diag = "ô có $($items.Count) mục$(if ($near.Count) { "; gần giống: '$($near -join "', '")'" })"
+        if ($idx -ge 0) { $Value = $items[$idx]; [Vdb]::SelectCombo($c.H, $idx); $how = "chọn mục $idx" }
         else {
+            # không có mục → gõ từng ký tự như người gõ (WM_CHAR), VietDA nhận như bàn phím; đặt chữ 1 lần (WM_SETTEXT) bị ô Lý do xóa (13/11/2026)
             $e = @([Vdb]::Descendants($c.H) | Where-Object { [Vdb]::ClassOf($_) -eq 'Edit' }) | Select-Object -First 1
             if (-not $e) { throw "ô '$Label' không gõ được" }
-            [void][VdForm]::Click($e, 3, 3); [void][Vdb]::SetText($e, $Value); $how = 'gõ chữ'
+            [void][VdForm]::Click($e, 3, 3); [void][Vdb]::SetText($e, '')
+            foreach ($ch in $Value.ToCharArray()) { [void][VdForm]::Send($e, 0x102, [IntPtr][int]$ch, [IntPtr]1) }
+            $how = 'gõ từng ký tự'
         }
     } else { [void][VdForm]::Click($c.H, 3, 3); [void][Vdb]::SetText($c.H, $Value); $how = 'gõ chữ' }
     [void][VdForm]::Click($Grid, $FormRow1.X, $FormRow1.Y)
     $notes = Wait-FixDialogs "điền '$Label'"
     $got = ([Vdb]::TextOf($c.H)).Trim()
-    if ($got -ne $Value) { throw "ô '$Label' điền '$Value' nhưng đọc lại '$got'" }
+    if ($got -ne $Value) { throw "ô '$Label' điền '$Value' ($how) nhưng đọc lại '$got'$(if ($diag) { " — $diag" })" }
     Write-Log INFO "    $Label → '$Value' ($how)$(if ($notes.Count) { ' — ' + ($notes -join '; ') })"
     return , $notes
 }
@@ -1215,6 +1250,8 @@ function Invoke-HeaderFix([IntPtr]$Form, $Fixes) {
     $save = @($kids | Where-Object { $_.Cls -like '*BUTTON*' -and $_.Text -eq 'Lưu' }) | Select-Object -First 1
     if (-not $grid -or -not $save) { throw 'phiếu không có lưới dòng hàng / nút Lưu' }
     $done = [System.Collections.Generic.List[string]]::new()
+    # Lý do trước: điền hỏng thì hủy sớm, đỡ phí các ô khác (caller mở lại phiếu sửa tiếp không Lý do)
+    $Fixes = @($Fixes | Sort-Object { if ($_.Field -eq 'Lý do') { 0 } else { 1 } })
     try {
         foreach ($f in $Fixes) {
             $to = [string]$f.To
@@ -1269,6 +1306,7 @@ function Read-AllVouchers([string]$FromD, [string]$ToD, $Xmls) {
     $fails = 0
     $fixFails = 0
     $script:fixUsed = @{}
+    $script:reasonBroken = $false
     $resync = $true
     # mở + đọc + đóng 1 dòng → phiếu ($null = không mở được)
     $visit = {
@@ -1282,12 +1320,25 @@ function Read-AllVouchers([string]$FromD, [string]$ToD, $Xmls) {
         $fixed = $null; $fixErr = $null
         if ($Fix -and -not $err) {
             $x = Find-XmlFor $v $Xmls
-            $todo = if ($x) { @((Get-HeaderFixes $v $x) | Where-Object { $_.Auto }) } else { @() }
+            $todo = if ($x) { @((Get-HeaderFixes $v $x) | Where-Object { $_.Auto -and -not ($script:reasonBroken -and $_.Field -eq 'Lý do') }) } else { @() }
             if (-not $x) { Write-Log WARN "  $($v.SoCt): không có XML khớp hẳn (Ký hiệu + Số HĐ, hoặc ngày + tiền + thuế + số dòng) → không tự sửa" }
             if ($x) { $script:fixUsed[$x.File] = $true }
             if ($todo.Count) {
                 Write-Log INFO "  Sửa $($v.SoCt) (HĐ $($x.Kh)/$($x.Number)): $(($todo | ForEach-Object Text) -join '; ')"
                 try { $fixed = Invoke-HeaderFix $o.Form $todo } catch { $fixErr = $_.Exception.Message }
+                # Lý do không điền được (VietDA xóa ô — 13/11/2026 máy kế toán) → các phiếu sau bỏ Lý do; phiếu này mở lại sửa các ô còn lại
+                $rest = @($todo | Where-Object { $_.Field -ne 'Lý do' })
+                if ($fixErr -and $fixErr -like "ô 'Lý do'*") {
+                    if (-not $script:reasonBroken) { Write-Log WARN "  Ô 'Lý do' không điền được ($fixErr) → từ giờ KHÔNG sửa Lý do (ghi 'sửa tay'), vẫn sửa các ô khác" }
+                    $script:reasonBroken = $true
+                    if ($rest.Count) {
+                        $o = Open-ListingRow $L $Index -Same
+                        if (-not $o.Form) { throw "dòng $($Index + 1): hủy sửa Lý do xong không mở lại được phiếu ($($o.Note))" }
+                        try { [void](Read-VoucherForm $o.Form) } catch { }
+                        Write-Log INFO "  Sửa lại $($v.SoCt) (không Lý do): $(($rest | ForEach-Object Text) -join '; ')"
+                        try { $fixed = Invoke-HeaderFix $o.Form $rest; $fixErr = $null } catch { $fixErr = $_.Exception.Message }
+                    } else { $fixErr = $null }
+                }
             }
         }
         $closeNote = if ([VdForm]::IsWindow($o.Form) -and [Vdb]::IsWindowVisible($o.Form)) { Close-VoucherForm $o.Form } else { '' }
@@ -1300,7 +1351,7 @@ function Read-AllVouchers([string]$FromD, [string]$ToD, $Xmls) {
             [void](Close-VoucherForm $o2.Form)
             if ($err2) { throw "dòng $($Index + 1): đã Lưu, đọc lại lỗi — $err2" }
             if ($v2.SoCt -ne $v.SoCt) { throw "dòng $($Index + 1): đã Lưu $($v.SoCt) nhưng mở lại ra $($v2.SoCt) — danh sách đổi thứ tự?" }
-            $left = @((Get-HeaderFixes $v2 $x) | Where-Object { $_.Auto })
+            $left = @((Get-HeaderFixes $v2 $x) | Where-Object { $_.Auto -and -not ($script:reasonBroken -and $_.Field -eq 'Lý do') })
             $v = $v2
             Write-Log $(if ($left.Count) { 'WARN' } else { 'OK' }) "  Đã lưu $($v.SoCt)$(if ($left.Count) { " — mở lại vẫn sai: $(($left | ForEach-Object Text) -join '; ')" } else { ', mở lại kiểm: đúng' })"
             if ($left.Count) { $fixErr = "Lưu xong nhưng mở lại vẫn sai: $(($left | ForEach-Object Text) -join '; ')" }
@@ -1424,6 +1475,22 @@ function Get-HeaderFixes($V, $X) {
     if (-not (Test-TkNo $V.TkNo $kind)) { $to = if ($kind -eq 'CK') { '131' } else { '1111' }; & $add 'Ghi nợ' $V.TkNo $to "Ghi nợ '$($V.TkNo)' → $to" $true "Đúng ($(if ($kind -eq 'CK') { 'chuyển khoản' } else { 'tiền mặt' }))" }
     if ($V.TkCo -ne $TkCoOk) { & $add 'Ghi có' $V.TkCo $TkCoOk "Ghi có '$($V.TkCo)' → $TkCoOk" $true 'Đúng' }
     if ($V.HasInvoice -eq $false) { & $add 'Tick Hóa đơn' 'chưa tick' 'phải tick (sửa tay)' "tick 'Hóa đơn' (sửa tay)" $false 'Đúng' }
+    # Theo 2 phiếu mẫu kế toán 13/11/2026 — CHỈ BÁO (chưa tự sửa): cột "Số hóa đơn" mọi dòng hàng = Số HĐ; Thanh toán theo PTTT
+    $lines = @($V.Lines)
+    if ($lines.Count -and $lines[0].PSObject.Properties['InvNo']) {
+        $badInv = @($lines | Where-Object { $null -ne $_.InvNo -and ("$($_.InvNo)" -replace '^0+', '') -ne [string]$X.Number })
+        if ($badInv.Count) {
+            $seenInv = (@($badInv | ForEach-Object { if ($_.InvNo) { $_.InvNo } else { 'trống' } } | Select-Object -Unique) -join ', ')
+            & $add 'Số hóa đơn dòng hàng' "$seenInv ($($badInv.Count)/$($lines.Count) dòng)" ([string]$X.Number) "Số HĐ ở $($badInv.Count)/$($lines.Count) dòng hàng '$seenInv' → $($X.Number) (sửa tay)" $false
+        }
+    }
+    if ($V.PSObject.Properties['Paid'] -and $null -ne $V.Paid -and $kind) {
+        $total = if ($V.InvTotal) { [long]$V.InvTotal } else { $V.Goods + $V.Vat }
+        $wantPaid = if ($kind -eq 'TM') { $total } else { 0 }
+        if ([Math]::Abs([long]$V.Paid - $wantPaid) -gt 1) {
+            & $add 'Thanh toán' $V.Paid $wantPaid "Thanh toán '$($V.Paid)' → $wantPaid (sửa tay)" $false "Đúng ($(if ($kind -eq 'TM') { 'tiền mặt: = Tổng hóa đơn, Còn nợ 0' } else { 'chuyển khoản: 0, Còn nợ = Tổng hóa đơn' }))"
+        }
+    }
     return , $list
 }
 

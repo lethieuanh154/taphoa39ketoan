@@ -39,7 +39,7 @@ export class ToolsDownloadPageComponent {
       requires: 'Windows, VietDA đã đăng nhập — không cần cài thêm',
       steps: [
         'Giải nén zip. Mở VietDA, đăng nhập đúng file dữ liệu, không để hộp thoại nào đang mở.',
-        'Dễ nhất: double-click VietDA-Tools.bat → cửa sổ 2 tab làm theo từng bước: thêm file / chọn thư mục ngay trong cửa sổ (sao kê, Đối soát CK, danh mục, XML), mỗi bước báo ✔/✘. Phiếu XH: Kiểm tra trước, chỉ khi KHÔNG ĐẠT mới bật nút Sửa.',
+        'Dễ nhất: double-click VietDA-Tools.bat → cửa sổ 2 tab làm theo từng bước: thêm file / chọn thư mục ngay trong cửa sổ (sao kê, Đối soát CK, danh mục, XML), mỗi bước báo ✔/✘. Phiếu XH: bấm Sửa + Lưu đầu phiếu (tool đọc từng phiếu, sửa phiếu sai, Lưu, mở lại kiểm; hỏi "Bạn có muốn lưu dữ liệu không?" khi đóng phiếu đúng sẵn → tự chọn No).',
         'Copy sao kê TPBank (.xlsx) + Excel Đối soát CK (trang Đối soát CK > Xuất Excel, doi-soat-ck_*.xlsx) + danh mục Đối tượng xuất từ VietDA (DANH SACH.xlsx) vào thư mục Input trong thư mục tool (nhiều sao kê được, tool gộp lại).',
         'Copy XML hóa đơn tải từ GDT vào thư mục xml trong thư mục tool: xml/sold = bán ra, xml/purchase = mua vào.',
         'Double-click Nhap-SaoKe-vao-VietDA.bat → xem danh sách → gõ Y + Enter.',

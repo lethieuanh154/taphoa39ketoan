@@ -143,9 +143,9 @@ log có màu + tiến độ; 2 script và các file .bat cũ giữ nguyên. Log 
 
 | Tab | Bước | Nút nhập liệu |
 |---|---|---|
-| Kiểm / sửa XH | 1 XML bán ra | chọn **thư mục của tool** (`xml\sold`) hoặc **thư mục khác** (→ `-XmlFolder`); *Thêm file XML…* copy vào `xml\sold`; *Dọn XML cũ…* |
+| Sửa phiếu XH | 1 XML bán ra | chọn **thư mục của tool** (`xml\sold`) hoặc **thư mục khác** (→ `-XmlFolder`); *Thêm file XML…* copy vào `xml\sold`; *Dọn XML cũ…* |
 | | 2 Danh mục VTHH (tùy chọn) | *Chọn file danh mục…* → copy vào `Input\danh-muc-vthh\` (file cũ / file đặt nhầm trong `Input\` chuyển vào `_cu\`) |
-| | 3 VietDA · 4 Kiểm tra · 5 Sửa + Lưu | xem bảng dưới |
+| | 3 VietDA · 4 Sửa + Lưu | xem bảng dưới |
 | Sao kê | 1 Sao kê · 2 Đối soát CK · 3 Danh mục Đối tượng | danh sách file trong `Input\` + *Thêm…* (copy vào `Input\`; đối soát / đối tượng không đúng tên thì thêm tiền tố `doi-soat-ck_` / `DANH SACH_`) + *Bỏ file đã chọn* |
 | | 4 XML | thư mục của tool (`xml\sold` + `xml\purchase`, *Thêm XML bán ra / mua vào…*) hoặc thư mục khác |
 | | 5 VietDA (loại phiếu, số phiếu) · 6 Chạy | xem bảng dưới |
@@ -154,16 +154,15 @@ log có màu + tiến độ; 2 script và các file .bat cũ giữ nguyên. Log 
 sao kê báo ⚠ và trước khi chạy hỏi chuyển sang `Input\danh-muc-vthh\`.
 | Tab | Nút | Chạy |
 |---|---|---|
-| Kiểm / sửa phiếu XH | **1. Kiểm tra** | `vietda-sales-check.ps1 -NoOpen [-From -To] [-Limit]` |
-| | **2. Sửa + Lưu đầu phiếu** | cùng điều kiện + `-Fix -Yes` (hộp xác nhận thay cho gõ Y) |
+| Sửa phiếu XH | **Sửa + Lưu đầu phiếu** | `vietda-sales-check.ps1 -NoOpen -Fix -Yes [-XmlFolder] [-From -To] [-Limit]` (hộp xác nhận thay cho gõ Y) |
 | Sao kê → phiếu thu/chi | Xem trước / Chỉ kiểm tra VietDA / Tạo phiếu | `vietda-bank-import.ps1 [-Mode Thu\|Chi] [-Limit] -DryRun / -VerifyOnly / (tạo)` + `-Yes` |
 
-Nút **Sửa** (user chốt 10/11/2026): xám cho tới khi Kiểm tra xong. Đọc `tom-tat.txt` của lần kiểm: **ĐẠT** (Cần sửa đầu phiếu,
-Lỗi dòng, Chưa nhập, Không có XML, Sửa lỗi đều 0) → Sửa **xám**; **KHÔNG ĐẠT** và `Phiếu có đầu phiếu tool sửa được` > 0 → Sửa
-**bật**. Không đạt mà chỉ có lỗi dòng hàng (tool không sửa được) → Sửa vẫn xám + ghi "lỗi còn lại chỉ sửa tay". Đổi khoảng ngày /
-số phiếu sau khi kiểm → Sửa xám lại, phải Kiểm tra lại (sửa đúng phạm vi đã kiểm).
+Tab XH (13/11/2026, user bỏ bước Kiểm tra): kế toán bấm thẳng **Sửa + Lưu đầu phiếu** (bật khi Bước 1 có XML + VietDA đang mở). Tool đọc
+từng phiếu, phiếu sai đầu phiếu thì sửa + Lưu + mở lại kiểm; phiếu đúng sẵn không sửa; Thoát mà VietDA hỏi "Bạn có muốn lưu dữ liệu
+không ?" → **No**. Kết quả sau khi chạy (đọc `tom-tat.txt` = trạng thái SAU khi Lưu): **ĐẠT** hoặc **CÒN LỖI** — lỗi dòng hàng /
+đầu phiếu chưa sửa được / chưa nhập / không có XML → mở **Kết quả**, cột "So với XML". `Kiem-PhieuXH-VietDA.bat` (chỉ đọc) vẫn dùng được ngoài cửa sổ.
 
-Nút **Kết quả kiểm tra** (tab XH) / **Kết quả chạy** (tab sao kê): mở file Excel kết quả **mới nhất** trong `Output\`
+Nút **Kết quả** (tab XH) / **Kết quả chạy** (tab sao kê): mở file Excel kết quả **mới nhất** trong `Output\`
 (`*_kiem-xh\ket-qua-kiem-xh.xlsx` / `<ngày-giờ>\ket-qua-chay.xlsx`), kể cả của lần chạy trước khi mở cửa sổ; chưa có file → nút xám,
 rê chuột xem tên file + giờ. Tool sao kê dùng chuột + bàn phím thật → cửa sổ tự thu nhỏ khi chạy, mở lại khi xong. Nút **Dừng** = taskkill cả cây tiến trình
 (cảnh báo nếu đang sửa / tạo phiếu: có thể còn phiếu mở chưa Lưu trên VietDA). Đóng cửa sổ khi đang chạy → hỏi rồi dừng.
@@ -243,6 +242,8 @@ VietDA: MST '0304762338' | XML: MST '0499000002' (cảnh báo)
 | Ký hiệu / Số hóa đơn | theo XML — Ký hiệu = KHHDon (`C26MFD`, số mẫu `1` nằm ô Mã\|Mẫu HĐ như ảnh kế toán 10/11/2026); `1C26MFD` cũng tính đúng |
 | Phương thức TT | cùng loại với XML (`CK`/`Chuyển khoản`, `TM`/`Tiền mặt`); tool sửa thì chọn đúng chữ XML nếu ô có mục đó |
 | Ghi nợ / Ghi có | CK (công nợ) → `131` / `33311`; TM → `1111` (111x đều đúng) / `33311`. Dòng hàng Có `5111` |
+| Số hóa đơn dòng hàng | cột "Số hóa đơn" (sau Tổng tiền) mọi dòng = Số HĐ — **chỉ báo, sửa tay** (2 phiếu mẫu kế toán 13/11/2026) |
+| Thanh toán / Còn nợ (góc dưới) | tiền mặt: Thanh toán = Tổng hóa đơn, Còn nợ 0 · chuyển khoản: Thanh toán 0, Còn nợ = Tổng — **chỉ báo, sửa tay** |
 | Tick | "Hóa đơn" (sửa tay). **Không kiểm** "Hiển thị thuế suất từng mặt hàng": VietDA không lưu ô này theo phiếu (tick tay + Lưu, mở lại vẫn mất — user thử 10/11/2026) |
 
 Loại thuế đầu phiếu để trống — không kiểm. Mẫu không kiểm.

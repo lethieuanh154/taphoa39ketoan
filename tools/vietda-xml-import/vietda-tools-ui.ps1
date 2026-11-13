@@ -1,7 +1,7 @@
 ﻿<#
 .SYNOPSIS
   Cửa sổ chạy 2 tool VietDA theo từng bước (10/11/2026) — WinForms trong PowerShell, không cần cài thêm.
-    Tab "Kiểm / sửa phiếu XH" (vietda-sales-check.ps1):
+    Tab "Sửa phiếu XH" (vietda-sales-check.ps1):
       1 XML bán ra (thêm file vào xml\sold hoặc chọn thư mục khác) · 2 Danh mục Vật tư hàng hóa (Input\danh-muc-vthh) · 3 VietDA ·
       4 Kiểm tra → ĐẠT thì nút Sửa xám · 5 Sửa + Lưu (chỉ bật khi KHÔNG ĐẠT + còn đầu phiếu tool sửa được).
     Tab "Sao kê → phiếu thu/chi" (vietda-bank-import.ps1):
@@ -66,7 +66,6 @@ function Save-Settings { try { [IO.File]::WriteAllText($SettingsFile, (ConvertTo
 $script:runner = $null
 $script:job = $null
 $script:lastOut = $null
-$script:xhChecked = $null
 $script:readCount = 0
 
 # ---------------- dựng giao diện ----------------
@@ -112,7 +111,7 @@ $tabs = New-Object System.Windows.Forms.TabControl; $tabs.Dock = 'Fill'
 $split.Panel1.Controls.Add($tabs)
 
 # ===================== Tab 1: Kiểm / sửa phiếu XH =====================
-$tabXh = New-Object System.Windows.Forms.TabPage; $tabXh.Text = 'Kiểm / sửa phiếu XH (sau Hội nhập XML)'; $tabXh.AutoScroll = $true
+$tabXh = New-Object System.Windows.Forms.TabPage; $tabXh.Text = 'Sửa phiếu XH (sau Hội nhập XML)'; $tabXh.AutoScroll = $true
 $x1 = New-Step $tabXh 1 'XML hóa đơn bán ra (XML QUY ĐỔI, đúng bản đã Hội nhập)' 8 112
 $rbXhTool = New-Object System.Windows.Forms.RadioButton; $rbXhTool.Location = New-Object System.Drawing.Point(14, 26); $rbXhTool.Size = New-Object System.Drawing.Size(560, 24)
 $rbXhOther = New-Object System.Windows.Forms.RadioButton; $rbXhOther.Text = 'Thư mục khác:'; $rbXhOther.Location = New-Object System.Drawing.Point(14, 52); $rbXhOther.Size = New-Object System.Drawing.Size(120, 24)
@@ -138,7 +137,7 @@ $lblXhVda = New-Label '' 14 24 1000 44
 $lblXhVda.Text = 'Mở VietDA, đăng nhập đúng file dữ liệu. Nên mở sẵn Nhập xuất > Tìm kiếm chứng từ (loại XH, khoảng ngày) — tool dùng luôn danh sách đó; không có thì tool tự mở theo khoảng ngày. Trong lúc chạy KHÔNG bấm vào VietDA (dùng app khác được).'
 Add-To $x3 @($lblXhVda)
 
-$x4 = New-Step $tabXh 4 'Kiểm tra' 320 112
+$x4 = New-Step $tabXh 4 'Sửa + Lưu đầu phiếu' 320 150
 $chkXhAuto = New-Object System.Windows.Forms.CheckBox; $chkXhAuto.Text = 'Khoảng ngày theo XML'; $chkXhAuto.Checked = $true
 $chkXhAuto.Location = New-Object System.Drawing.Point(14, 28); $chkXhAuto.Size = New-Object System.Drawing.Size(180, 24)
 $dtXhFrom = New-Object System.Windows.Forms.DateTimePicker; $dtXhFrom.Format = 'Custom'; $dtXhFrom.CustomFormat = 'dd/MM/yyyy'
@@ -148,17 +147,13 @@ $dtXhTo = New-Object System.Windows.Forms.DateTimePicker; $dtXhTo.Format = 'Cust
 $dtXhTo.Location = New-Object System.Drawing.Point(348, 27); $dtXhTo.Width = 120; $dtXhTo.Enabled = $false
 $lblXhLimit = New-Label 'Chỉ chạy N phiếu đầu (0 = tất cả):' 500 30 220
 $numXhLimit = New-Object System.Windows.Forms.NumericUpDown; $numXhLimit.Location = New-Object System.Drawing.Point(722, 27); $numXhLimit.Width = 70; $numXhLimit.Maximum = 100000
-$btnXhCheck = New-Button 'Kiểm tra' 14 62 150
-$btnXhReport = New-Button 'Kết quả kiểm tra' 172 62 150
-$lblXhResult = New-Label 'Chưa kiểm tra.' 334 60 680 46; $lblXhResult.Font = $bold
-Add-To $x4 @($chkXhAuto, $dtXhFrom, $lblXhArrow, $dtXhTo, $lblXhLimit, $numXhLimit, $btnXhCheck, $btnXhReport)
-$x4.Box.Controls.Add($lblXhResult)
-
-$x5 = New-Step $tabXh 5 'Sửa + Lưu đầu phiếu (bật khi Bước 4 KHÔNG ĐẠT)' 438 86
-$btnXhFix = New-Button 'Sửa + Lưu đầu phiếu' 14 28 190; $btnXhFix.Enabled = $false
-$lblXhFixNote = New-Label "Sửa theo XML: Lý do 'Doanh thu bán hàng', Ký hiệu, Số HĐ, Phương thức TT, Ghi nợ (CK 131 / TM 1111), Ghi có 33311 → Lưu → mở lại kiểm. Dòng hàng (mã, tiền) KHÔNG sửa — sửa tay theo cột 'So với XML'." 214 26 800 52
+$lblXhFixNote = New-Label "Tool mở từng phiếu, sửa theo XML: Lý do 'Doanh thu bán hàng', Ký hiệu, Số HĐ, Phương thức TT, Ghi nợ (CK 131 / TM 1111), Ghi có 33311 → Lưu → mở lại kiểm. Phiếu đúng sẵn: không sửa; VietDA hỏi 'Bạn có muốn lưu dữ liệu không?' khi đóng → No. Dòng hàng (mã, tiền) KHÔNG sửa — sửa tay theo cột 'So với XML'." 14 58 1000 40
 $lblXhFixNote.ForeColor = $gray
-Add-To $x5 @($btnXhFix, $lblXhFixNote)
+$btnXhFix = New-Button 'Sửa + Lưu đầu phiếu' 14 102 190
+$btnXhReport = New-Button 'Kết quả' 212 102 110
+$lblXhResult = New-Label 'Chưa chạy.' 334 100 680 46; $lblXhResult.Font = $bold
+Add-To $x4 @($chkXhAuto, $dtXhFrom, $lblXhArrow, $dtXhTo, $lblXhLimit, $numXhLimit, $lblXhFixNote, $btnXhFix, $btnXhReport)
+$x4.Box.Controls.Add($lblXhResult)
 
 # ===================== Tab 2: Sao kê → phiếu thu/chi =====================
 $tabBank = New-Object System.Windows.Forms.TabPage; $tabBank.Text = 'Sao kê → phiếu thu/chi tiền gửi'; $tabBank.AutoScroll = $true
@@ -323,9 +318,9 @@ function Update-XhSteps {
     $vda = [bool](Get-Process -Name Menu -ErrorAction SilentlyContinue)
     if ($vda) { Set-StepStatus $x3 'ok' 'VietDA đang mở' } else { Set-StepStatus $x3 'bad' 'VietDA chưa mở' }
     $ready = $xmls.Count -gt 0 -and $vda
-    $btnXhCheck.Enabled = $ready -and -not (Test-Busy)
-    $tip.SetToolTip($btnXhCheck, $(if ($ready) { 'Đọc từng phiếu trên VietDA, so với XML' } else { 'Cần Bước 1 (có XML) và Bước 3 (VietDA đang mở)' }))
-    if (-not $script:xhChecked) { Set-StepStatus $x4 'none' 'chưa kiểm' }
+    $btnXhFix.Enabled = $ready -and -not (Test-Busy)
+    $tip.SetToolTip($btnXhFix, $(if ($ready) { 'Mở từng phiếu trên VietDA, sửa đầu phiếu sai theo XML, Lưu, mở lại kiểm' } else { 'Cần Bước 1 (có XML) và Bước 3 (VietDA đang mở)' }))
+    if (-not $script:job -or $script:job.Kind -notlike 'xh-*') { Set-StepStatus $x4 'none' 'chưa chạy' }
 }
 function Update-BankSteps {
     $g = Get-InputGroups
@@ -353,7 +348,7 @@ function Update-All { Update-XhSteps; Update-BankSteps; Update-ReportButtons }
 # ---------------- chạy / kết thúc ----------------
 function Test-Busy { [bool]($script:runner -and $script:runner.Running) }
 function Set-Running([bool]$On) {
-    foreach ($c in @($x1.Box, $x2.Box, $x4.Box, $x5.Box, $b1.Box, $b2.Box, $b3.Box, $b4.Box, $b5.Box, $b6.Box)) { $c.Enabled = -not $On }
+    foreach ($c in @($x1.Box, $x2.Box, $x4.Box, $b1.Box, $b2.Box, $b3.Box, $b4.Box, $b5.Box, $b6.Box)) { $c.Enabled = -not $On }
     $btnStop.Enabled = $On
     $progress.Style = if ($On) { 'Marquee' } else { 'Blocks' }
     $progress.Value = 0
@@ -394,35 +389,32 @@ function Complete-Job([int]$Code) {
     $sum = Read-Summary
     Add-Log ">> Kết thúc (mã $Code)$(if ($script:lastOut) { " — kết quả: $script:lastOut" })"
     Write-UiLog "Xong $kind, mã $Code, output $script:lastOut"
-    $fixOn = $false
     if ($kind -like 'xh-*') {
         if ($Code -ne 0 -or -not $sum.Count) {
             $lblXhResult.ForeColor = $red; $lblXhResult.Text = 'LỖI CHẠY TOOL — xem log bên dưới.'
-            $script:xhChecked = $null; Set-StepStatus $x4 'bad' 'lỗi chạy'; $lblStatus.Text = 'Lỗi.'
+            Set-StepStatus $x4 'bad' 'lỗi chạy'; $lblStatus.Text = 'Lỗi.'
         } else {
+            # tom-tat sau khi sửa = trạng thái phiếu SAU khi Lưu (tool mở lại từng phiếu đã sửa để đọc)
             $need = Get-Num $sum 'Cần sửa đầu phiếu'; $lineErr = Get-Num $sum 'Lỗi dòng'; $warn = Get-Num $sum 'Cảnh báo'
             $missing = Get-Num $sum 'Chưa nhập VietDA'; $noXml = Get-Num $sum 'Phiếu không có XML'; $fixErr = Get-Num $sum 'Sửa lỗi'
-            $okN = Get-Num $sum 'OK'; $fixable = Get-Num $sum 'Phiếu có đầu phiếu tool sửa được'; $fixed = Get-Num $sum 'Tool đã sửa + Lưu'
+            $okN = Get-Num $sum 'OK'; $fixed = Get-Num $sum 'Tool đã sửa + Lưu'
             $fail = $need + $lineErr + $missing + $noXml + $fixErr
-            $head = if ($kind -eq 'xh-fix') { "Đã sửa + Lưu $fixed phiếu. " } else { '' }
+            $head = "Đã sửa + Lưu $fixed phiếu. "
             if ($fail -eq 0) {
                 $lblXhResult.ForeColor = $green
-                $lblXhResult.Text = "$head" + "ĐẠT — $okN phiếu khớp XML$(if ($warn) { ", $warn phiếu có cảnh báo (xem Kết quả kiểm tra)" })."
+                $lblXhResult.Text = $head + "ĐẠT — $okN phiếu khớp XML$(if ($warn) { ", $warn phiếu có cảnh báo (xem Kết quả)" })."
                 Set-StepStatus $x4 'ok' 'ĐẠT'
             } else {
                 $lblXhResult.ForeColor = $red
                 $parts = @()
-                if ($fixable) { $parts += "$fixable phiếu sai đầu phiếu → Bước 5" }
                 if ($lineErr) { $parts += "$lineErr phiếu lỗi dòng hàng (sửa tay)" }
+                if ($need) { $parts += "$need phiếu đầu phiếu chưa sửa được" }
+                if ($fixErr) { $parts += "$fixErr phiếu sửa lỗi" }
                 if ($missing) { $parts += "$missing HĐ chưa nhập VietDA" }
                 if ($noXml) { $parts += "$noXml phiếu không có XML" }
-                if ($fixErr) { $parts += "$fixErr phiếu sửa lỗi" }
-                $lblXhResult.Text = "$head" + 'KHÔNG ĐẠT — ' + ($parts -join '; ') + '.' + $(if (-not $fixable) { ' Lỗi còn lại chỉ sửa tay (cột "So với XML").' } else { '' })
-                Set-StepStatus $x4 'bad' 'KHÔNG ĐẠT'
+                $lblXhResult.Text = $head + 'CÒN LỖI — ' + ($parts -join '; ') + ' → xem Kết quả, cột "So với XML".'
+                Set-StepStatus $x4 'bad' 'còn lỗi'
             }
-            # Sửa chỉ bật khi KHÔNG ĐẠT + còn đầu phiếu tool sửa được, cùng điều kiện của lần kiểm này
-            $script:xhChecked = Get-XhKey
-            $fixOn = ($fail -gt 0 -and $fixable -gt 0)
             $lblStatus.Text = 'Xong.'
         }
     } else {
@@ -432,8 +424,6 @@ function Complete-Job([int]$Code) {
         $lblStatus.Text = if ($Code -eq 0) { 'Xong.' } else { 'Lỗi / dừng.' }
     }
     Set-Running $false
-    $btnXhFix.Enabled = $fixOn
-    if ($kind -like 'xh-*') { if ($fixOn) { Set-StepStatus $x5 'warn' 'có phiếu cần sửa' } elseif ($script:xhChecked) { Set-StepStatus $x5 'none' 'không cần / không sửa được' } }
 }
 
 $timer = New-Object System.Windows.Forms.Timer; $timer.Interval = 200
@@ -459,7 +449,7 @@ function Get-LatestReport([string]$Name) {
     @(Get-ChildItem -LiteralPath $OutRoot -Directory | ForEach-Object { Get-Item -LiteralPath (Join-Path $_.FullName $Name) -ErrorAction SilentlyContinue } | Where-Object { $_ } | Sort-Object LastWriteTime -Descending) | Select-Object -First 1
 }
 function Update-ReportButtons {
-    foreach ($pair in @(@($btnXhReport, 'ket-qua-kiem-xh.xlsx', 'Chưa có kết quả — bấm Kiểm tra'), @($btnBankReport, 'ket-qua-chay.xlsx', 'Chưa có kết quả chạy'))) {
+    foreach ($pair in @(@($btnXhReport, 'ket-qua-kiem-xh.xlsx', 'Chưa có kết quả — bấm Sửa + Lưu'), @($btnBankReport, 'ket-qua-chay.xlsx', 'Chưa có kết quả chạy'))) {
         $f = Get-LatestReport $pair[1]
         $pair[0].Enabled = [bool]$f -and -not (Test-Busy)
         $pair[0].Tag = if ($f) { $f.FullName } else { $null }
@@ -475,7 +465,6 @@ $openReport = {
 }
 
 # ---------------- sự kiện tab XH ----------------
-function Get-XhKey { "$($rbXhOther.Checked)|$($script:cfg.XhXmlFolder)|$($chkXhAuto.Checked)|$($dtXhFrom.Value.ToString('dd/MM/yyyy'))|$($dtXhTo.Value.ToString('dd/MM/yyyy'))|$($numXhLimit.Value)" }
 function Get-XhArgs {
     $a = @('-NoOpen')
     if ($rbXhOther.Checked -and $script:cfg.XhXmlFolder) { $a += @('-XmlFolder', $script:cfg.XhXmlFolder) }
@@ -483,25 +472,17 @@ function Get-XhArgs {
     if ($numXhLimit.Value -gt 0) { $a += @('-Limit', [string][int]$numXhLimit.Value) }
     return , $a
 }
-# đổi đầu vào / điều kiện sau khi đã kiểm → phải Kiểm tra lại mới được Sửa
-function Reset-XhCheck {
-    if ($script:xhChecked -and $script:xhChecked -ne (Get-XhKey)) {
-        $btnXhFix.Enabled = $false; $lblXhResult.ForeColor = $gray; $lblXhResult.Text = 'Đã đổi XML / điều kiện → bấm Kiểm tra lại.'
-        $script:xhChecked = $null; Set-StepStatus $x4 'none' 'cần kiểm lại'; Set-StepStatus $x5 'none' ''
-    }
-}
-$chkXhAuto.Add_CheckedChanged({ $dtXhFrom.Enabled = $dtXhTo.Enabled = -not $chkXhAuto.Checked; Reset-XhCheck })
-$dtXhFrom.Add_ValueChanged({ Reset-XhCheck }); $dtXhTo.Add_ValueChanged({ Reset-XhCheck }); $numXhLimit.Add_ValueChanged({ Reset-XhCheck })
-$rbXhTool.Add_CheckedChanged({ Update-XhSteps; Reset-XhCheck })
-$rbXhOther.Add_Click({ if (-not $script:cfg.XhXmlFolder) { $f = Pick-Folder 'Chọn thư mục XML hóa đơn bán ra (quét cả thư mục con)' ''; if ($f) { $script:cfg.XhXmlFolder = $f; Save-Settings } else { $rbXhTool.Checked = $true } }; Update-XhSteps; Reset-XhCheck })
-$btnXhPick.Add_Click({ $f = Pick-Folder 'Chọn thư mục XML hóa đơn bán ra (quét cả thư mục con)' $script:cfg.XhXmlFolder; if ($f) { $script:cfg.XhXmlFolder = $f; Save-Settings; $rbXhOther.Checked = $true }; Update-XhSteps; Reset-XhCheck })
-$btnXhAddXml.Add_Click({ $fs = Pick-Files 'Chọn file XML hóa đơn bán ra (XML quy đổi)' 'XML hóa đơn (*.xml)|*.xml'; if ($fs.Count) { [void](Import-Files $fs (Join-Path $XmlRoot 'sold')); Update-XhSteps; Reset-XhCheck } })
+$chkXhAuto.Add_CheckedChanged({ $dtXhFrom.Enabled = $dtXhTo.Enabled = -not $chkXhAuto.Checked })
+$rbXhTool.Add_CheckedChanged({ Update-XhSteps })
+$rbXhOther.Add_Click({ if (-not $script:cfg.XhXmlFolder) { $f = Pick-Folder 'Chọn thư mục XML hóa đơn bán ra (quét cả thư mục con)' ''; if ($f) { $script:cfg.XhXmlFolder = $f; Save-Settings } else { $rbXhTool.Checked = $true } }; Update-XhSteps })
+$btnXhPick.Add_Click({ $f = Pick-Folder 'Chọn thư mục XML hóa đơn bán ra (quét cả thư mục con)' $script:cfg.XhXmlFolder; if ($f) { $script:cfg.XhXmlFolder = $f; Save-Settings; $rbXhOther.Checked = $true }; Update-XhSteps })
+$btnXhAddXml.Add_Click({ $fs = Pick-Files 'Chọn file XML hóa đơn bán ra (XML quy đổi)' 'XML hóa đơn (*.xml)|*.xml'; if ($fs.Count) { [void](Import-Files $fs (Join-Path $XmlRoot 'sold')); Update-XhSteps } })
 $btnXhOpenXml.Add_Click({ & $openDir $(if ($rbXhOther.Checked -and $script:cfg.XhXmlFolder) { $script:cfg.XhXmlFolder } else { Join-Path $XmlRoot 'sold' }) })
 $btnXhClearXml.Add_Click({
     $sold = Join-Path $XmlRoot 'sold'; $fs = @(Get-Files $sold @('.xml') -Recurse)
     if (-not $fs.Count) { return }
     if ([System.Windows.Forms.MessageBox]::Show($form, "Chuyển $($fs.Count) file XML trong xml\sold vào xml\sold\_cu\<ngày-giờ>\ (không xóa)?", 'Dọn XML cũ', 'YesNo', 'Question') -ne 'Yes') { return }
-    Move-ToOld @($fs | ForEach-Object FullName) $sold; Update-XhSteps; Reset-XhCheck
+    Move-ToOld @($fs | ForEach-Object FullName) $sold; Update-XhSteps
 })
 $btnXhCatPick.Add_Click({
     $fs = Pick-Files 'Chọn file danh mục Vật tư hàng hóa xuất từ VietDA (.xlsx)' 'Excel (*.xlsx)|*.xlsx' $false
@@ -512,21 +493,16 @@ $btnXhCatPick.Add_Click({
     $keep = @($fs | ForEach-Object { Join-Path $CatalogDir ([IO.Path]::GetFileName($_)) })
     $toOld = @($old + $stray | Where-Object { $keep -notcontains $_ })
     if ($toOld.Count) { Move-ToOld $toOld $CatalogDir }
-    Update-All; Reset-XhCheck
+    Update-All
 })
 $btnXhCatOpen.Add_Click({ & $openDir $CatalogDir })
 $btnXhCatRemove.Add_Click({ $old = @(Get-Files $CatalogDir @('.xlsx') | ForEach-Object FullName); if ($old.Count) { Move-ToOld $old $CatalogDir }; Update-XhSteps })
-$btnXhCheck.Add_Click({
-    Update-XhSteps
-    if (-not $btnXhCheck.Enabled) { return }
-    $lblXhResult.ForeColor = $gray; $lblXhResult.Text = 'Đang kiểm tra…'; Set-StepStatus $x4 'none' 'đang chạy'
-    Start-ToolRun 'xh-check' $XhScript (Get-XhArgs) 'Kiểm tra phiếu XH'
-})
 $btnXhFix.Add_Click({
-    if ($script:xhChecked -ne (Get-XhKey)) { $btnXhFix.Enabled = $false; return }
+    Update-XhSteps
+    if (-not $btnXhFix.Enabled) { return }
     $msg = "Tool sẽ SỬA + LƯU đầu phiếu trên VietDA theo XML:`r`n  Lý do 'Doanh thu bán hàng', Ký hiệu, Số HĐ, Phương thức TT,`r`n  Ghi nợ (chuyển khoản 131 / tiền mặt 1111), Ghi có 33311`r`n  VietDA hỏi 'điền tự động TK dòng hàng' → Yes.`r`nDòng hàng KHÔNG sửa. Sau khi Lưu tool mở lại từng phiếu để kiểm.`r`n`r`nTrong lúc chạy KHÔNG bấm vào VietDA. Tiếp tục?"
     if ([System.Windows.Forms.MessageBox]::Show($form, $msg, 'Sửa + Lưu phiếu XH', 'YesNo', 'Warning') -ne 'Yes') { return }
-    $lblXhResult.ForeColor = $gray; $lblXhResult.Text = 'Đang sửa + Lưu…'; Set-StepStatus $x5 'none' 'đang sửa'
+    $lblXhResult.ForeColor = $gray; $lblXhResult.Text = 'Đang sửa + Lưu…'; Set-StepStatus $x4 'none' 'đang chạy'
     Start-ToolRun 'xh-fix' $XhScript ((Get-XhArgs) + @('-Fix', '-Yes')) 'Sửa + Lưu đầu phiếu XH'
 })
 $btnXhReport.Add_Click($openReport)
