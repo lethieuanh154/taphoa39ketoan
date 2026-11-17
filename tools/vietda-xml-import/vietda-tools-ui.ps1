@@ -147,7 +147,7 @@ $dtXhTo = New-Object System.Windows.Forms.DateTimePicker; $dtXhTo.Format = 'Cust
 $dtXhTo.Location = New-Object System.Drawing.Point(348, 27); $dtXhTo.Width = 120; $dtXhTo.Enabled = $false
 $lblXhLimit = New-Label 'Chỉ chạy N phiếu đầu (0 = tất cả):' 500 30 220
 $numXhLimit = New-Object System.Windows.Forms.NumericUpDown; $numXhLimit.Location = New-Object System.Drawing.Point(722, 27); $numXhLimit.Width = 70; $numXhLimit.Maximum = 100000
-$lblXhFixNote = New-Label "Tool mở từng phiếu, sửa theo XML: Lý do 'Doanh thu bán hàng', Ký hiệu, Số HĐ, Phương thức TT, Ghi nợ (CK 131 / TM 1111), Ghi có 33311 → Lưu → mở lại kiểm. Phiếu đúng sẵn: không sửa; VietDA hỏi 'Bạn có muốn lưu dữ liệu không?' khi đóng → No. Dòng hàng (mã, tiền) KHÔNG sửa — sửa tay theo cột 'So với XML'." 14 58 1000 40
+$lblXhFixNote = New-Label "Tool mở từng phiếu, sửa theo XML: Lý do 'Doanh thu bán hàng', Ký hiệu, Số HĐ, Phương thức TT, Ghi nợ (CK 131 / TM 1111), Ghi có 33311, Tiền thuế lệch làm tròn → Lưu → mở lại kiểm → xóa hết 'Nhiều hóa đơn' → tiền mặt: bấm 'Thu tiền'. Đóng phiếu VietDA hỏi lưu → No. Dòng hàng (mã, tiền) KHÔNG sửa — sửa tay theo cột 'So với XML'." 14 58 1000 40
 $lblXhFixNote.ForeColor = $gray
 $btnXhFix = New-Button 'Sửa + Lưu đầu phiếu' 14 102 190
 $btnXhReport = New-Button 'Kết quả' 212 102 110
@@ -216,7 +216,16 @@ $log = New-Object System.Windows.Forms.RichTextBox; $log.Dock = 'Fill'; $log.Rea
 $log.Font = New-Object System.Drawing.Font('Consolas', 9.5); $log.WordWrap = $false
 $split.Panel2.Controls.Add($log); $split.Panel2.Controls.Add($bar)
 $form.Controls.Add($split)
-$form.Add_Shown({ $split.SplitterDistance = [Math]::Max(300, $form.ClientSize.Height - 210) })
+# khung trên vừa đủ các bước của tab đang chọn, phần còn lại cho log (tab XH ít bước → log cao hơn)
+function Fit-Split {
+    $page = $tabs.SelectedTab; if (-not $page) { return }
+    $bottom = 0; foreach ($c in $page.Controls) { $b = $c.Bottom - $page.AutoScrollPosition.Y; if ($b -gt $bottom) { $bottom = $b } }
+    $need = $bottom + $tabs.DisplayRectangle.Y + ($tabs.Height - $tabs.DisplayRectangle.Bottom) + 12
+    $max = $split.Height - $split.SplitterWidth - 120
+    try { $split.SplitterDistance = [Math]::Max(150, [Math]::Min($need, $max)) } catch { Write-UiLog "Chỉnh khung log lỗi: $($_.Exception.Message)" }
+}
+$form.Add_Shown({ $split.FixedPanel = 'Panel1'; Fit-Split })
+$tabs.Add_SelectedIndexChanged({ Fit-Split })
 
 function Add-Log([string]$Line) {
     $color = switch -Regex ($Line) {

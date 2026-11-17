@@ -501,13 +501,17 @@ export function payerNameFromDesc(desc: string): string {
 }
 
 /**
- * Định danh người chuyển để khớp HĐ "N lần": TK đối ứng (cột G) + tên trong diễn giải; diễn giải không có tên mới dùng cột
+ * Định danh người chuyển để khớp HĐ "N lần": TÊN trong diễn giải; diễn giải không có tên mới dùng TK đối ứng (cột G) + cột
  * "Chủ TK đối ứng". KHÔNG dùng cột H trước (04/11/2026): GD liên ngân hàng ghi chung "MBBANK IBFT", ví MoMo ghi tên công ty
  * (09/2026: 139 + 147 GD) → 2 khách khác nhau bị coi là 1 người (HD445796: lấy nhầm GD 30.000 18:57:05 của người khác thay vì
- * 17:14:00 của LE MINH TOAN). TK ví MoMo dùng chung → phải ghép thêm tên. '' nếu không đọc được.
+ * 17:14:00 của LE MINH TOAN). 16/11/2026: có tên trong diễn giải thì KHÔNG ghép TK đối ứng — ví ZaloPay đi qua TK trung gian
+ * khác nhau mỗi lần (HD447878: "Nhi dung Zalopay chuyen tien" 32.000 qua TK 212356786 "CONG TY CO PHAN ZION", 30.000 qua TK
+ * 0721100912006 "MBBANK IBFT") → 2 khoản của cùng 1 người bị tách, bước 1 lấy nhầm GD sớm nhất của 2 người khác. '' nếu không đọc được.
  */
 export function payerKey(txn: Pick<ReconBankTxn, 'counterparty' | 'desc'> & { account?: string }): string {
-  const name = payerNameFromDesc(txn.desc) || normalizeVi(txn.counterparty || '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const fromDesc = payerNameFromDesc(txn.desc);
+  if (fromDesc) return fromDesc;
+  const name = normalizeVi(txn.counterparty || '').replace(/[^a-z0-9]+/g, ' ').trim();
   if (!name) return '';
   const account = String(txn.account || '').replace(/\D/g, '');
   return account ? `${account}|${name}` : name;

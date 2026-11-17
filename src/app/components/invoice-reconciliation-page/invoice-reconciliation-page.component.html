@@ -45,11 +45,171 @@
         <i class="fa-solid fa-download"></i> Tải JSON
       </button>
     </div>
-    <div class="hint indent">Mỗi mã master KiotViet (ĐVT nhỏ nhất) được máy tự cấp 1 mã HH cố định, không trùng
-      @if (hhStatus) { ({{ hhStatus.count | number }} mã, mã mới tiếp theo {{ hhStatus.next_code }}) }. Hàng khuyến mại (tên
-      KiotViet có "(KM)") dùng mã KM như Danh sách đối tượng Vietda
-      @if (hhStatus?.next_km_code) { ({{ hhStatus?.km_count ?? 0 | number }} mã, mã KM tiếp theo {{ hhStatus?.next_km_code }}) }.
-      Bản sao XML quy đổi chỉ ghi mã HH / KM — không dùng mã KiotViet; dòng chưa có mã giữ nguyên.</div>
+    <div class="hint indent">Mã hàng trong XML quy đổi = mã HH trong <b>Danh mục Vật tư hàng hóa Vietda</b> (hàng khuyến mại — tên
+      KiotViet có "(KM)" — dùng mã KM). Máy <b>không tự tạo mã mới</b>: hàng chưa có mã được liệt kê ở kết quả đối soát để thêm vào
+      Vietda (hoặc gán tay), còn thiếu mã thì không tải được XML quy đổi. 1 mã HH dùng chung được cho nhiều mã KiotViet
+      (vd các vị của cùng 1 loại mì).</div>
+
+    <!-- Danh mục Vật tư hàng hóa Vietda → dùng lại mã HH / KM cũ (14/11/2026) -->
+    <div class="row catalog">
+      <span class="label">Danh mục Vật tư hàng hóa Vietda</span>
+      @if (hhStatus && hhStatus.old && hhStatus.old.count) {
+      <span>{{ hhStatus.old.file }} · {{ hhStatus.old.count | number }} mã HH / KM · tải lúc
+        {{ formatDate(hhStatus.old.imported_at) }} (giờ UTC) · {{ oldUsedCount | number }} mã master đang dùng mã cũ</span>
+      } @else if (hhStatus) {
+      <span class="warn"><i class="fa-solid fa-triangle-exclamation"></i> Chưa tải — chưa hàng nào có mã HH, XML quy đổi sẽ bị
+        chặn</span>
+      }
+      <label class="btn pick" [class.disabled]="oldBusy" title="Vietda: Hệ thống > Cập nhật danh mục > Vật tư, hàng hóa > Excel">
+        <i class="fa-solid" [ngClass]="oldBusy ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'"></i>
+        {{ oldBusy ? 'Đang ghép mã cũ...' : 'Tải danh mục Vietda (.xlsx)' }}
+        <input type="file" accept=".xlsx" (change)="onOldCatalogSelected($event)" [disabled]="oldBusy" hidden>
+      </label>
+      @if (hhStatus?.old?.count) {
+      <button type="button" class="btn" (click)="loadUnmatched()" [disabled]="unmatchedLoading">
+        <i class="fa-solid" [ngClass]="unmatchedLoading ? 'fa-spinner fa-spin' : 'fa-list-check'"></i> Mã cũ chưa ghép
+      </button>
+      <button type="button" class="btn" (click)="loadAssigned()" [disabled]="assignedLoading"
+        title="Rà các mã master đã có mã HH — đổi mã / bỏ gán khi ghép sai">
+        <i class="fa-solid" [ngClass]="assignedLoading ? 'fa-spinner fa-spin' : 'fa-magnifying-glass'"></i> Mã HH đã ghép
+      </button>
+      }
+    </div>
+    <div class="hint indent">Xuất từ Vietda: Hệ thống &gt; Cập nhật danh mục &gt; Vật tư, hàng hóa &gt; Excel. Máy ghép mã cũ khi tên
+      trùng + ĐVT Vietda = ĐVT nhỏ nhất KiotViet; còn lại gán tay ở bảng "Hàng chưa có mã HH" của kết quả đối soát (hoặc "Mã cũ
+      chưa ghép"). Thêm mã mới trong Vietda → xuất lại danh mục → tải lên lại. Sau khi tải / gán: <b>Đối soát</b> lại thư mục XML rồi
+      <b>Tải XML quy đổi</b>.</div>
+    @if (oldResult) {
+    <div class="msg ok"><i class="fa-solid fa-circle-check"></i>
+      Đọc {{ oldResult.old_count | number }} mã HH / KM · dùng mã cũ cho {{ oldResult.old_used | number }} mã
+      (ghép thêm lần này {{ oldResult.remapped | number }})
+      @if (reasonsText(oldResult.skipped)) { · bỏ qua: {{ reasonsText(oldResult.skipped) }} }
+      @if (reasonsText(oldResult.unmatched)) { <br>Chưa ghép: {{ reasonsText(oldResult.unmatched) }} → bấm "Mã cũ chưa ghép" để gán tay }
+    </div>
+    }
+    @if (oldError) {
+    <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ oldError }}</div>
+    }
+    @if (unmatched) {
+    <div class="row">
+      <b>{{ unmatched.length | number }}</b>&nbsp;/ {{ unmatchedTotal | number }} mã cũ chưa ghép
+      <input type="text" class="input" [(ngModel)]="unmatchedFilter" placeholder="Lọc mã / tên / lý do">
+      @if (unmatchedFiltered.length > unmatchedShow) {
+      <span class="hint">hiện {{ unmatchedShow }} dòng đầu / {{ unmatchedFiltered.length | number }} — gõ lọc để tìm</span>
+      }
+      <button type="button" class="btn small" (click)="unmatched = null">Đóng</button>
+    </div>
+    @if (assignMsg) { <div class="hint indent">{{ assignMsg }}</div> }
+    <div class="runs-wrap">
+      <table class="runs">
+        <thead>
+          <tr><th>Mã cũ</th><th>Tên trên Vietda</th><th>ĐVT</th><th>Lý do chưa ghép</th><th>Gán cho mã master KiotViet (bấm được nhiều mã)</th></tr>
+        </thead>
+        <tbody>
+          @for (r of unmatchedFiltered.slice(0, unmatchedShow); track r.hh) {
+          <tr>
+            <td>{{ r.hh }}</td>
+            <td>{{ r.name }}</td>
+            <td>{{ r.unit }}</td>
+            <td>{{ r.reason }}</td>
+            <td>
+              @for (s of r.suggestions; track s.master_code) {
+              <div>
+                <button type="button" class="btn small" (click)="assign(r, s)"
+                  [disabled]="assigning === r.hh || !!assignedOld[r.hh]?.includes(s.master_code)"
+                  [title]="'Điểm giống tên ' + s.score + (s.current_hh ? ' · đang dùng ' + s.current_hh + ' (' + s.current_source + ')' : '')">
+                  @if (assignedOld[r.hh]?.includes(s.master_code)) { <i class="fa-solid fa-check"></i> }
+                  {{ s.master_code }}</button>
+                {{ s.name }} ({{ s.unit }})
+                @if (!s.unit_ok) { <span class="warn">ĐVT khác</span> }
+              </div>
+              }
+              <div>
+                <input type="text" class="input" [(ngModel)]="manualMaster[r.hh]" placeholder="Mã master khác">
+                <button type="button" class="btn small" (click)="assign(r, manualMaster[r.hh] || '')" [disabled]="assigning === r.hh">Gán</button>
+              </div>
+              @if (assignedOld[r.hh]; as done) {
+              <div>
+                <span class="hint">Đã gán {{ done.length }} mã master: {{ done.join(', ') }}</span>
+                <button type="button" class="btn small" (click)="finishOld(r)">Xong</button>
+              </div>
+              }
+            </td>
+          </tr>
+          } @empty {
+          <tr><td colspan="5" class="empty">Không còn mã cũ nào chưa ghép.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
+    @if (assignedError) {
+    <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ assignedError }}</div>
+    }
+    @if (assigned) {
+    <h3 class="review-title">Mã HH đã ghép ({{ assigned.length | number }} mã master)</h3>
+    <p class="hint">Dòng <b>Đáng ngờ</b>: quy cách (ml / g) khác nhau, tên khác xa, ĐVT lệch, sai loại HH / KM, hoặc mã master không
+      còn trên KiotViet. Máy không phân biệt được hương vị / màu — lọc theo tên để rà thêm. Ghép sai: gõ mã đúng → <b>Đổi</b>, hoặc
+      <b>Bỏ gán</b> (mã master về "chưa có mã HH"). Xong <b>Đối soát</b> lại thư mục XML.</p>
+    @if (!assignedHasCatalog) {
+    <div class="msg error"><i class="fa-solid fa-triangle-exclamation"></i> Chưa có bảng quy đổi KiotViet trên máy chủ — không so
+      được tên KiotViet, không có cờ đáng ngờ.</div>
+    }
+    <div class="row">
+      <button type="button" class="btn small" [class.btn-primary]="assignedView === 'flagged'" (click)="assignedView = 'flagged'">
+        Đáng ngờ ({{ assignedCount('flagged') | number }})</button>
+      <button type="button" class="btn small" [class.btn-primary]="assignedView === 'shared'" (click)="assignedView = 'shared'">
+        Dùng chung mã ({{ assignedCount('shared') | number }})</button>
+      <button type="button" class="btn small" [class.btn-primary]="assignedView === 'manual'" (click)="assignedView = 'manual'">
+        Gán tay ({{ assignedCount('manual') | number }})</button>
+      <button type="button" class="btn small" [class.btn-primary]="assignedView === 'all'" (click)="assignedView = 'all'">
+        Tất cả ({{ assigned.length | number }})</button>
+      <input type="text" class="input" [(ngModel)]="assignedFilter" placeholder="Lọc mã / tên (không cần dấu)">
+      @if (assignedFiltered.length > unmatchedShow) {
+      <span class="hint">hiện {{ unmatchedShow }} dòng đầu / {{ assignedFiltered.length | number }} — gõ lọc để tìm</span>
+      }
+      <button type="button" class="btn small" (click)="downloadAssigned()" [disabled]="downloading === 'assigned'">
+        <i class="fa-solid fa-file-excel"></i> Tải Excel</button>
+      <button type="button" class="btn small" (click)="loadAssigned()" [disabled]="assignedLoading">
+        <i class="fa-solid fa-rotate" [class.fa-spin]="assignedLoading"></i> Tải lại</button>
+      <button type="button" class="btn small" (click)="closeAssigned()">Đóng</button>
+    </div>
+    @if (assignedMsg) { <div class="hint indent">{{ assignedMsg }}</div> }
+    <div class="runs-wrap review-frame">
+      <table class="runs review">
+        <thead>
+          <tr>
+            <th>Mã master</th><th>Tên KiotViet</th><th>ĐVT</th><th>Mã HH</th><th>Tên Vietda</th><th>ĐVT Vietda</th>
+            <th>Nguồn</th><th>Cảnh báo</th><th>Đổi mã / bỏ gán</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of assignedVisible; track r.master_code) {
+          <tr>
+            <td>{{ r.master_code }}</td>
+            <td class="wrap">{{ r.kv_name }}</td>
+            <td>{{ r.kv_unit }}</td>
+            <td>{{ r.hh }}@if (r.shared > 1) { <br><small title="Số mã master dùng chung mã HH này">dùng chung {{ r.shared }}</small> }</td>
+            <td class="wrap">{{ r.vd_name }}</td>
+            <td>{{ r.vd_unit }}</td>
+            <td>{{ r.source === 'manual' ? 'Gán tay' : 'Máy ghép' }}</td>
+            <td class="wrap">
+              @for (f of r.flags; track f.kind) { <div class="warn">{{ f.text }}</div> }
+            </td>
+            <td>
+              <input type="text" class="input" [(ngModel)]="editHh[r.master_code]" placeholder="Mã HH đúng">
+              <button type="button" class="btn small" (click)="changeAssigned(r, editHh[r.master_code] || '')"
+                [disabled]="!!assignedBusy">Đổi</button>
+              <button type="button" class="btn small" (click)="unassign(r)" [disabled]="!!assignedBusy">Bỏ gán</button>
+            </td>
+          </tr>
+          } @empty {
+          <tr><td colspan="9" class="empty">{{ assignedView === 'flagged' ? 'Không còn dòng đáng ngờ.' : 'Không có dòng nào.' }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
     @if (catalogInfo) {
     <div class="msg ok"><i class="fa-solid fa-circle-check"></i> {{ catalogInfo }}</div>
     }
@@ -160,7 +320,10 @@
           <i class="fa-solid fa-link"></i> Sửa ánh xạ hàng hóa
           @if (run.summary.n_review) { <span class="pill">{{ run.summary.n_review | number }} cần xem</span> }
         </a>
-        @if (run.has_clone_zip !== false) {
+        @if (run.hh_missing) {
+        <span class="warn" title="Thêm mã vào Danh mục Vietda / gán tay ở bảng bên dưới, rồi đối soát lại thư mục XML">
+          <i class="fa-solid fa-ban"></i> Chưa tải được XML quy đổi: {{ run.hh_missing | number }} mã master chưa có mã HH</span>
+        } @else if (run.has_clone_zip !== false) {
         <button type="button" class="btn" (click)="downloadCloneZip()" [disabled]="downloading === 'clone'"
           title="Bản sao XML đã quy đổi về ĐVT nhỏ nhất + mã HH Vietda (để nhập Vietda) — mỗi thư mục vào / ra tách 'Chuyen khoan' (HTTToan ghi Chuyển khoản) và 'Tien mat' (còn lại)">
           <i class="fa-solid fa-file-zipper"></i> Tải XML quy đổi
@@ -186,6 +349,77 @@
     <ul class="hh-list">
       @for (p of xmlPlans; track p.plan) { <li>{{ p.plan }}: <b>{{ p.count | number }}</b></li> }
     </ul>
+    }
+
+    @if (run.hh_missing) {
+    <h3 class="review-title">Hàng chưa có mã HH ({{ hhMissing?.length ?? run.hh_missing | number }} / {{ run.hh_missing | number }} mã master)</h3>
+    <p class="hint">Mã master KiotViet trong HĐ của lần đối soát này nhưng chưa có mã trong Danh mục Vietda → XML quy đổi bị chặn.
+      Cách 1: <b>Tải Excel</b>, thêm mã vào Vietda, xuất lại danh mục rồi tải lên ở trên. Cách 2: gán mã Vietda đã có (bấm gợi ý /
+      gõ mã). Nhiều vị / nhiều mã KiotViet cùng 1 mã Vietda: lọc tên → tick → <b>Gán chung</b>. Xong bấm <b>Đối soát</b> lại thư mục XML.</p>
+    <div class="row">
+      <button type="button" class="btn" (click)="downloadHhMissing()" [disabled]="downloading === 'hh-missing'">
+        <i class="fa-solid fa-file-excel"></i> Tải Excel
+      </button>
+      <button type="button" class="btn" (click)="loadHhMissing(run.id)" [disabled]="hhMissingLoading" title="Tính lại theo bảng mã mới nhất">
+        <i class="fa-solid fa-rotate" [class.fa-spin]="hhMissingLoading"></i> Tải lại
+      </button>
+      <input type="text" class="input" [(ngModel)]="hhMissingFilter" placeholder="Lọc mã / tên (không cần dấu)">
+      @if (hhMissingFiltered.length > unmatchedShow) {
+      <span class="hint">hiện {{ unmatchedShow }} dòng đầu / {{ hhMissingFiltered.length | number }} — gõ lọc để tìm</span>
+      }
+    </div>
+    <div class="row">
+      <span>Đã tick <b>{{ hhSelected.size | number }}</b></span>
+      <input type="text" class="input" [(ngModel)]="bulkHh" placeholder="Mã Vietda (vd HH832)">
+      <button type="button" class="btn btn-primary small" (click)="assignSelected()" [disabled]="!!hhAssigning || !hhSelected.size">
+        Gán chung cho các dòng đã tick</button>
+    </div>
+    @if (hhAssignMsg) { <div class="hint indent">{{ hhAssignMsg }}</div> }
+    @if (hhMissingError) {
+    <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ hhMissingError }}</div>
+    } @else if (hhMissingLoading && !hhMissing) {
+    <div class="hint">Đang tải...</div>
+    } @else if (hhMissing) {
+    <div class="runs-wrap review-frame">
+      <table class="runs review">
+        <thead>
+          <tr>
+            <th><input type="checkbox" [ngModel]="allVisibleSelected" (ngModelChange)="toggleAllVisible($event)"
+              title="Tick / bỏ tick mọi dòng đang hiện"></th>
+            <th>Mã master</th><th>Tên KiotViet</th><th>ĐVT nhỏ nhất</th><th class="num">Dòng HĐ vào / ra</th>
+            <th>Gợi ý mã Vietda (bấm để gán)</th><th>Mã khác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of hhVisible; track r.master_code) {
+          <tr>
+            <td><input type="checkbox" [ngModel]="hhSelected.has(r.master_code)" (ngModelChange)="toggleHhSelected(r, $event)"></td>
+            <td>{{ r.master_code }}@if (r.kind === 'KM') { <br><small>cần mã KM</small> }</td>
+            <td class="wrap">{{ r.name }}@if (!r.in_kiotviet) { <br><span class="warn">không có trong bảng quy đổi KiotViet</span> }</td>
+            <td>{{ r.unit }}</td>
+            <td class="num">{{ r.lines_in | number }} / {{ r.lines_out | number }}</td>
+            <td class="wrap">
+              @for (s of r.suggestions; track s.hh) {
+              <div>
+                <button type="button" class="btn small" (click)="assignHh(r, s.hh)" [disabled]="!!hhAssigning"
+                  [title]="'Điểm giống tên ' + s.score">{{ s.hh }}</button>
+                {{ s.name }} ({{ s.unit }})
+                @if (!s.unit_ok) { <span class="warn">ĐVT khác — máy chủ sẽ từ chối</span> }
+              </div>
+              } @empty { <span class="hint">Không có mã gần giống — thêm mã mới vào Vietda</span> }
+            </td>
+            <td>
+              <input type="text" class="input" [(ngModel)]="manualHh[r.master_code]" placeholder="HH...">
+              <button type="button" class="btn small" (click)="assignHh(r, manualHh[r.master_code] || '')" [disabled]="!!hhAssigning">Gán</button>
+            </td>
+          </tr>
+          } @empty {
+          <tr><td colspan="7" class="empty">Đã đủ mã HH — bấm <b>Đối soát</b> lại thư mục XML để tải XML quy đổi.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
     }
 
     @if (run.summary.n_review || review.length || reviewError) {

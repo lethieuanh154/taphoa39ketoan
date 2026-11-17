@@ -1,0 +1,22 @@
+.pxi { display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; color: #1e293b; }
+.pxi-head { display: flex; align-items: center; justify-content: space-between; }
+.pxi-head h3 { margin: 0; font-size: 1.05rem; }
+.pxi-close { border: none; background: transparent; font-size: 1.1rem; color: #64748b; cursor: pointer; }
+.pxi-hint { margin: 0; color: #475569; line-height: 1.5; }
+.pxi-pick { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.pxi-pick .btn { cursor: pointer; margin: 0; }
+.pxi-pick .btn.disabled { opacity: 0.6; pointer-events: none; }
+.pxi-alert { padding: 0.55rem 0.75rem; border-radius: 6px; }
+.pxi-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.pxi-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.pxi-stats { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; padding: 0.5rem 0.75rem; background: #f8fafc; border-radius: 6px; }
+.pxi-stats .warn { color: #b45309; }
+.pxi-stats .muted { color: #64748b; }
+.pxi h4 { margin: 0.25rem 0 0; font-size: 0.95rem; }
+.pxi-table-wrap { max-height: 280px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
+.pxi-table { width: 100%; border-collapse: collapse; }
+.pxi-table th, .pxi-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #f1f5f9; text-align: left; vertical-align: top; }
+.pxi-table th { position: sticky; top: 0; background: #f1f5f9; font-weight: 600; }
+.pxi-table .code { font-family: ui-monospace, Consolas, monospace; white-space: nowrap; }
+.pxi-table .num { text-align: right; white-space: nowrap; }
+.pxi-actions { display: flex; gap: 0.5rem; }

@@ -38,6 +38,8 @@ export interface ReconciliationRun {
   warnings?: string[]; logs?: string[]; tabs?: RunTab[]; has_report?: boolean;
   /** Bảng ánh xạ sửa được (anh-xa-dau-vao / anh-xa-dau-ra) — đọc bằng getTab */
   mapping_tabs?: RunTab[]; has_clone_zip?: boolean; source_run?: string;
+  /** số mã master chưa có mã HH lúc chạy (16/11/2026) — > 0 thì không có XML quy đổi; undefined = lần chạy cũ */
+  hh_missing?: number;
   /** Tab Số liệu khai thuế (bảng kê, PL142) + file bảng kê Excel — bước 5 */
   tax_tabs?: RunTab[]; has_bang_ke?: boolean;
   options?: { mst: string; tu_ngay: string; den_ngay: string; file_count: number; toan_bo?: boolean };
@@ -64,8 +66,45 @@ export interface HhCodeStatus {
   version: number; count: number; next_code: string; updated_at: string;
   /** hàng khuyến mại — tên KiotViet có (KM) → mã KM (07/11/2026) */
   next_km_code?: string; km_count?: number;
+  /** số mã theo nguồn: vietda (mã cũ ghép tự động) / manual (gán tay) / none (bỏ gán); auto / manual_new = mã máy cấp trước
+   *  16/11/2026, KHÔNG còn dùng */
+  sources?: { [source: string]: number };
+  /** danh mục Vật tư hàng hóa Vietda đã tải lên (old-catalog, 04/11/2026); count 0 = chưa tải */
+  old?: { count: number; file: string; imported_at: string };
 }
 export interface HhCode { hh: string; master_code: string; name: string; unit: string; }
+
+/** POST /api/vietda-codes/old-catalog — tải danh mục Vietda → giữ mã HH cũ (14/11/2026 nối FE) */
+export interface OldCatalogResult {
+  old_count: number; skipped: { [reason: string]: number }; remapped: number; added: number; old_used: number;
+  unmatched: { [reason: string]: number }; status: HhCodeStatus;
+}
+export interface OldCodeSuggestion {
+  master_code: string; name: string; unit: string; score: number; unit_ok: boolean; current_hh: string; current_source: string;
+}
+/** Mã HH cũ chưa ghép mã master nào → kế toán gán tay */
+export interface OldUnmatchedRow { hh: string; name: string; unit: string; reason: string; suggestions: OldCodeSuggestion[]; }
+
+/** GET /api/vietda-codes/assigned — mã master đang có mã HH + cờ đáng ngờ (17/11/2026) */
+export type AssignedFlagKind = 'size' | 'name' | 'unit' | 'kind' | 'no_kv';
+export interface AssignedCodeRow {
+  master_code: string; kv_name: string; kv_unit: string; hh: string; vd_name: string; vd_unit: string;
+  source: 'vietda' | 'manual'; shared: number; flags: { kind: AssignedFlagKind; text: string }[];
+}
+export interface AssignedCodesResult {
+  version: number; total: number; flagged: number; flag_kinds: { [kind: string]: number }; has_catalog: boolean;
+  items: AssignedCodeRow[];
+}
+
+/** Mã master của 1 lần đối soát chưa có mã HH Vietda (16/11/2026 — máy không tự cấp mã nữa) */
+export interface HhMissingSuggestion { hh: string; name: string; unit: string; unit_ok: boolean; score: number; }
+export interface HhMissingRow {
+  master_code: string; name: string; unit: string; kind: 'HH' | 'KM' | ''; in_kiotviet: boolean; unassigned: boolean;
+  n_items: number; lines_in: number; lines_out: number; suggestions: HhMissingSuggestion[];
+}
+export interface HhMissingResult {
+  run_id: string; has_clone_zip: boolean; total: number; old_count: number; old_file: string; items: HhMissingRow[];
+}
 
 const HH_BASE = `${environment.ketoanBackendUrl}/api/vietda-codes`;
 const HH_CACHE_KEY = 'hh-codes';
@@ -256,6 +295,57 @@ export class ReconciliationService {
     );
   }
 
+  /** Danh mục Vật tư hàng hóa xuất từ Vietda (.xlsx) → máy chủ dùng lại mã HH / KM cũ cho mã master khớp chắc chắn */
+  uploadOldCatalog(file: File): Observable<OldCatalogResult> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    console.info(`${LOG} Tải danh mục Vietda '${file.name}' (${file.size.toLocaleString('vi-VN')} byte)`);
+    return this.http.post<any>(`${HH_BASE}/old-catalog`, form).pipe(
+      map(r => r as OldCatalogResult),
+      tap({
+        next: r => console.info(`${LOG} Danh mục Vietda: ${r.old_count} mã, dùng mã cũ ${r.old_used}, ghép thêm ${r.remapped}, cấp mới ${r.added}`),
+        error: e => console.warn(`${LOG} Tải danh mục Vietda lỗi: ${httpErrorText(e)}`)
+      })
+    );
+  }
+
+  oldUnmatched(): Observable<{ total_old: number; items: OldUnmatchedRow[] }> {
+    return this.http.get<any>(`${HH_BASE}/old-unmatched`, { params: { _: Date.now() } }).pipe(
+      map(r => ({ total_old: r.total_old as number, items: (r.items || []) as OldUnmatchedRow[] })),
+      tap({
+        next: r => console.info(`${LOG} Mã HH cũ chưa ghép: ${r.items.length}/${r.total_old}`),
+        error: e => console.warn(`${LOG} Lấy mã HH cũ chưa ghép lỗi: ${httpErrorText(e)}`)
+      })
+    );
+  }
+
+  /** Bảng "Mã HH đã ghép" + cờ đáng ngờ (17/11/2026) */
+  assignedCodes(): Observable<AssignedCodesResult> {
+    return this.http.get<any>(`${HH_BASE}/assigned`, { params: { _: Date.now() } }).pipe(
+      map(r => ({ version: r.version, total: r.total, flagged: r.flagged, flag_kinds: r.flag_kinds || {},
+        has_catalog: !!r.has_catalog, items: (r.items || []) as AssignedCodeRow[] })),
+      tap({
+        next: r => console.info(`${LOG} Mã HH đã ghép: ${r.total} mã master, ${r.flagged} đáng ngờ`, r.flag_kinds),
+        error: e => console.warn(`${LOG} Lấy mã HH đã ghép lỗi: ${httpErrorText(e)}`)
+      })
+    );
+  }
+
+  downloadAssignedCodes(): Promise<void> {
+    return this.download(`${HH_BASE}/assigned/export`, 'ma_HH_da_ghep.xlsx');
+  }
+
+  /** Gán tay mã HH cũ cho 1 mã master (hh rỗng = bỏ gán → chưa có mã). 1 mã HH gán được cho nhiều mã master (16/11/2026) */
+  setManualCode(masterCode: string, hh: string): Observable<{ item: HhCode & { source: string }; status: HhCodeStatus }> {
+    return this.http.put<any>(`${HH_BASE}/manual`, { master_code: masterCode, hh }).pipe(
+      map(r => ({ item: r.item, status: r.status as HhCodeStatus })),
+      tap({
+        next: r => console.info(`${LOG} Gán ${r.item.hh || '(bỏ gán)'} (${r.item.source}) cho mã master ${masterCode}`),
+        error: e => console.warn(`${LOG} Gán ${hh || '(bỏ gán)'} → ${masterCode} lỗi: ${httpErrorText(e)}`)
+      })
+    );
+  }
+
   /** Bảng mã HH: dùng bản IndexedDB nếu cùng version máy chủ, không thì tải lại + lưu */
   async hhCodes(status: HhCodeStatus): Promise<HhCode[]> {
     const hit = await this.cache.get<{ version: number; items: HhCode[] }>(HH_CACHE_KEY);
@@ -345,6 +435,21 @@ export class ReconciliationService {
 
   downloadCloneZip(id: string): Promise<void> {
     return this.download(`${BASE}/runs/${id}/xml-quy-doi`, `xml_quy_doi_${id}.zip`);
+  }
+
+  /** Mã master của lần đối soát VẪN chưa có mã HH (máy chủ tính lại theo bảng mã hiện tại) + gợi ý mã cũ Vietda */
+  hhMissing(id: string): Observable<HhMissingResult> {
+    return this.http.get<any>(`${BASE}/runs/${id}/hh-missing`, { params: { _: Date.now() } }).pipe(
+      map(r => ({ ...r, items: (r.items || []) as HhMissingRow[] }) as HhMissingResult),
+      tap({
+        next: r => console.info(`${LOG} Mã chưa có mã HH của ${id}: ${r.items.length}/${r.total}`),
+        error: e => console.warn(`${LOG} Lấy mã chưa có mã HH của ${id} lỗi: ${httpErrorText(e)}`)
+      })
+    );
+  }
+
+  downloadHhMissing(id: string): Promise<void> {
+    return this.download(`${BASE}/runs/${id}/hh-missing/export`, `chua_co_ma_HH_${id}.xlsx`);
   }
 
   catalogStatus(): Observable<CatalogStatus> {

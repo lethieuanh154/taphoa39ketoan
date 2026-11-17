@@ -3,7 +3,7 @@
 Ke toan ho kinh doanh, chuan TT 133/2016 + TT 78/2021. Angular 19, FastAPI backend (port 8000).
 
 ## Routes (14 active / 40 total)
-dashboard, journal, ledger, trial-balance, balance-sheet (B01-DNN), income-statement (B02-DNN, 15 chi tieu), cash-flow (B03-DNN), chart-of-accounts (70 TK), cash-vouchers, invoices, period-lock, audit-trail + 26 placeholder
+dashboard, journal, ledger, trial-balance, balance-sheet (B01-DNN), income-statement (B02-DNN, 15 chi tieu), cash-flow (B03-DNN), chart-of-accounts (145 TK, ledger-rs), cash-vouchers, invoices, period-lock, audit-trail + 26 placeholder
 
 ## Logging — BAT BUOC cho moi code moi / code sua (user 22/10/2026)
 - `console.info` buoc chinh + ket qua; `console.warn` tu choi / loi co xu ly (kem ly do); `console.error` loi khong mong doi; `console.debug` log moi request. Prefix `[TenService/Component]`: `[Auth]`, `[AuthGuard]`, `[AuthInterceptor]`, `[Login]`, `[MainLayout]`…
@@ -21,7 +21,8 @@ dashboard, journal, ledger, trial-balance, balance-sheet (B01-DNN), income-state
 - Bang nhieu dong: dung `components/shared/server-table` (phan trang / loc / sap xep / xuat Excel-CSV lam o BE) — quy uoc chung moi bang.
 - `src/app/utils/transfer-reconcile.util.ts` (+ spec), `utils/tpbank-statement.util.ts` = MIRROR giong het TapHoa39BanHang (Doi soat CK, 23/10/2026) — sua 1 ben phai sua ben kia (CLAUDE.md goc).
 - App bat `eventCoalescing` → DOM cap nhat tre 1 khung hinh sau click; test E2E phai cho (wait) sau cu bam chi doi giao dien.
-- 70 tai khoan TT 133/2016, 7 loai so S1-S7 HKD
+- He thong TK (15/11/2026): 145 TK TT 133/2016 luu Postgres qua ledger-rs (`environment.ledgerUrl` + `/api/ledger/accounts*`, `ChartOfAccountsService`; prod `ledgerUrl` rong = nginx cung origin), interceptor gan `X-Id-Token` ca cho `ledgerUrl`. Rang buoc (chi TK la hach toan, TK he thong, ngung dung) o BE — FE chi hien ly do loi. Spec: `TapHoa39KeToanBackEnd/specs/001-he-thong-tai-khoan/`. Trang khac (cash-voucher, ledger.models, bank-transaction...) VAN con danh muc TK viet cung — chua noi ledger.
+- 7 loai so S1-S7 HKD
 - Cash voucher: DRAFT → POSTED → CANCELLED (chi sua/xoa khi DRAFT)
 - Period lock: khoa xong khong sua but toan
 

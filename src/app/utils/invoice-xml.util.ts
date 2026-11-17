@@ -19,6 +19,8 @@ export interface LocalXmlInvoice {
   mccqt?: string;     // mã CQT cấp (28/10/2026 — bản lưu IndexedDB cũ không có)
   httt?: string;      // hình thức thanh toán TTChung/HTTToan ("Chuyển khoản", "Tiền mặt", "TM/CK"…) — 13/11/2026, bản lưu cũ không có
   nmhvten?: string;   // NMua/HVTNMHang — tên người mua hàng (HĐ bán lẻ không có Ten, vd "Bán cho người tiêu dùng")
+  nbdchi?: string;    // NBan/DChi — địa chỉ người bán (17/11/2026, tạo NCC từ XML; bản lưu cũ không có)
+  nmdchi?: string;    // NMua/DChi — địa chỉ người mua (17/11/2026, tạo KH từ XML; bản lưu cũ không có)
   lookup?: InvoiceLookup;   // mã / link tra cứu HĐ gốc (invoice-lookup.util.ts)
 }
 
@@ -82,6 +84,7 @@ export function parseInvoiceXml(xml: string, file: string): LocalXmlInvoice | nu
     nbmst: text(nban, 'MST'), nbten: text(nban, 'Ten'), nmmst: text(nmua, 'MST'), nmten: text(nmua, 'Ten'),
     tgtcthue: num(text(tt, 'TgTCThue')), tgtthue: num(text(tt, 'TgTThue')), tgtttbso: num(text(tt, 'TgTTTBSo')),
     file, mccqt: (first(doc, 'MCCQT')?.textContent || '').trim(), httt: text(ttc, 'HTTToan'), nmhvten: text(nmua, 'HVTNMHang'),
+    nbdchi: text(nban, 'DChi'), nmdchi: text(nmua, 'DChi'),
     lookup: detectLookup(text(ttc, 'MSTTCGP'), headerFields(doc)),
   };
 }

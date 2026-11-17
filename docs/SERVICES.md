@@ -12,7 +12,7 @@
 | BalanceSheetService | services/balance-sheet.service.ts | 10 KB | BCĐKT |
 | IncomeStatementService | services/income-statement.service.ts | 16 KB | Báo cáo KQKD |
 | CashFlowService | services/cash-flow.service.ts | 18 KB | LCTT |
-| ChartOfAccountsService | services/chart-of-accounts.service.ts | 9.5 KB | Hệ thống TK |
+| ChartOfAccountsService | services/chart-of-accounts.service.ts | — | Hệ thống TK (ledger-rs) |
 | CashVoucherService | services/cash-voucher.service.ts | 17 KB | Phiếu thu/chi |
 | InvoiceService | **models**/invoice.service.ts | 28 KB | Hóa đơn |
 | AuditLogService | services/audit-log.service.ts | 13 KB | Audit trail |
@@ -152,19 +152,22 @@ getFinancingCashFlow(): Observable<number>
 
 **File**: `services/chart-of-accounts.service.ts`
 
-### Chức năng
-- CRUD hệ thống tài khoản
-- Quản lý hierarchy (parent-child)
-- BehaviorSubject state management
+### Chức năng (viết lại 15/11/2026)
+- Gọi ledger-rs `${environment.ledgerUrl}/api/ledger/accounts` (HttpClient → `authInterceptor` gắn `X-Id-Token`), map DTO snake_case → `Account`.
+- 145 TK lưu Postgres; KHÔNG còn template TK trong code, KHÔNG BehaviorSubject (mỗi lần gọi lấy từ BE).
+- Lọc `search` (không dấu) / `type` / `status` / `postable` ở BE; `level` / `isParent` / `parentCode` lọc ở FE.
+- Lỗi: 4xx → `console.warn`, còn lại `console.error` (prefix `[ChartOfAccounts]`, `httpErrorText`), ném lại `HttpErrorResponse` để page hiện lý do.
 
 ### Methods chính
 ```typescript
-getAccounts(): Observable<Account[]>
-getAccountByCode(code: string): Observable<Account | null>
-createAccount(account: Account): Observable<Account>
-updateAccount(code: string, updates): Observable<Account>
-deleteAccount(code: string): Observable<boolean>
-getAccountTree(): Observable<AccountTreeNode[]>
+getAccounts(filter?: AccountFilter): Observable<Account[]>
+getAccountByCode(code: string): Observable<Account | null>   // 404 → null
+getChildAccounts(parentCode) / getLeafAccounts() / getAccountGroups()
+addAccount(input: NewAccountInput): Observable<Account>      // trùng mã → BE 409 LA201
+updateAccount(code, changes): Observable<Account>            // chỉ name / note / nature / detailType / status
+deleteAccount(code: string): Observable<void>                // xóa thật (ngừng dùng = status INACTIVE)
+getHistory(code: string): Observable<AccountHistoryEntry[]>
+exportExcel(): Observable<Blob>                              // xlsx do BE tạo
 ```
 
 ---

@@ -3,7 +3,8 @@
     <div>
       <h1><i class="fa-solid fa-link"></i> Ánh xạ hàng hóa</h1>
       <p class="sub">Mỗi mặt hàng trên hóa đơn → <b>Mã master</b> KiotViet (mã của ĐVT nhỏ nhất) + <b>Hệ số quy đổi</b>
-        (1 ĐVT trên HĐ = bao nhiêu ĐVT master). Dòng <b>Cần xem</b> nằm trên cùng. Sửa xong bấm <b>Lưu</b> rồi
+        (1 ĐVT trên HĐ = bao nhiêu ĐVT master). Dòng <b>Cần xem</b> nằm trên cùng — <b>chỉ cần kiểm các dòng này</b>,
+        dòng không có cờ máy đã ghép chắc chắn. Mã HH trong XML quy đổi đi theo Mã master (gán mã cũ Vietda ở trang Đối soát). Sửa xong bấm <b>Lưu</b> rồi
         <b>Chạy lại đối soát</b>. Dòng đã sửa hoặc tick <b>Đã kiểm</b> được giữ cho mọi lần đối soát sau.</p>
     </div>
   </header>
@@ -70,6 +71,10 @@
             <button type="button" class="chip" [class.active]="quickValue === qk.value" (click)="setQuick(qk.value)">{{ qk.label }}</button>
           }
         </div>
+        <button type="button" class="chip" [class.active]="fullColumns" (click)="toggleFull()"
+                title="Bảng gọn chỉ giữ cột cần để kiểm Mã master + Hệ số; bật để xem thêm SL, Mã HH, cách ghép, gợi ý khác">
+          <i class="fa-solid fa-table-columns"></i> {{ fullColumns ? 'Bảng gọn' : 'Hiện đủ cột' }}
+        </button>
         @if (page) {
           <span class="total">{{ page.total | number }} dòng</span>
         }
@@ -86,7 +91,7 @@
               <tr>
                 @for (c of columns; track c.header) {
                   <th [style.min-width.px]="c.width" (click)="toggleSort(c)" [class.sorted]="query.sort === col[c.header]"
-                      [class.editable]="c.kind === 'master' || c.kind === 'factor' || c.kind === 'vietda' || c.kind === 'vdfactor' || c.kind === 'check'">
+                      [class.editable]="c.kind === 'master' || c.kind === 'factor' || c.kind === 'check'">
                     {{ c.label }}
                     @if (query.sort === col[c.header]) {
                       <i class="fa-solid" [class.fa-arrow-down-wide-short]="query.desc" [class.fa-arrow-up-short-wide]="!query.desc"></i>
@@ -137,20 +142,6 @@
                           <input type="text" inputmode="decimal" class="num" [class.invalid]="isFactorInvalid(row)"
                                  [ngModel]="factorValue(row)" (ngModelChange)="setFactor(row, $event)" placeholder="(trống)"
                                  [attr.aria-label]="'Hệ số ' + raw(row, 'Tên hàng (HĐ)')">
-                        </td>
-                      }
-                      @case ('vietda') {
-                        <td class="edit">
-                          <input type="text" [ngModel]="current(row).ma_vietda" (ngModelChange)="setVietda(row, $event)"
-                                 [attr.aria-label]="'Mã Vietda ' + raw(row, 'Tên hàng (HĐ)')">
-                        </td>
-                      }
-                      @case ('vdfactor') {
-                        <td class="edit">
-                          <input type="text" inputmode="decimal" class="num" [class.invalid]="isVdFactorInvalid(row)"
-                                 [ngModel]="vdFactorValue(row)" (ngModelChange)="setVdFactor(row, $event)" placeholder="(trống)"
-                                 [title]="'1 ' + (raw(row, 'ĐVT master') || 'ĐVT master') + ' = bao nhiêu ' + (raw(row, 'ĐVT Vietda') || 'ĐVT Vietda')"
-                                 [attr.aria-label]="'Hệ số Vietda ' + raw(row, 'Tên hàng (HĐ)')">
                         </td>
                       }
                       @default {

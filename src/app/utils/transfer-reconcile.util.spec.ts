@@ -163,12 +163,13 @@ describe('transfer-reconcile.util', () => {
       expect(pairs.every(p => p.kind === 'matched')).toBeTrue();
     });
 
-    it('payerKey: TK đối ứng + tên trong diễn giải, thiếu tên mới dùng cột Chủ TK đối ứng', () => {
+    it('payerKey: tên trong diễn giải; thiếu tên mới dùng TK đối ứng + cột Chủ TK đối ứng', () => {
       expect(payerKey({ counterparty: 'HO PHUOC THINH ', desc: '' })).toBe('ho phuoc thinh');
       expect(payerKey({ counterparty: '', desc: 'TPB;69586928888;NGUYEN THI LE THANH chuyen tien' })).toBe('nguyen thi le thanh');
       expect(payerKey({ counterparty: '', desc: 'IBFT NGUYEN THI LE THANH chuyen tien' })).toBe('nguyen thi le thanh');
       expect(payerKey({ counterparty: '', desc: 'Thanh toan QR' })).toBe('');
-      expect(payerKey({ counterparty: 'MBBANK IBFT', desc: 'LE MINH TOAN chuyen tien', account: '0775369559' })).toBe('0775369559|le minh toan');
+      expect(payerKey({ counterparty: 'MBBANK IBFT', desc: 'LE MINH TOAN chuyen tien', account: '0775369559' })).toBe('le minh toan');
+      expect(payerKey({ counterparty: 'MBBANK IBFT', desc: 'FT26307740128947', account: '0775369559' })).toBe('0775369559|mbbank ibft');
       // ví MoMo: cùng TK + cùng cột H, khác người
       const momo = (desc: string) => payerKey({ counterparty: 'CT CP DICH VU DI DONG TRUC TUYEN', desc, account: '1770260769' });
       expect(momo('149353799186 0983010909 HUA THI MY DUYEN chuyen tien qua MoMo'))
@@ -200,6 +201,21 @@ describe('transfer-reconcile.util', () => {
       const part = (i: number) => pairs.find(p => p.item?.partIndex === i)!.txn!.code;
       expect(part(1)).toBe('T_30');
       expect(part(2)).toBe('T_15');
+    });
+
+    it('CK nhiều lần qua ví ZaloPay: 2 khoản cùng tên trong diễn giải, khác TK trung gian (mẫu thật HD447878 16/11)', () => {
+      const t = (code: string, credit: number, date: string, desc: string, counterparty: string, account: string): ReconBankTxn =>
+        ({ code, credit, date, counterparty, desc, account });
+      const items = expandInvoiceItems([inv('HD447878', 62000, '16/11/2026 11:43:05', 'chuyển khoản 2 lần 32 + 30')]);
+      const pairs = reconcileByAmount(items, [
+        t('T_BA_DAT', 30000, '16/11/2026 08:42:21', 'NGUYEN BA DAT chuyen tien', 'MBBANK IBFT', '0905000111'),
+        t('T_BAO_NGUYEN', 32000, '16/11/2026 09:44:04', 'NGUYEN BAO NGUYEN chuyen tien', 'MBBANK IBFT', '0905000222'),
+        t('ZP_32', 32000, '16/11/2026 10:56:39', 'ZP263200213282 Nhi dung Zalopay chuyen tien', 'CONG TY CO PHAN ZION', '212356786'),
+        t('ZP_30', 30000, '16/11/2026 10:59:44', 'O5CH7L3VG13M Nhi dung Zalopay chuyen tien', 'MBBANK IBFT', '0721100912006'),
+      ]);
+      const part = (i: number) => pairs.find(p => p.item?.partIndex === i)!.txn!.code;
+      expect(part(1)).toBe('ZP_32');
+      expect(part(2)).toBe('ZP_30');
     });
 
     it('phần dư + gợi ý biên kỳ', () => {

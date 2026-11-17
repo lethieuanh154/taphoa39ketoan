@@ -3,23 +3,31 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subscription, timer } from 'rxjs';
+import { firstValueFrom, Subscription, timer } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { httpErrorText } from '../../services/auth.service';
 import { PeriodService, formatVn } from '../../services/period.service';
 import { CompanyService } from '../../services/company.service';
 import {
-  CatalogStatus, FolderScan, HhCode, HhCodeStatus, ReconciliationRun, ReconciliationService, ReviewItem
+  AssignedCodeRow, CatalogStatus, FolderScan, HhCode, HhCodeStatus, HhMissingRow, OldCatalogResult, OldCodeSuggestion, OldUnmatchedRow, ReconciliationRun,
+  ReconciliationService, ReviewItem
 } from '../../services/reconciliation.service';
 import { expandArchives } from '../../utils/archive.util';
 
 const LOG = '[InvoiceReconciliation]';
+
+/** chữ thường, bỏ dấu — lọc tên hàng không cần gõ dấu */
+function plainText(t: string): string {
+  return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+}
 
 /**
  * TIỆN ÍCH — ĐỐI SOÁT HÓA ĐƠN XML (plan-doi-soat-web.md, Pha 1 bước 3)
  * Chọn thư mục XML (app FDI) → nén ZIP + upload → KeToanBackEnd chạy doi_soat.py.
  * 02/11/2026: trang chỉ còn chức năng QUY ĐỔI — ghép hàng HĐ vào ⇄ HĐ ra theo mã master KiotViet, về ĐVT nhỏ nhất, mã hàng =
  * mã HH máy tự cấp (lưu Firestore + IndexedDB) → tải XML quy đổi nhập Vietda. Bỏ các tab Tổng quan / Danh sách SP...
+ * 16/11/2026: máy KHÔNG tự cấp mã nữa — chỉ mã trong Danh mục Vietda; mã master chưa có mã → bảng "Hàng chưa có mã HH" (gán tay,
+ * 1 mã HH cho nhiều mã master, xuất Excel cho kế toán thêm vào Vietda) và máy chủ chặn tải XML quy đổi.
  */
 @Component({
   selector: 'app-invoice-reconciliation-page',
@@ -47,6 +55,50 @@ export class InvoiceReconciliationPageComponent implements OnInit {
   /** Mã HH máy tự cấp theo mã master (02/11/2026) — bản IndexedDB */
   hhStatus: HhCodeStatus | null = null;
   hhCodes: HhCode[] = [];
+
+  /** Danh mục Vật tư hàng hóa Vietda (14/11/2026): tải lên → máy chủ dùng lại mã HH / KM cũ, tránh Vietda sinh mã trùng */
+  oldBusy = false;
+  oldResult: OldCatalogResult | null = null;
+  oldError = '';
+  /** mã HH cũ chưa ghép → kế toán gán tay */
+  unmatched: OldUnmatchedRow[] | null = null;
+  unmatchedTotal = 0;
+  unmatchedLoading = false;
+  unmatchedFilter = '';
+  /** mã master gõ tay cho từng mã HH cũ (khi 3 gợi ý không đúng) */
+  manualMaster: { [hh: string]: string } = {};
+  /** mã master đã gán cho từng mã cũ trong phiên này — 1 mã HH gán được nhiều mã master (vd nhiều vị mì) */
+  assignedOld: { [hh: string]: string[] | undefined } = {};
+  /** Bảng "Mã HH đã ghép" (17/11/2026) — rà / sửa / bỏ gán mã đã ghép */
+  assigned: AssignedCodeRow[] | null = null;
+  assignedLoading = false;
+  assignedError = '';
+  assignedHasCatalog = true;
+  assignedFilter = '';
+  assignedView: 'flagged' | 'shared' | 'manual' | 'all' = 'flagged';
+  /** mã HH mới gõ cho từng mã master */
+  editHh: { [master: string]: string } = {};
+  assignedBusy = '';
+  assignedMsg = '';
+  /** mã HH cũ đang gán (khóa nút) */
+  assigning = '';
+  assignMsg = '';
+  readonly unmatchedShow = 100;
+
+  /** Mã master của lần đối soát đang mở chưa có mã HH (16/11/2026) */
+  hhMissing: HhMissingRow[] | null = null;
+  hhMissingRunId = '';
+  hhMissingTotal = 0;
+  hhMissingLoading = false;
+  hhMissingError = '';
+  hhMissingFilter = '';
+  /** mã HH gõ tay cho từng mã master */
+  manualHh: { [master: string]: string } = {};
+  /** mã master đã tick → gán chung 1 mã HH (vd mọi vị Mỳ Hảo Hảo = 1 mã Vietda) */
+  hhSelected = new Set<string>();
+  bulkHh = '';
+  hhAssigning = '';
+  hhAssignMsg = '';
 
   scan: FolderScan | null = null;
   /** đang giải nén file ZIP / RAR người dùng chọn (30/10/2026) */
@@ -169,7 +221,7 @@ export class InvoiceReconciliationPageComponent implements OnInit {
         this.catalog = st;
         this.catalogBusy = false;
         if (st.codes) {
-          this.catalogInfo = `Tự cấp thêm ${st.codes.added.toLocaleString('vi-VN')} mã HH cho mã master mới.`;
+          this.catalogInfo = 'Đã ghép lại mã cũ Vietda cho mã master mới (máy không tự cấp mã HH mới).';
           this.loadHh(st.codes.status);
         }
       },
@@ -178,6 +230,324 @@ export class InvoiceReconciliationPageComponent implements OnInit {
         this.catalogError = `Không cập nhật được bảng quy đổi: ${httpErrorText(e)}`;
       }
     });
+  }
+
+  // ───────────────────────────── Danh mục Vật tư hàng hóa Vietda (giữ mã HH cũ — 14/11/2026)
+
+  /** Số mã master đang dùng mã cũ Vietda (ghép tự động + gán tay) */
+  get oldUsedCount(): number {
+    const s = this.hhStatus?.sources || {};
+    return (s['vietda'] || 0) + (s['manual'] || 0);
+  }
+
+  get unmatchedFiltered(): OldUnmatchedRow[] {
+    const q = this.unmatchedFilter.trim().toLowerCase();
+    const rows = this.unmatched || [];
+    return q ? rows.filter(r => `${r.hh} ${r.name} ${r.reason}`.toLowerCase().includes(q)) : rows;
+  }
+
+  reasonsText(m: { [reason: string]: number } | undefined): string {
+    return Object.entries(m || {}).map(([k, v]) => `${k}: ${v.toLocaleString('vi-VN')}`).join(' · ');
+  }
+
+  onOldCatalogSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) {
+      console.info(`${LOG} Không chọn file danh mục Vietda`);
+      return;
+    }
+    if (!/\.xlsx$/i.test(file.name)) {
+      console.warn(`${LOG} Danh mục Vietda '${file.name}' không phải .xlsx`);
+      this.oldError = 'Chọn file .xlsx xuất từ Vietda (Hệ thống > Cập nhật danh mục > Vật tư, hàng hóa > Excel).';
+      return;
+    }
+    this.oldBusy = true;
+    this.oldError = '';
+    this.oldResult = null;
+    this.service.uploadOldCatalog(file).subscribe({
+      next: r => {
+        this.oldBusy = false;
+        this.oldResult = r;
+        this.loadHh(r.status);
+        if (this.unmatched) this.loadUnmatched();
+      },
+      error: e => {
+        this.oldBusy = false;
+        this.oldError = `Không tải được danh mục Vietda: ${httpErrorText(e)}`;
+      }
+    });
+  }
+
+  loadUnmatched(): void {
+    this.unmatchedLoading = true;
+    this.assignMsg = '';
+    this.service.oldUnmatched().subscribe({
+      next: r => {
+        this.unmatchedLoading = false;
+        this.unmatched = r.items;
+        this.unmatchedTotal = r.total_old;
+        this.assignedOld = {};
+      },
+      error: e => {
+        this.unmatchedLoading = false;
+        this.oldError = `Không lấy được mã cũ chưa ghép: ${httpErrorText(e)}`;
+      }
+    });
+  }
+
+  /** Gán mã HH cũ `row.hh` cho mã master (gợi ý hoặc gõ tay) */
+  assign(row: OldUnmatchedRow, master: string | OldCodeSuggestion): void {
+    const code = (typeof master === 'string' ? master : master.master_code).trim();
+    if (!code) {
+      console.warn(`${LOG} Gán ${row.hh}: chưa nhập mã master`);
+      this.assignMsg = `Nhập mã master KiotViet cho ${row.hh}.`;
+      return;
+    }
+    if ((this.assignedOld[row.hh] || []).includes(code)) {
+      console.info(`${LOG} Gán ${row.hh} → ${code}: đã gán trước đó, bỏ qua`);
+      return;
+    }
+    if (typeof master !== 'string' && master.current_hh && master.current_source !== 'auto'
+      && !confirm(`Mã master ${code} đang dùng ${master.current_hh} (${master.current_source}). Đổi sang ${row.hh}?`)) {
+      console.info(`${LOG} Gán ${row.hh} → ${code}: người dùng hủy (đang dùng ${master.current_hh})`);
+      return;
+    }
+    this.assigning = row.hh;
+    this.assignMsg = '';
+    this.service.setManualCode(code, row.hh).subscribe({
+      next: r => {
+        this.assigning = '';
+        const done = [...(this.assignedOld[row.hh] || []), code];
+        this.assignedOld = { ...this.assignedOld, [row.hh]: done };
+        this.manualMaster[row.hh] = '';
+        this.assignMsg = `Đã gán ${r.item.hh} cho mã master ${code} (${done.length} mã master). Gán thêm vị / mã khác nếu cần, xong bấm "Xong".`;
+        console.info(`${LOG} ${row.hh} đã gán ${done.length} mã master: ${done.join(', ')}`);
+        this.loadHh(r.status);
+      },
+      error: e => {
+        this.assigning = '';
+        this.assignMsg = `Gán ${row.hh} → ${code} lỗi: ${httpErrorText(e)}`;
+      }
+    });
+  }
+
+  /** Ẩn mã cũ khỏi bảng sau khi đã gán đủ mã master */
+  finishOld(row: OldUnmatchedRow): void {
+    console.info(`${LOG} ${row.hh} xong — ${(this.assignedOld[row.hh] || []).length} mã master`);
+    this.unmatched = (this.unmatched || []).filter(x => x.hh !== row.hh);
+  }
+
+  // ───────────────────────────── Mã HH đã ghép (17/11/2026)
+
+  assignedCount(view: 'flagged' | 'shared' | 'manual' | 'all'): number {
+    return (this.assigned || []).filter(r => this.inView(r, view)).length;
+  }
+
+  private inView(r: AssignedCodeRow, view: string): boolean {
+    return view === 'all' || (view === 'flagged' && r.flags.length > 0) || (view === 'shared' && r.shared > 1)
+      || (view === 'manual' && r.source === 'manual');
+  }
+
+  get assignedFiltered(): AssignedCodeRow[] {
+    const q = plainText(this.assignedFilter.trim());
+    return (this.assigned || []).filter(r => this.inView(r, this.assignedView)
+      && (!q || plainText(`${r.master_code} ${r.kv_name} ${r.hh} ${r.vd_name}`).includes(q)));
+  }
+
+  get assignedVisible(): AssignedCodeRow[] {
+    return this.assignedFiltered.slice(0, this.unmatchedShow);
+  }
+
+  loadAssigned(): void {
+    this.assignedLoading = true;
+    this.assignedError = '';
+    this.service.assignedCodes().subscribe({
+      next: r => {
+        this.assignedLoading = false;
+        this.assigned = r.items;
+        this.assignedHasCatalog = r.has_catalog;
+        if (!r.flagged && this.assignedView === 'flagged' && !this.assignedMsg) this.assignedView = 'all';
+      },
+      error: e => {
+        this.assignedLoading = false;
+        this.assignedError = `Không lấy được bảng mã HH đã ghép: ${httpErrorText(e)}`;
+      }
+    });
+  }
+
+  closeAssigned(): void {
+    this.assigned = null;
+    this.assignedMsg = '';
+  }
+
+  /** Đổi mã HH của 1 mã master (hh rỗng = bỏ gán → mã master về "chưa có mã HH") */
+  changeAssigned(row: AssignedCodeRow, hh: string): void {
+    const code = hh.trim().toUpperCase();
+    if (!code) {
+      console.warn(`${LOG} Đổi mã HH cho ${row.master_code}: chưa nhập mã`);
+      this.assignedMsg = `Nhập mã HH / KM Vietda mới cho ${row.master_code}.`;
+      return;
+    }
+    if (code === row.hh.toUpperCase()) {
+      console.info(`${LOG} Đổi mã HH cho ${row.master_code}: trùng mã đang dùng ${row.hh}`);
+      this.assignedMsg = `${row.master_code} đang dùng ${row.hh} rồi.`;
+      return;
+    }
+    this.saveAssigned(row, code, `Đã đổi ${row.master_code} từ ${row.hh} sang ${code}.`);
+  }
+
+  unassign(row: AssignedCodeRow): void {
+    if (!confirm(`Bỏ gán ${row.hh} khỏi ${row.master_code} ${row.kv_name}?
+Mã master này sẽ thành "chưa có mã HH" — XML quy đổi `
+      + `bị chặn đến khi gán mã khác.`)) {
+      console.info(`${LOG} Bỏ gán ${row.hh} → ${row.master_code}: người dùng hủy`);
+      return;
+    }
+    this.saveAssigned(row, '', `Đã bỏ gán ${row.hh} khỏi ${row.master_code} — đối soát lại để thấy ở bảng "Hàng chưa có mã HH".`);
+  }
+
+  private saveAssigned(row: AssignedCodeRow, code: string, okMsg: string): void {
+    this.assignedBusy = row.master_code;
+    this.assignedMsg = '';
+    this.service.setManualCode(row.master_code, code).subscribe({
+      next: r => {
+        this.assignedBusy = '';
+        this.assignedMsg = okMsg;
+        this.editHh[row.master_code] = '';
+        this.loadHh(r.status);
+        this.loadAssigned();
+      },
+      error: e => {
+        this.assignedBusy = '';
+        this.assignedMsg = `${code ? 'Đổi ' + row.master_code + ' → ' + code : 'Bỏ gán ' + row.master_code} lỗi: ${httpErrorText(e)}`;
+      }
+    });
+  }
+
+  async downloadAssigned(): Promise<void> {
+    await this.runDownload('assigned', () => this.service.downloadAssignedCodes());
+  }
+
+  // ───────────────────────────── Hàng chưa có mã HH của lần đối soát (16/11/2026)
+
+  get hhMissingFiltered(): HhMissingRow[] {
+    const q = plainText(this.hhMissingFilter.trim());
+    const rows = this.hhMissing || [];
+    if (!q) return rows;
+    return rows.filter(r => plainText(`${r.master_code} ${r.name} ${r.suggestions.map(s => s.hh + ' ' + s.name).join(' ')}`).includes(q));
+  }
+
+  get hhVisible(): HhMissingRow[] {
+    return this.hhMissingFiltered.slice(0, this.unmatchedShow);
+  }
+
+  get allVisibleSelected(): boolean {
+    const v = this.hhVisible;
+    return v.length > 0 && v.every(r => this.hhSelected.has(r.master_code));
+  }
+
+  loadHhMissing(id: string): void {
+    this.hhMissingRunId = id;
+    this.hhMissingLoading = true;
+    this.hhMissingError = '';
+    this.hhAssignMsg = '';
+    this.service.hhMissing(id).subscribe({
+      next: r => {
+        if (this.hhMissingRunId !== id) return;
+        this.hhMissingLoading = false;
+        this.hhMissing = r.items;
+        this.hhMissingTotal = r.total;
+        this.hhSelected.clear();
+      },
+      error: e => {
+        if (this.hhMissingRunId !== id) return;
+        this.hhMissingLoading = false;
+        this.hhMissing = null;
+        this.hhMissingError = `Không lấy được danh sách hàng chưa có mã HH: ${httpErrorText(e)}`;
+      }
+    });
+  }
+
+  toggleHhSelected(row: HhMissingRow, on: boolean): void {
+    if (on) this.hhSelected.add(row.master_code);
+    else this.hhSelected.delete(row.master_code);
+  }
+
+  toggleAllVisible(on: boolean): void {
+    for (const r of this.hhVisible) this.toggleHhSelected(r, on);
+  }
+
+  /** Gán mã HH (gợi ý hoặc gõ tay) cho 1 mã master */
+  assignHh(row: HhMissingRow, hh: string): void {
+    const code = hh.trim().toUpperCase();
+    if (!code) {
+      console.warn(`${LOG} Gán mã HH cho ${row.master_code}: chưa nhập mã`);
+      this.hhAssignMsg = `Nhập mã HH / KM Vietda cho ${row.master_code}.`;
+      return;
+    }
+    this.hhAssigning = row.master_code;
+    this.hhAssignMsg = '';
+    this.service.setManualCode(row.master_code, code).subscribe({
+      next: r => {
+        this.hhAssigning = '';
+        this.hhAssignMsg = `Đã gán ${r.item.hh} cho ${row.master_code} ${row.name}.`;
+        this.removeHhRow(row.master_code);
+        this.loadHh(r.status);
+      },
+      error: e => {
+        this.hhAssigning = '';
+        this.hhAssignMsg = `Gán ${code} → ${row.master_code} lỗi: ${httpErrorText(e)}`;
+      }
+    });
+  }
+
+  /** 1 mã HH cho mọi mã master đã tick (gán lần lượt, dòng lỗi giữ lại) */
+  async assignSelected(): Promise<void> {
+    const code = this.bulkHh.trim().toUpperCase();
+    const rows = (this.hhMissing || []).filter(r => this.hhSelected.has(r.master_code));
+    if (!code || !rows.length) {
+      console.warn(`${LOG} Gán chung: thiếu mã (${code || 'trống'}) hoặc chưa tick dòng (${rows.length})`);
+      this.hhAssignMsg = !rows.length ? 'Tick các mã master cần gán chung 1 mã HH.' : 'Nhập mã HH / KM Vietda để gán chung.';
+      return;
+    }
+    const list = rows.slice(0, 15).map(r => `• ${r.master_code} ${r.name} (${r.unit})`).join('\n');
+    if (!confirm(`Gán mã ${code} cho ${rows.length} mã master:\n${list}${rows.length > 15 ? '\n…' : ''}`)) {
+      console.info(`${LOG} Gán chung ${code}: người dùng hủy`);
+      return;
+    }
+    console.info(`${LOG} Gán chung ${code} cho ${rows.length} mã master`);
+    this.hhAssigning = '*';
+    this.hhAssignMsg = '';
+    let ok = 0;
+    let status: HhCodeStatus | null = null;
+    const errors: string[] = [];
+    for (const r of rows) {
+      try {
+        const res = await firstValueFrom(this.service.setManualCode(r.master_code, code));
+        status = res.status;
+        ok++;
+        this.removeHhRow(r.master_code);
+      } catch (e) {
+        console.warn(`${LOG} Gán chung ${code} → ${r.master_code} lỗi: ${httpErrorText(e)}`);
+        errors.push(`${r.master_code}: ${httpErrorText(e)}`);
+      }
+    }
+    this.hhAssigning = '';
+    this.hhAssignMsg = `Đã gán ${code} cho ${ok}/${rows.length} mã master.` + (errors.length ? ` Lỗi: ${errors.join(' · ')}` : '');
+    console.info(`${LOG} Gán chung ${code}: ${ok}/${rows.length} OK, ${errors.length} lỗi`);
+    if (status) this.loadHh(status);
+  }
+
+  private removeHhRow(master: string): void {
+    this.hhMissing = (this.hhMissing || []).filter(x => x.master_code !== master);
+    this.hhSelected.delete(master);
+  }
+
+  async downloadHhMissing(): Promise<void> {
+    const id = this.run?.id;
+    if (id) await this.runDownload('hh-missing', () => this.service.downloadHhMissing(id));
   }
 
   async downloadCatalog(): Promise<void> {
@@ -292,12 +662,21 @@ export class InvoiceReconciliationPageComponent implements OnInit {
         const wasRunning = this.run?.id === id && (this.run.status === 'queued' || this.run.status === 'running');
         this.run = run;
         if (run.status === 'done' && this.reviewRunId !== run.id) this.loadReview(run.id);
+        if (run.status === 'done' && run.hh_missing !== undefined && this.hhMissingRunId !== run.id) {
+          if (run.hh_missing) {
+            this.loadHhMissing(run.id);
+          } else {
+            this.hhMissingRunId = run.id;
+            this.hhMissing = null;
+            this.hhMissingError = '';
+          }
+        }
         if (run.status === 'done' || run.status === 'error') {
           this.pollSub?.unsubscribe();
           if (wasRunning) {
             console.info(`${LOG} Lần chạy ${id}: ${run.status}${run.error ? ' — ' + run.error : ''}`);
             this.loadRuns();
-            if (run.status === 'done') this.loadHh();   // lần chạy có thể đã cấp mã HH cho mã master mới
+            if (run.status === 'done') this.loadHh();   // lần chạy có thể đã ghép mã cũ cho mã master mới
           }
         }
       },

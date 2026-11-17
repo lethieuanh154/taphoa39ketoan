@@ -1,0 +1,91 @@
+<div class="pxi">
+  <div class="pxi-head">
+    <h3><i class="fa-solid fa-file-import"></i> Tạo {{ roleLabel }} từ XML hóa đơn</h3>
+    <button type="button" class="pxi-close" (click)="close()" [disabled]="busy" title="Đóng"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
+  <p class="pxi-hint">
+    Chọn thư mục / file ZIP, RAR chứa XML <b>{{ dirLabel }}</b>. Lấy MST, tên, địa chỉ {{ isSupplier ? 'người bán' : 'người mua có MST' }};
+    MST đã có ở danh mục {{ roleLabel }} thì bỏ qua (không ghi đè thông tin đã sửa).
+    MST công ty: <b>{{ companyMst || '(chưa nhập)' }}</b>.
+  </p>
+
+  <div class="pxi-pick">
+    <label class="btn btn-primary" [class.disabled]="busy">
+      <i class="fa-solid" [class.fa-spinner]="busy" [class.fa-spin]="busy" [class.fa-folder-open]="!busy"></i>
+      {{ busy ? ('Đang ' + (progress || 'xử lý') + '...') : 'Chọn thư mục XML' }}
+      <input type="file" webkitdirectory multiple (change)="onFilesSelected($event)" [disabled]="busy" hidden>
+    </label>
+    <label class="btn btn-outline-primary" [class.disabled]="busy" title="Chọn 1 hoặc nhiều file .zip / .rar (hoặc .xml) — giải nén ngay trên máy">
+      <i class="fa-solid fa-file-zipper"></i> Chọn file ZIP / RAR
+      <input type="file" accept=".zip,.rar,.xml" multiple (change)="onFilesSelected($event)" [disabled]="busy" hidden>
+    </label>
+  </div>
+
+  @if (error) {
+    <div class="pxi-alert pxi-error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div>
+  }
+  @if (success) {
+    <div class="pxi-alert pxi-success"><i class="fa-solid fa-circle-check"></i> {{ success }}</div>
+  }
+
+  @if (folder && nFiles) {
+    <div class="pxi-stats">
+      <span><i class="fa-regular fa-folder"></i> <b>{{ folder }}</b>: {{ nFiles }} file XML</span>
+      <span>{{ dirLabel }}: <b>{{ nMatched }}</b></span>
+      @if (nWrongDir) { <span class="warn">{{ wrongDirLabel }} bị bỏ qua: <b>{{ nWrongDir }}</b></span> }
+      @if (nOther) { <span class="warn">HĐ không của MST công ty: <b>{{ nOther }}</b></span> }
+      @if (nNoMst) { <span class="muted">HĐ {{ isSupplier ? 'người bán' : 'người mua' }} không MST: <b>{{ nNoMst }}</b></span> }
+      @if (nReadErrors) { <span class="warn">File lỗi: <b>{{ nReadErrors }}</b> (xem Console)</span> }
+      <span>MST khác nhau: <b>{{ candidates.length }}</b></span>
+    </div>
+  }
+
+  @if (preview) {
+    <h4>{{ preview.dryRun ? 'Sẽ tạo' : 'Đã tạo' }} {{ preview.create.length }} {{ roleLabel }}</h4>
+    @if (preview.create.length) {
+      <div class="pxi-table-wrap">
+        <table class="pxi-table">
+          <thead><tr>@if (!preview.dryRun) { <th>Mã</th> }<th>MST</th><th>Tên</th><th class="num">Số HĐ</th></tr></thead>
+          <tbody>
+            @for (c of preview.create; track c.taxCode) {
+              <tr>
+                @if (!preview.dryRun) { <td class="code">{{ c.code }}</td> }
+                <td class="code">{{ c.taxCode }}</td>
+                <td>{{ c.name || '(không có tên)' }}</td>
+                <td class="num">{{ invoicesOf(c.taxCode) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (preview.skip.length) {
+      <h4>Bỏ qua {{ preview.skip.length }} MST</h4>
+      <div class="pxi-table-wrap">
+        <table class="pxi-table">
+          <thead><tr><th>MST</th><th>Tên trong XML</th><th>Lý do</th></tr></thead>
+          <tbody>
+            @for (s of preview.skip; track $index) {
+              <tr>
+                <td class="code">{{ s.taxCode || '—' }}</td>
+                <td>{{ s.name }}</td>
+                <td>{{ s.reason }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (preview.dryRun) {
+      <div class="pxi-actions">
+        <button type="button" class="btn btn-primary" (click)="confirm()" [disabled]="busy || !preview.create.length">
+          <i class="fa-solid fa-check"></i> Tạo {{ preview.create.length }} {{ roleLabel }}
+        </button>
+        <button type="button" class="btn btn-outline-secondary" (click)="close()" [disabled]="busy">Hủy</button>
+      </div>
+    }
+  }
+</div>

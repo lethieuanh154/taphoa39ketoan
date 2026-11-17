@@ -58,7 +58,7 @@ tài khoản, CĐKT, KQKD, LCTT, Tờ khai GTGT đều ra **số giả**. Đây 
 
 | Nhóm | Page | Route | TT | Thiếu / ghi chú |
 |---|---|---|---|---|
-| 1. Danh mục | Hệ thống tài khoản | `chart-of-accounts-page` | 🔴 | 70 TK cài sẵn trong code; thêm / sửa không lưu |
+| 1. Danh mục | Hệ thống tài khoản | `chart-of-accounts-page` | 🟢 | 15/11/2026: 145 TK lưu Postgres qua ledger-rs (`/api/ledger/accounts`), thêm / sửa / ngừng dùng / xóa có ràng buộc BE, lịch sử sửa, xuất Excel. Chưa có: trang khác (phiếu thu chi, `ledger.models`, bank-transaction, tạo phiếu từ HĐ) vẫn dùng danh mục TK viết cứng |
 | | Khách hàng | `customer-page` | 🔴 | `loadDemoData()` |
 | | Nhà cung cấp | `supplier-page` | 🔴 | `loadDemoData()` |
 | | Nhân viên | `employee-page` | 🔴 | `loadDemoData()` |

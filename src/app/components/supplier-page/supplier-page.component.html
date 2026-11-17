@@ -1,5 +1,5 @@
 <!-- ═══════════════════════════════════════════════════════════════════════════════
-     SUPPLIER PAGE - DANH MỤC NHÀ CUNG CẤP
+     SUPPLIER PAGE - DANH MỤC NHÀ CUNG CẤP (ledger-rs /api/ledger/partners, vai SUPPLIER)
      ═══════════════════════════════════════════════════════════════════════════════ -->
 
 <div class="supplier-page">
@@ -8,52 +8,44 @@
   <div class="page-header">
     <div class="header-content">
       <h1 class="page-title">Danh mục nhà cung cấp</h1>
-      <p class="page-subtitle">Quản lý thông tin NCC - Công nợ phải trả (TK 331)</p>
+      <p class="page-subtitle">Đối tượng theo dõi công nợ phải trả (TK 331) — mã để trống thì tự cấp NCC0001, NCC0002…</p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-primary" (click)="openCreateModal()">
-        <span class="icon">+</span>
-        Thêm NCC
+      <button class="btn btn-secondary" (click)="openImport()" title="Tạo NCC theo MST người bán trong XML hóa đơn đầu vào">
+        <i class="fa-solid fa-file-import"></i> Tạo từ XML
       </button>
+      <button class="btn btn-secondary" (click)="exportExcel()"><i class="fa-solid fa-file-excel"></i> Xuất Excel</button>
+      <button class="btn btn-primary" (click)="openCreateModal()"><span class="icon">+</span> Thêm NCC</button>
     </div>
   </div>
+
+  @if (errorMessage) {
+    <div class="page-alert alert-error">
+      <span><i class="fa-solid fa-circle-exclamation"></i> {{ errorMessage }}</span>
+      <button class="alert-close" (click)="dismissError()" title="Đóng">&times;</button>
+    </div>
+  }
+  @if (successMessage) {
+    <div class="page-alert alert-success"><span><i class="fa-solid fa-circle-check"></i> {{ successMessage }}</span></div>
+  }
 
   <!-- STATS CARDS -->
   <div class="stats-cards">
     <div class="stat-card card-total">
       <div class="stat-icon">🏭</div>
-      <div class="stat-content">
-        <span class="stat-label">Tổng số</span>
-        <span class="stat-value">{{ stats.total }}</span>
-      </div>
+      <div class="stat-content"><span class="stat-label">Tổng số</span><span class="stat-value">{{ stats.total }}</span></div>
     </div>
     <div class="stat-card card-active">
       <div class="stat-icon">✅</div>
-      <div class="stat-content">
-        <span class="stat-label">Đang hoạt động</span>
-        <span class="stat-value">{{ stats.active }}</span>
-      </div>
+      <div class="stat-content"><span class="stat-label">Đang dùng</span><span class="stat-value">{{ stats.active }}</span></div>
     </div>
     <div class="stat-card card-inactive">
       <div class="stat-icon">⏸️</div>
-      <div class="stat-content">
-        <span class="stat-label">Ngừng hoạt động</span>
-        <span class="stat-value">{{ stats.inactive }}</span>
-      </div>
+      <div class="stat-content"><span class="stat-label">Ngừng dùng</span><span class="stat-value">{{ stats.inactive }}</span></div>
     </div>
     <div class="stat-card card-goods">
-      <div class="stat-icon">📦</div>
-      <div class="stat-content">
-        <span class="stat-label">Hàng hóa</span>
-        <span class="stat-value">{{ stats.byGroup['GOODS'] || 0 }}</span>
-      </div>
-    </div>
-    <div class="stat-card card-service">
-      <div class="stat-icon">🔧</div>
-      <div class="stat-content">
-        <span class="stat-label">Dịch vụ</span>
-        <span class="stat-value">{{ stats.byGroup['SERVICE'] || 0 }}</span>
-      </div>
+      <div class="stat-icon">🧾</div>
+      <div class="stat-content"><span class="stat-label">Có MST</span><span class="stat-value">{{ stats.withTax }}</span></div>
     </div>
   </div>
 
@@ -62,30 +54,19 @@
     <div class="filter-row">
       <div class="filter-group filter-search">
         <label>Tìm kiếm</label>
-        <input type="text" [(ngModel)]="filter.search" (input)="onFilterChange()" placeholder="Mã NCC, tên, MST, SĐT...">
-      </div>
-      <div class="filter-group">
-        <label>Loại NCC</label>
-        <select [(ngModel)]="filter.supplierType" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let type of supplierTypes" [value]="type.value">{{ type.label }}</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>Nhóm NCC</label>
-        <select [(ngModel)]="filter.supplierGroup" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let group of supplierGroups" [value]="group.value">{{ group.label }}</option>
-        </select>
+        <input type="text" [(ngModel)]="search" (ngModelChange)="onFilterChange()" placeholder="Mã NCC, MST, tên (có hoặc không dấu)...">
       </div>
       <div class="filter-group">
         <label>Trạng thái</label>
-        <select [ngModel]="filter.status || ''" (ngModelChange)="onStatusFilterChange($event)">
+        <select [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
           <option value="">Tất cả</option>
-          <option value="ACTIVE">Đang hoạt động</option>
-          <option value="INACTIVE">Ngừng hoạt động</option>
+          <option value="ACTIVE">Đang dùng</option>
+          <option value="INACTIVE">Ngừng dùng</option>
         </select>
       </div>
+      @if (hasFilter) {
+        <button class="btn btn-secondary btn-sm" (click)="clearSearch()">Xóa lọc</button>
+      }
     </div>
   </div>
 
@@ -98,305 +79,221 @@
           <th class="col-code">Mã NCC</th>
           <th class="col-name">Tên nhà cung cấp</th>
           <th class="col-tax">MST</th>
-          <th class="col-type">Loại</th>
-          <th class="col-group">Nhóm</th>
+          <th class="col-address">Địa chỉ</th>
           <th class="col-phone">Điện thoại</th>
-          <th class="col-term">Hạn TT</th>
           <th class="col-status">Trạng thái</th>
           <th class="col-actions">Thao tác</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let supplier of filteredSuppliers; let i = index" [class.inactive]="supplier.status === 'INACTIVE'">
-          <td class="col-no">{{ i + 1 }}</td>
-          <td class="col-code"><span class="supplier-code">{{ supplier.code }}</span></td>
-          <td class="col-name">
-            <div class="supplier-info">
-              <span class="supplier-name">{{ supplier.name }}</span>
-              <span class="supplier-short" *ngIf="supplier.shortName">({{ supplier.shortName }})</span>
-            </div>
-          </td>
-          <td class="col-tax">{{ supplier.taxCode || '-' }}</td>
-          <td class="col-type">{{ getSupplierTypeLabel(supplier.supplierType) }}</td>
-          <td class="col-group">
-            <span class="group-badge" [class]="'group-' + supplier.supplierGroup.toLowerCase()">
-              {{ getSupplierGroupLabel(supplier.supplierGroup) }}
-            </span>
-          </td>
-          <td class="col-phone">{{ supplier.phone || '-' }}</td>
-          <td class="col-term">{{ supplier.paymentTermDays }} ngày</td>
-          <td class="col-status">
-            <span class="status-badge" [class]="getStatusClass(supplier.status)">{{ getStatusLabel(supplier.status) }}</span>
-          </td>
-          <td class="col-actions">
-            <div class="action-buttons">
-              <button class="btn-icon btn-view" title="Xem" (click)="viewDetail(supplier)">👁️</button>
-              <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(supplier)">✏️</button>
-              <button class="btn-icon btn-delete" title="Xóa" (click)="confirmDelete(supplier)">🗑️</button>
-            </div>
-          </td>
-        </tr>
+        @for (s of suppliers; track s.code; let i = $index) {
+          <tr [class.inactive]="s.status === 'INACTIVE'">
+            <td class="col-no">{{ i + 1 }}</td>
+            <td class="col-code"><span class="supplier-code">{{ s.code }}</span></td>
+            <td class="col-name"><span class="supplier-name">{{ s.name }}</span></td>
+            <td class="col-tax">{{ s.taxCode || '-' }}</td>
+            <td class="col-address">{{ s.address || '-' }}</td>
+            <td class="col-phone">{{ s.phone || '-' }}</td>
+            <td class="col-status"><span class="status-badge" [class]="getStatusClass(s.status)">{{ getStatusLabel(s.status) }}</span></td>
+            <td class="col-actions">
+              <div class="action-buttons">
+                <button class="btn-icon btn-view" title="Xem + lịch sử" (click)="viewDetail(s)">👁️</button>
+                <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(s)">✏️</button>
+                <button class="btn-icon btn-view" [title]="s.status === 'ACTIVE' ? 'Ngừng dùng' : 'Dùng lại'" (click)="toggleStatus(s)">
+                  {{ s.status === 'ACTIVE' ? '⏸️' : '▶️' }}
+                </button>
+                <button class="btn-icon btn-delete" title="Xóa hẳn" (click)="confirmDelete(s)">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        }
       </tbody>
     </table>
-    <div class="empty-state" *ngIf="filteredSuppliers.length === 0">
-      <div class="empty-icon">🏭</div>
-      <p>Không có nhà cung cấp nào</p>
-    </div>
+    @if (!loading && suppliers.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">🏭</div>
+        <p>{{ hasFilter ? 'Không có nhà cung cấp nào khớp bộ lọc' : 'Chưa có nhà cung cấp — bấm "Thêm NCC" hoặc "Tạo từ XML"' }}</p>
+      </div>
+    }
   </div>
 </div>
 
-<!-- CREATE/EDIT MODAL -->
-<div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
-  <div class="modal modal-large" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h2>{{ isEditMode ? 'Sửa nhà cung cấp' : 'Thêm nhà cung cấp mới' }}</h2>
-      <button class="btn-close" (click)="closeCreateModal()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <!-- Basic Info -->
-      <div class="form-section">
-        <h3 class="section-title">Thông tin cơ bản</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Mã NCC <span class="required">*</span></label>
-            <input type="text" [(ngModel)]="formData.code" [disabled]="isEditMode">
-          </div>
-          <div class="form-group col-span-2">
-            <label>Tên nhà cung cấp <span class="required">*</span></label>
-            <input type="text" [(ngModel)]="formData.name" placeholder="Nhập tên NCC">
-          </div>
-          <div class="form-group">
-            <label>Tên viết tắt</label>
-            <input type="text" [(ngModel)]="formData.shortName">
-          </div>
-          <div class="form-group">
-            <label>Loại NCC</label>
-            <select [(ngModel)]="formData.supplierType">
-              <option *ngFor="let type of supplierTypes" [value]="type.value">{{ type.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Nhóm NCC</label>
-            <select [(ngModel)]="formData.supplierGroup">
-              <option *ngFor="let group of supplierGroups" [value]="group.value">{{ group.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Trạng thái</label>
-            <select [(ngModel)]="formData.status">
-              <option *ngFor="let s of supplierStatus" [value]="s.value">{{ s.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Mã số thuế</label>
-            <input type="text" [(ngModel)]="formData.taxCode" placeholder="0123456789">
+<!-- CREATE / EDIT MODAL -->
+@if (showFormModal) {
+  <div class="modal-overlay" (click)="closeFormModal()">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ isEditMode ? 'Sửa nhà cung cấp ' + selected?.code : 'Thêm nhà cung cấp' }}</h2>
+        <button class="btn-close" (click)="closeFormModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        @if (formError) {
+          <div class="page-alert alert-error"><span><i class="fa-solid fa-circle-exclamation"></i> {{ formError }}</span></div>
+        }
+        <div class="form-section">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Mã NCC</label>
+              <input type="text" [(ngModel)]="form.code" [disabled]="isEditMode" placeholder="Để trống = tự cấp" maxlength="20">
+              @if (!isEditMode) { <span class="form-hint">Mã không sửa được sau khi tạo</span> }
+            </div>
+            <div class="form-group col-span-2">
+              <label>Tên nhà cung cấp <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.name" placeholder="Nhập tên NCC">
+            </div>
+            <div class="form-group">
+              <label>Trạng thái</label>
+              <select [(ngModel)]="form.status">
+                <option value="ACTIVE">Đang dùng</option>
+                <option value="INACTIVE">Ngừng dùng</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Mã số thuế</label>
+              <input type="text" [(ngModel)]="form.taxCode" (blur)="onTaxCodeBlur()" placeholder="10 / 10-3 / 12 số">
+            </div>
+            <div class="form-group col-span-3">
+              <label>Địa chỉ</label>
+              <input type="text" [(ngModel)]="form.address">
+            </div>
+            @if (taxDuplicate) {
+              <div class="form-group col-span-4">
+                <span class="form-warn">MST này đã dùng cho nhà cung cấp <b>{{ taxDuplicate.code }}</b> — {{ taxDuplicate.name }}.</span>
+              </div>
+            }
+            @if (taxSuggestion) {
+              <div class="form-group col-span-4">
+                <span class="form-suggest">
+                  MST này đã có ở {{ roleName(taxSuggestion) }} <b>{{ taxSuggestion.code }}</b> — {{ taxSuggestion.name }}.
+                  <button class="btn btn-secondary btn-sm" (click)="applySuggestion()">Điền sẵn tên / địa chỉ</button>
+                </span>
+              </div>
+            }
+            <div class="form-group">
+              <label>Điện thoại</label>
+              <input type="text" [(ngModel)]="form.phone">
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" [(ngModel)]="form.email">
+            </div>
+            <div class="form-group col-span-2">
+              <label>Ghi chú</label>
+              <input type="text" [(ngModel)]="form.note">
+            </div>
           </div>
         </div>
       </div>
-
-      <!-- Address -->
-      <div class="form-section">
-        <h3 class="section-title">Địa chỉ</h3>
-        <div class="form-grid">
-          <div class="form-group col-span-3">
-            <label>Địa chỉ <span class="required">*</span></label>
-            <input type="text" [(ngModel)]="formData.address" placeholder="Số nhà, đường...">
-          </div>
-          <div class="form-group">
-            <label>Phường/Xã</label>
-            <input type="text" [(ngModel)]="formData.ward">
-          </div>
-          <div class="form-group">
-            <label>Quận/Huyện</label>
-            <input type="text" [(ngModel)]="formData.district">
-          </div>
-          <div class="form-group">
-            <label>Tỉnh/Thành phố</label>
-            <input type="text" [(ngModel)]="formData.province">
-          </div>
-        </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeFormModal()" [disabled]="saving">Hủy</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving">
+          {{ saving ? 'Đang lưu...' : (isEditMode ? 'Lưu' : 'Thêm') }}
+        </button>
       </div>
-
-      <!-- Contact -->
-      <div class="form-section">
-        <h3 class="section-title">Liên hệ</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Điện thoại</label>
-            <input type="text" [(ngModel)]="formData.phone">
-          </div>
-          <div class="form-group">
-            <label>Email</label>
-            <input type="email" [(ngModel)]="formData.email">
-          </div>
-          <div class="form-group">
-            <label>Website</label>
-            <input type="text" [(ngModel)]="formData.website">
-          </div>
-          <div class="form-group">
-            <label>Fax</label>
-            <input type="text" [(ngModel)]="formData.fax">
-          </div>
-        </div>
-      </div>
-
-      <!-- Payment Terms -->
-      <div class="form-section">
-        <h3 class="section-title">Điều khoản thanh toán</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Số ngày được nợ</label>
-            <input type="number" [(ngModel)]="formData.paymentTermDays" min="0">
-          </div>
-          <div class="form-group">
-            <label>Hạn mức công nợ</label>
-            <input type="number" [(ngModel)]="formData.creditLimit" min="0">
-          </div>
-          <div class="form-group">
-            <label>TK công nợ</label>
-            <input type="text" [(ngModel)]="formData.accountCode" value="331">
-          </div>
-        </div>
-      </div>
-
-      <!-- Contacts -->
-      <div class="form-section">
-        <div class="section-header">
-          <h3 class="section-title">Người liên hệ</h3>
-          <button class="btn btn-secondary btn-sm" (click)="addContact()">+ Thêm</button>
-        </div>
-        <div class="contacts-list" *ngIf="formContacts.length > 0">
-          <div class="contact-item" *ngFor="let contact of formContacts; let i = index">
-            <input type="text" [(ngModel)]="contact.name" placeholder="Họ tên">
-            <input type="text" [(ngModel)]="contact.position" placeholder="Chức vụ">
-            <input type="text" [(ngModel)]="contact.phone" placeholder="Điện thoại">
-            <input type="email" [(ngModel)]="contact.email" placeholder="Email">
-            <button class="btn-icon btn-remove" (click)="removeContact(i)">✕</button>
-          </div>
-        </div>
-        <p class="empty-text" *ngIf="formContacts.length === 0">Chưa có người liên hệ</p>
-      </div>
-
-      <!-- Bank Accounts -->
-      <div class="form-section">
-        <div class="section-header">
-          <h3 class="section-title">Tài khoản ngân hàng</h3>
-          <button class="btn btn-secondary btn-sm" (click)="addBankAccount()">+ Thêm</button>
-        </div>
-        <div class="bank-list" *ngIf="formBankAccounts.length > 0">
-          <div class="bank-item" *ngFor="let bank of formBankAccounts; let i = index">
-            <input type="text" [(ngModel)]="bank.bankName" placeholder="Tên ngân hàng">
-            <input type="text" [(ngModel)]="bank.accountNumber" placeholder="Số tài khoản">
-            <input type="text" [(ngModel)]="bank.accountHolder" placeholder="Chủ tài khoản">
-            <input type="text" [(ngModel)]="bank.branch" placeholder="Chi nhánh">
-            <button class="btn-icon btn-remove" (click)="removeBankAccount(i)">✕</button>
-          </div>
-        </div>
-        <p class="empty-text" *ngIf="formBankAccounts.length === 0">Chưa có tài khoản ngân hàng</p>
-      </div>
-
-      <!-- Note -->
-      <div class="form-section">
-        <div class="form-group">
-          <label>Ghi chú</label>
-          <textarea [(ngModel)]="formData.note" rows="2"></textarea>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="closeCreateModal()">Hủy</button>
-      <button class="btn btn-primary" (click)="saveSupplier()" [disabled]="loading">
-        {{ loading ? 'Đang lưu...' : (isEditMode ? 'Cập nhật' : 'Thêm mới') }}
-      </button>
     </div>
   </div>
-</div>
+}
 
 <!-- DETAIL MODAL -->
-<div class="modal-overlay" *ngIf="showDetailModal && selectedSupplier" (click)="closeDetailModal()">
-  <div class="modal modal-large" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h2>Chi tiết NCC: {{ selectedSupplier.code }}</h2>
-      <button class="btn-close" (click)="closeDetailModal()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="detail-grid">
-        <div class="detail-section">
-          <h4>Thông tin cơ bản</h4>
-          <div class="detail-item"><label>Mã NCC:</label><span>{{ selectedSupplier.code }}</span></div>
-          <div class="detail-item"><label>Tên:</label><span>{{ selectedSupplier.name }}</span></div>
-          <div class="detail-item" *ngIf="selectedSupplier.shortName"><label>Viết tắt:</label><span>{{ selectedSupplier.shortName }}</span></div>
-          <div class="detail-item"><label>Loại:</label><span>{{ getSupplierTypeLabel(selectedSupplier.supplierType) }}</span></div>
-          <div class="detail-item"><label>Nhóm:</label><span>{{ getSupplierGroupLabel(selectedSupplier.supplierGroup) }}</span></div>
-          <div class="detail-item" *ngIf="selectedSupplier.taxCode"><label>MST:</label><span>{{ selectedSupplier.taxCode }}</span></div>
-          <div class="detail-item"><label>Trạng thái:</label><span class="status-badge" [class]="getStatusClass(selectedSupplier.status)">{{ getStatusLabel(selectedSupplier.status) }}</span></div>
+@if (showDetailModal && selected) {
+  <div class="modal-overlay" (click)="closeDetailModal()">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Nhà cung cấp {{ selected.code }}</h2>
+        <button class="btn-close" (click)="closeDetailModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h4>Thông tin</h4>
+            <div class="detail-item"><label>Mã:</label><span>{{ selected.code }}</span></div>
+            <div class="detail-item"><label>Tên:</label><span>{{ selected.name }}</span></div>
+            <div class="detail-item"><label>MST:</label><span>{{ selected.taxCode || '-' }}</span></div>
+            <div class="detail-item"><label>Trạng thái:</label><span class="status-badge" [class]="getStatusClass(selected.status)">{{ getStatusLabel(selected.status) }}</span></div>
+          </div>
+          <div class="detail-section">
+            <h4>Liên hệ</h4>
+            <div class="detail-item"><label>Địa chỉ:</label><span>{{ selected.address || '-' }}</span></div>
+            <div class="detail-item"><label>Điện thoại:</label><span>{{ selected.phone || '-' }}</span></div>
+            <div class="detail-item"><label>Email:</label><span>{{ selected.email || '-' }}</span></div>
+          </div>
+          <div class="detail-section">
+            <h4>Sửa lần cuối</h4>
+            <div class="detail-item"><label>Lúc:</label><span>{{ selected.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span></div>
+            <div class="detail-item"><label>Bởi:</label><span>{{ selected.updatedBy }}</span></div>
+            <div class="detail-item"><label>Tạo bởi:</label><span>{{ selected.createdBy }}</span></div>
+          </div>
         </div>
-        <div class="detail-section">
-          <h4>Địa chỉ & Liên hệ</h4>
-          <div class="detail-item"><label>Địa chỉ:</label><span>{{ formatFullAddress(selectedSupplier) }}</span></div>
-          <div class="detail-item" *ngIf="selectedSupplier.phone"><label>Điện thoại:</label><span>{{ selectedSupplier.phone }}</span></div>
-          <div class="detail-item" *ngIf="selectedSupplier.email"><label>Email:</label><span>{{ selectedSupplier.email }}</span></div>
-          <div class="detail-item" *ngIf="selectedSupplier.website"><label>Website:</label><span>{{ selectedSupplier.website }}</span></div>
+        @if (selected.note) {
+          <div class="detail-note"><h4>Ghi chú</h4><p>{{ selected.note }}</p></div>
+        }
+
+        <div class="history-section">
+          <div class="section-header">
+            <h3 class="section-title">Lịch sử thay đổi</h3>
+            <button class="btn btn-secondary btn-sm" (click)="loadHistory()" [disabled]="historyLoading">
+              {{ historyLoading ? 'Đang tải...' : (history.length ? 'Tải lại' : 'Xem lịch sử') }}
+            </button>
+          </div>
+          @if (historyError) { <p class="form-warn">{{ historyError }}</p> }
+          @for (h of history; track h.id) {
+            <div class="history-item">
+              <div class="history-head">
+                <span class="history-action" [class]="'action-' + h.action">{{ getActionLabel(h.action) }}</span>
+                <span>{{ h.at | date:'dd/MM/yyyy HH:mm:ss' }}</span>
+                <span class="history-user">{{ h.userEmail }}</span>
+              </div>
+              @if (h.changes.length) {
+                <ul class="history-changes">
+                  @for (c of h.changes; track c.field) {
+                    <li><b>{{ getFieldLabel(c.field) }}</b>: {{ formatValue(c.field, c.old) }} → {{ formatValue(c.field, c.new) }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          }
         </div>
-        <div class="detail-section">
-          <h4>Điều khoản thanh toán</h4>
-          <div class="detail-item"><label>Số ngày nợ:</label><span>{{ selectedSupplier.paymentTermDays }} ngày</span></div>
-          <div class="detail-item"><label>Hạn mức CN:</label><span>{{ formatCurrency(selectedSupplier.creditLimit) }}</span></div>
-          <div class="detail-item"><label>TK công nợ:</label><span>{{ selectedSupplier.accountCode }}</span></div>
-        </div>
       </div>
-      <div class="detail-list" *ngIf="selectedSupplier.contacts && selectedSupplier.contacts.length > 0">
-        <h4>Người liên hệ</h4>
-        <table class="sub-table">
-          <thead><tr><th>Họ tên</th><th>Chức vụ</th><th>Điện thoại</th><th>Email</th></tr></thead>
-          <tbody>
-            <tr *ngFor="let c of selectedSupplier.contacts">
-              <td>{{ c.name }}</td><td>{{ c.position || '-' }}</td><td>{{ c.phone || '-' }}</td><td>{{ c.email || '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+        <button class="btn btn-primary" (click)="openEditModal(selected)">Sửa</button>
       </div>
-      <div class="detail-list" *ngIf="selectedSupplier.bankAccounts && selectedSupplier.bankAccounts.length > 0">
-        <h4>Tài khoản ngân hàng</h4>
-        <table class="sub-table">
-          <thead><tr><th>Ngân hàng</th><th>Số TK</th><th>Chủ TK</th><th>Chi nhánh</th></tr></thead>
-          <tbody>
-            <tr *ngFor="let b of selectedSupplier.bankAccounts">
-              <td>{{ b.bankName }}</td><td>{{ b.accountNumber }}</td><td>{{ b.accountHolder }}</td><td>{{ b.branch || '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="detail-note" *ngIf="selectedSupplier.note">
-        <h4>Ghi chú</h4>
-        <p>{{ selectedSupplier.note }}</p>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
-      <button class="btn btn-primary" (click)="openEditModal(selectedSupplier); closeDetailModal()">Sửa</button>
     </div>
   </div>
-</div>
+}
 
 <!-- DELETE CONFIRM -->
-<div class="modal-overlay" *ngIf="showDeleteConfirm" (click)="showDeleteConfirm = false">
-  <div class="modal modal-small" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h2>Xác nhận xóa</h2>
-      <button class="btn-close" (click)="showDeleteConfirm = false">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="warning-message">
-        <span class="warning-icon">⚠️</span>
-        <p>Bạn có chắc muốn xóa NCC <strong>{{ selectedSupplier?.name }}</strong>?</p>
+@if (showDeleteConfirm && selected) {
+  <div class="modal-overlay" (click)="cancelDelete()">
+    <div class="modal modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Xóa nhà cung cấp</h2>
+        <button class="btn-close" (click)="cancelDelete()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="warning-message">
+          <span class="warning-icon">⚠️</span>
+          <p>Xóa hẳn <strong>{{ selected.code }} — {{ selected.name }}</strong>? Lịch sử vẫn được giữ.
+            Đã có phát sinh thì không xóa được — dùng <b>Ngừng dùng</b>.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="cancelDelete()" [disabled]="saving">Hủy</button>
+        <button class="btn btn-danger" (click)="deleteSelected()" [disabled]="saving">{{ saving ? 'Đang xóa...' : 'Xóa' }}</button>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="showDeleteConfirm = false">Hủy</button>
-      <button class="btn btn-danger" (click)="deleteSupplier()">Xóa</button>
+  </div>
+}
+
+<!-- TẠO TỪ XML -->
+@if (showImport) {
+  <div class="modal-overlay">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-body">
+        <app-partner-xml-import role="SUPPLIER" (imported)="onImported($event)" (closed)="closeImport()"></app-partner-xml-import>
+      </div>
     </div>
   </div>
-</div>
+}
 
-<div class="loading-overlay" *ngIf="loading"><div class="spinner"></div></div>
+@if (loading) { <div class="loading-bar"></div> }

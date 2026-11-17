@@ -15,32 +15,33 @@ import {
 const LOG = '[ItemMapping]';
 const KEY = 'Khóa (không sửa)';
 
-type ColKind = 'text' | 'num' | 'check' | 'master' | 'factor' | 'vietda' | 'vdfactor' | 'qty';
-interface Col { header: string; label: string; kind: ColKind; width: number; filter?: boolean; vaoOnly?: boolean; }
+type ColKind = 'text' | 'num' | 'check' | 'master' | 'factor' | 'qty';
+/** full: chỉ hiện khi bật "Hiện đủ cột" (14/11/2026 — bảng gọn mặc định) */
+interface Col { header: string; label: string; kind: ColKind; width: number; filter?: boolean; vaoOnly?: boolean; full?: boolean; }
+const FULL_KEY = 'itemMapping.fullColumns';
 
 /** Cột hiện trên trang (bảng BE có đủ cột MAP_HEADERS của script) */
 const COLUMNS: Col[] = [
   { header: 'Đã kiểm (x)', label: 'Đã kiểm', kind: 'check', width: 60 },
-  { header: 'Mã hàng (HĐ)', label: 'Mã hàng (HĐ)', kind: 'text', width: 110, filter: true },
+  { header: 'Mã hàng (HĐ)', label: 'Mã hàng (HĐ)', kind: 'text', width: 110, filter: true, full: true },
   { header: 'Tên hàng (HĐ)', label: 'Tên hàng (HĐ)', kind: 'text', width: 280, filter: true },
   { header: 'ĐVT (HĐ)', label: 'ĐVT', kind: 'text', width: 60 },
   { header: 'Tên người bán', label: 'Người bán', kind: 'text', width: 180, filter: true, vaoOnly: true },
-  { header: 'Số dòng', label: 'Số dòng', kind: 'num', width: 60 },
-  { header: 'Tổng SL (HĐ)', label: 'Tổng SL', kind: 'num', width: 70 },
+  { header: 'Số dòng', label: 'Số dòng', kind: 'num', width: 60, full: true },
+  { header: 'Tổng SL (HĐ)', label: 'Tổng SL', kind: 'num', width: 70, full: true },
   { header: 'Mã master', label: 'Mã master', kind: 'master', width: 150, filter: true },
   { header: 'Tên master', label: 'Tên master', kind: 'text', width: 240 },
   { header: 'ĐVT master', label: 'ĐVT master', kind: 'text', width: 70 },
   { header: 'Hệ số quy đổi', label: 'Hệ số', kind: 'factor', width: 80 },
-  { header: 'Tổng SL quy đổi', label: 'SL quy đổi', kind: 'qty', width: 80 },
-  { header: 'Mã Vietda', label: 'Mã Vietda', kind: 'vietda', width: 110, filter: true },
-  { header: 'Tên Vietda', label: 'Tên Vietda', kind: 'text', width: 200 },
-  { header: 'ĐVT Vietda', label: 'ĐVT Vietda', kind: 'text', width: 70 },
-  { header: 'Hệ số Vietda', label: 'Hệ số Vietda', kind: 'vdfactor', width: 90 },
-  { header: 'Cách ghép', label: 'Cách ghép', kind: 'text', width: 130, filter: true },
-  { header: 'Độ tin cậy', label: 'Tin cậy', kind: 'num', width: 60 },
+  { header: 'Tổng SL quy đổi', label: 'SL quy đổi', kind: 'qty', width: 80, full: true },
+  { header: 'Mã Vietda', label: 'Mã HH', kind: 'text', width: 90, filter: true, full: true },
+  { header: 'Tên Vietda', label: 'Tên HH', kind: 'text', width: 200, full: true },
+  { header: 'ĐVT Vietda', label: 'ĐVT HH', kind: 'text', width: 70, full: true },
+  { header: 'Cách ghép', label: 'Cách ghép', kind: 'text', width: 130, filter: true, full: true },
+  { header: 'Độ tin cậy', label: 'Tin cậy', kind: 'num', width: 60, full: true },
   { header: 'Cần xem', label: 'Cần xem', kind: 'text', width: 300, filter: true },
-  { header: 'Gợi ý khác', label: 'Gợi ý khác', kind: 'text', width: 260 },
-  { header: 'Đã lưu', label: 'Đã lưu', kind: 'text', width: 60 },
+  { header: 'Gợi ý khác', label: 'Gợi ý khác', kind: 'text', width: 260, full: true },
+  { header: 'Đã lưu', label: 'Đã lưu', kind: 'text', width: 60, full: true },
 ];
 /** Lọc nhanh theo nội dung cột "Cần xem" (cờ của script) */
 const QUICK = [
@@ -49,7 +50,6 @@ const QUICK = [
   { label: 'Thiếu hệ số', value: 'thieu he so' },
   { label: 'Tin cậy thấp', value: 'tin cay thap' },
   { label: 'Lệch ĐVT', value: 'dvt' },
-  { label: 'Thiếu hệ số Vietda', value: 'thieu he so vietda' },
 ];
 const QTY_FMT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 });
 
@@ -67,7 +67,7 @@ const isBadFactor = (f: number | null) => f !== null && !(f > 0);
 
 /**
  * TIỆN ÍCH — ÁNH XẠ HÀNG HÓA (plan-doi-soat-web.md bước 4)
- * Sửa Mã master / Hệ số / Mã Vietda / Đã kiểm của mặt hàng trên HĐ → lưu máy chủ → Chạy lại đối soát (không tải lại XML).
+ * Sửa Mã master / Hệ số / Đã kiểm (Mã HH đi theo Mã master — 14/11/2026 bỏ sửa Mã / Hệ số Vietda) của mặt hàng trên HĐ → lưu máy chủ → Chạy lại đối soát (không tải lại XML).
  */
 @Component({
   selector: 'app-item-mapping-page',
@@ -92,12 +92,12 @@ export class ItemMappingPageComponent implements OnInit {
   query: TabQuery = this.emptyQuery();
   filters: { [header: string]: string } = {};
   quickValue = '';
+  fullColumns = this.readFull();
   col: { [header: string]: number } = {};
 
   /** khóa dòng → giá trị đang sửa (chưa lưu) */
   edits = new Map<string, MappingEdit>();
   factorText = new Map<string, string>();
-  vdFactorText = new Map<string, string>();
 
   loading = false;
   saving = false;
@@ -153,7 +153,17 @@ export class ItemMappingPageComponent implements OnInit {
   // ───────────────────────────── lần chạy + bảng
 
   get columns(): Col[] {
-    return COLUMNS.filter(c => !c.vaoOnly || this.activeTab === 'anh-xa-dau-vao');
+    return COLUMNS.filter(c => (!c.vaoOnly || this.activeTab === 'anh-xa-dau-vao') && (!c.full || this.fullColumns));
+  }
+
+  toggleFull(): void {
+    this.fullColumns = !this.fullColumns;
+    console.info(`${LOG} ${this.fullColumns ? 'Hiện đủ cột' : 'Bảng gọn'}`);
+    try { localStorage.setItem(FULL_KEY, this.fullColumns ? '1' : ''); } catch (e) { console.warn(`${LOG} Không lưu được lựa chọn cột:`, e); }
+  }
+
+  private readFull(): boolean {
+    try { return localStorage.getItem(FULL_KEY) === '1'; } catch (e) { console.warn(`${LOG} Không đọc được lựa chọn cột:`, e); return false; }
   }
 
   get pageCount(): number {
@@ -161,7 +171,7 @@ export class ItemMappingPageComponent implements OnInit {
   }
 
   get invalidCount(): number {
-    return [...this.edits.values()].filter(e => isBadFactor(e.he_so) || isBadFactor(e.he_so_vietda)).length;
+    return [...this.edits.values()].filter(e => isBadFactor(e.he_so)).length;
   }
 
   tabCount(key: string): number {
@@ -176,8 +186,7 @@ export class ItemMappingPageComponent implements OnInit {
     if (id === this.run?.id || !this.canLeave()) return;
     this.edits.clear();
     this.factorText.clear();
-    this.vdFactorText.clear();
-    this.router.navigate([], { relativeTo: this.route, queryParams: { run: id } });
+        this.router.navigate([], { relativeTo: this.route, queryParams: { run: id } });
   }
 
   private openRun(id: string): void {
@@ -339,30 +348,8 @@ export class ItemMappingPageComponent implements OnInit {
     return !!e && isBadFactor(e.he_so);
   }
 
-  /** Hệ số Vietda máy gợi ý có thể là 1/48 → hiện tối đa 6 số lẻ */
-  vdFactorValue(row: any[]): string {
-    const k = this.key(row);
-    if (this.vdFactorText.has(k)) return this.vdFactorText.get(k)!;
-    const f = this.current(row).he_so_vietda;
-    return f === null || f === undefined ? '' : String(Number(f.toFixed(6))).replace('.', ',');
-  }
-
-  isVdFactorInvalid(row: any[]): boolean {
-    const e = this.edits.get(this.key(row));
-    return !!e && isBadFactor(e.he_so_vietda);
-  }
-
-  setVdFactor(row: any[], text: string): void {
-    this.vdFactorText.set(this.key(row), text);
-    this.update(row, { he_so_vietda: parseFactor(text) });
-  }
-
   setMaster(row: any[], value: string): void {
     this.update(row, { ma_master: value.trim() });
-  }
-
-  setVietda(row: any[], value: string): void {
-    this.update(row, { ma_vietda: value.trim() });
   }
 
   setChecked(row: any[], value: boolean): void {
@@ -378,13 +365,11 @@ export class ItemMappingPageComponent implements OnInit {
     const k = this.key(row);
     const next: MappingEdit = { ...this.current(row), ...patch };
     const orig = this.fromRow(row);
-    // Hệ số Vietda hiện 6 số lẻ (1/48 = 0,020833) → sai số hiển thị không tính là sửa
     const same = next.ma_master === orig.ma_master && next.ma_vietda === orig.ma_vietda && next.da_kiem === orig.da_kiem
       && sameFactor(next.he_so, orig.he_so, 1e-9) && sameFactor(next.he_so_vietda, orig.he_so_vietda, 1e-6);
     if (same) {
       this.edits.delete(k);
       this.factorText.delete(k);
-      this.vdFactorText.delete(k);
     } else {
       this.edits.set(k, next);
     }
@@ -396,7 +381,6 @@ export class ItemMappingPageComponent implements OnInit {
     const k = this.key(row);
     this.edits.delete(k);
     this.factorText.delete(k);
-    this.vdFactorText.delete(k);
   }
 
   discard(): void {
@@ -404,14 +388,13 @@ export class ItemMappingPageComponent implements OnInit {
     console.info(`${LOG} Bỏ ${this.edits.size} thay đổi chưa lưu`);
     this.edits.clear();
     this.factorText.clear();
-    this.vdFactorText.clear();
   }
 
   save(): void {
     const run = this.run;
     if (!run || !this.edits.size || this.saving) return;
     if (this.invalidCount) {
-      this.error = `Có ${this.invalidCount} dòng Hệ số / Hệ số Vietda không hợp lệ (phải là số > 0, để trống = chưa ánh xạ).`;
+      this.error = `Có ${this.invalidCount} dòng Hệ số không hợp lệ (phải là số > 0, để trống = chưa ánh xạ).`;
       console.warn(`${LOG} Không lưu: ${this.invalidCount} hệ số không hợp lệ`);
       return;
     }
@@ -423,7 +406,6 @@ export class ItemMappingPageComponent implements OnInit {
         this.saving = false;
         this.edits.clear();
         this.factorText.clear();
-        this.vdFactorText.clear();
         this.message = `Đã lưu ${edits.length} dòng (${r.saved} dòng giữ lại cho lần sau${r.removed ? `, ${r.removed} dòng trở về gợi ý của máy` : ''}). `
           + 'Bấm "Chạy lại đối soát" để cập nhật kết quả.';
         this.load();

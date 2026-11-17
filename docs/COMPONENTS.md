@@ -303,7 +303,26 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
 - **Mã HH tự cấp** (BE `TapHoa39KeToanBackEnd/docs/RECONCILIATION.md`): "Cập nhật bảng quy đổi" = lấy lại KiotViet + máy tự cấp
   mã HH (từ HH3212, không trùng) cho mã master mới; trang chỉ hiện 1 dòng số mã / mã tiếp theo. Danh sách mã lưu IndexedDB
   `hh-codes` (`ReconciliationService.hhCodes()` tải lại khi `version` máy chủ đổi). Bản sao XML chỉ ghi mã HH, ĐVT nhỏ nhất;
-  `QUYDOI*.xlsx` trong thư mục không còn dùng. Không có nhập danh mục Vietda (user: mã Vietda kế toán tự gõ, không quy luật).
+  `QUYDOI*.xlsx` trong thư mục không còn dùng. ~~Không có nhập danh mục Vietda~~ → xem dòng dưới (14/11/2026).
+- **Danh mục Vật tư hàng hóa Vietda** (14/11/2026 — BE có từ 04/11 nhưng FE chưa nối → prod toàn mã tự cấp, Vietda sinh mã
+  trùng): nút "Tải danh mục Vietda (.xlsx)" → `ReconciliationService.uploadOldCatalog()` → `POST /api/vietda-codes/old-catalog`
+  (máy ghép mã HH/KM cũ: tên trùng + ĐVT = ĐVT nhỏ nhất, 1-1); dòng trạng thái đọc `status.old` + `status.sources`
+  (vietda + manual = số mã master dùng mã cũ). "Mã cũ chưa ghép" → `oldUnmatched()` (`GET old-unmatched`): bảng mã cũ + lý do +
+  3 gợi ý mã master; bấm gợi ý hoặc gõ mã master → `setManualCode()` (`PUT manual`). Bảng lọc trên máy, hiện 100 dòng đầu
+  (≤ vài nghìn dòng, không dùng server-table). Sau khi tải / gán: Đối soát lại → Tải XML quy đổi. BE chỉ nhận mã bắt đầu HH/KM.
+- **Hàng chưa có mã HH** (16/11/2026 — kế toán chốt máy KHÔNG tự cấp mã): lần chạy có `run.hh_missing > 0` → thay nút "Tải XML
+  quy đổi" bằng cảnh báo (BE trả 409) + bảng `hhMissing(id)` (`GET /runs/{id}/hh-missing`, tính lại theo bảng mã hiện tại):
+  mã master, tên, ĐVT nhỏ nhất, số dòng HĐ vào / ra, ≤ 5 gợi ý mã Vietda (bấm = `setManualCode`), ô gõ mã. **Gán chung**: tick
+  nhiều dòng (lọc không dấu, tick cả trang hiện) + 1 mã → gán lần lượt (1 mã HH cho nhiều mã KiotViet, vd các vị Mỳ Hảo Hảo).
+  "Tải Excel" → `downloadHhMissing()` (`/hh-missing/export`) cho kế toán thêm mã vào Vietda. Gán xong / tải lại danh mục → đối
+  soát lại thư mục XML (lần chạy này không có XML quy đổi). Bỏ dòng "mã mới tiếp theo" / "cấp mới".
+- **Mã cũ chưa ghép — gán nhiều mã master** (17/11/2026): gán 1 mã cũ không xóa dòng nữa; nút đã gán có ✓ (`assignedOld`), bấm
+  tiếp gợi ý khác / gõ mã master khác để dùng chung 1 mã HH (vd 3 vị Mì Siukay), bấm **Xong** (`finishOld`) để ẩn dòng.
+- **Mã HH đã ghép** (17/11/2026, nút cạnh "Mã cũ chưa ghép"): `assignedCodes()` (`GET /api/vietda-codes/assigned`) → bảng mã
+  master ↔ mã HH (tên + ĐVT KiotViet / Vietda, nguồn máy ghép / gán tay, số mã master dùng chung, cờ đáng ngờ của BE: quy cách
+  ml/g khác, tên khác xa, ĐVT lệch, sai loại HH/KM, không còn trên KiotViet). Lọc nhanh Đáng ngờ (mặc định) / Dùng chung mã /
+  Gán tay / Tất cả + ô lọc không dấu, hiện 100 dòng đầu. Mỗi dòng: gõ mã → **Đổi**, **Bỏ gán** (confirm; mã master về "chưa có
+  mã HH") qua `setManualCode`, xong tải lại bảng. "Tải Excel" → `downloadAssignedCodes()` (`/assigned/export`).
 - **Kỳ "Toàn bộ HĐ trong thư mục"** (mặc định, 02/11/2026): gửi `toan_bo=true` → BE lấy kỳ = ngày HĐ sớm nhất → muộn nhất.
   Lý do: thư mục MuaVao (tháng 9–10) + BanRa (tháng 11) bị "tự nhận quý" chọn Q4 → bỏ 16/20 HĐ vào tháng 9.
 - **ZIP XML quy đổi tách hình thức thanh toán**: `Dau vao (quy doi)/Chuyen khoan|Tien mat/…`, `Dau ra (quy doi)/…` —
@@ -488,6 +507,10 @@ chưa có bản lưu. 2 tab, chip Tất cả / Lệch / Ghi chú lệch, ô tìm
   lọc; hoàn tác từng dòng hoặc "Bỏ thay đổi"; rời trang / đóng tab khi chưa lưu → hỏi lại.
 - **Lưu** → `PUT /runs/{id}/mapping` (cột "Đã lưu" = Có) → **Chạy lại đối soát** → mở lần chạy mới ở trang Đối soát.
 - Trang Đối soát có nút "Sửa ánh xạ hàng hóa (n cần xem)"; lần chạy lại ghi "Chạy lại" và ẩn nút tải XML quy đổi.
+- (14/11/2026) **Bảng gọn mặc định**: chỉ Đã kiểm · Tên HĐ · ĐVT · Người bán · Mã master · Tên/ĐVT master · Hệ số · Cần xem; nút
+  "Hiện đủ cột" (nhớ ở `localStorage` `itemMapping.fullColumns`) hiện thêm SL, Mã/Tên/ĐVT HH, cách ghép, tin cậy, gợi ý khác, đã lưu.
+  **Bỏ sửa Mã Vietda / Hệ số Vietda** (chỉ đọc, cột "Mã HH"): web chạy `master_mode` → mã HH luôn theo Mã master, giá trị sửa tay bị
+  BE bỏ qua; gán mã cũ Vietda ở bảng "Mã cũ chưa ghép" trang Đối soát. Bỏ chip lọc "Thiếu hệ số Vietda".
 
 ## ServerTableComponent — bảng phân trang phía máy chủ (23/10/2026)
 

@@ -242,8 +242,10 @@ VietDA: MST '0304762338' | XML: MST '0499000002' (cảnh báo)
 | Ký hiệu / Số hóa đơn | theo XML — Ký hiệu = KHHDon (`C26MFD`, số mẫu `1` nằm ô Mã\|Mẫu HĐ như ảnh kế toán 10/11/2026); `1C26MFD` cũng tính đúng |
 | Phương thức TT | cùng loại với XML (`CK`/`Chuyển khoản`, `TM`/`Tiền mặt`); tool sửa thì chọn đúng chữ XML nếu ô có mục đó |
 | Ghi nợ / Ghi có | CK (công nợ) → `131` / `33311`; TM → `1111` (111x đều đúng) / `33311`. Dòng hàng Có `5111` |
-| Số hóa đơn dòng hàng | cột "Số hóa đơn" (sau Tổng tiền) mọi dòng = Số HĐ — **chỉ báo, sửa tay** (2 phiếu mẫu kế toán 13/11/2026) |
-| Thanh toán / Còn nợ (góc dưới) | tiền mặt: Thanh toán = Tổng hóa đơn, Còn nợ 0 · chuyển khoản: Thanh toán 0, Còn nợ = Tổng — **chỉ báo, sửa tay** |
+| Số hóa đơn dòng hàng | cột "Số hóa đơn" (sau Tổng tiền) mọi dòng = Số HĐ — VietDA **tự điền** khi sửa Số HĐ đầu phiếu; tool chỉ báo nếu còn sai (2 phiếu mẫu kế toán 13/11/2026) |
+| Thanh toán / Còn nợ (góc dưới) | tiền mặt: Thanh toán = Tổng hóa đơn, Còn nợ 0 · chuyển khoản: Thanh toán 0, Còn nợ = Tổng. Ô này **không gõ tay được** (Lưu báo "Dữ liệu không thay đổi") — tiền mặt: **tool -Fix bấm "Thu tiền"** (14/11/2026); chuyển khoản mà Thanh toán ≠ 0 → chỉ báo, sửa tay |
+| Tiền thuế (đầu phiếu) | = TgTThue XML. Tiền hàng khớp XML mà thuế lệch ≤ 10 đ (VietDA cộng thuế từng dòng → tổng 19.999 / 20.001) → **tool -Fix sửa ô Tiền thuế**; VietDA tự dồn phần lệch vào 1 dòng hàng (14/11/2026) |
+| Nhiều hóa đơn… | phải **trống** — có dòng thì VietDA ghi HĐ 2 lần (kế toán 14/11/2026) → tool -Fix xóa hết (sau khi đầu phiếu đúng Ký hiệu + Số HĐ) |
 | Tick | "Hóa đơn" (sửa tay). **Không kiểm** "Hiển thị thuế suất từng mặt hàng": VietDA không lưu ô này theo phiếu (tick tay + Lưu, mở lại vẫn mất — user thử 10/11/2026) |
 
 Loại thuế đầu phiếu để trống — không kiểm. Mẫu không kiểm.
@@ -253,8 +255,8 @@ Sheet **Loi-dong** (mỗi lỗi 1 dòng, Mức Lỗi = đỏ / Cảnh báo = và
 | Lỗi | Khi nào |
 |---|---|
 | Dòng 0 đ | Tiền hàng VietDA = 0, XML ≠ 0 |
-| Tổng thanh toán (hàng + thuế) lệch | VietDA ≠ TgTTTBSo — gợi ý chỉnh Tiền hàng ±N đ ở 1 dòng |
-| Tiền hàng lệch XML | lệch > 10 đ (`$RoundAdjMax`). Quy tắc kế toán 10/11/2026: tổng chẵn thì **chỉnh tiền hàng, không chỉnh thuế** → lệch ≤ 10 đ + tổng thanh toán khớp = OK; tổng chưa khớp → Cảnh báo |
+| Tổng thanh toán (hàng + thuế) lệch | VietDA ≠ TgTTTBSo — gợi ý chỉnh **Tiền thuế** ±N đ (ô đầu phiếu); `-Fix` tự sửa khi tiền hàng khớp XML |
+| Tiền hàng lệch XML | lệch > 10 đ (`$RoundAdjMax`). Quy tắc kế toán **chốt 14/11/2026: tổng lệch làm tròn → chỉnh tiền thuế VAT cho tổng tròn, KHÔNG sửa tiền hàng** (thay quy tắc 10/11 "chỉnh tiền hàng"). Phiếu cũ đã chỉnh tiền hàng ≤ 10 đ + tổng khớp vẫn tính OK |
 | Thuế suất / tiền thuế sai | Tiền VAT trên lưới lệch > 1 đ so với Tiền hàng XML × TSuat |
 | Loại thuế dòng ≠ XML | chỉ khi phiếu đã tick "Hiển thị thuế suất từng mặt hàng" (mới có cột này) |
 | Số lượng lệch XML | XML quy đổi: Lỗi; XML gốc: Cảnh báo |
@@ -301,3 +303,23 @@ Thoát → mở lại đúng dòng đó (Sửa phiếu, không ↓) đọc kiể
 
 VietDA chỉ Lưu khi giá trị ô khác lúc mở phiếu ("Dữ liệu không thay đổi !" nếu không). Không sửa dòng hàng (mã, tiền làm tròn) —
 vẫn làm tay theo Loi-dong. Đã thử trên data test MINH QUY XH1002/03: TM/1111 → Chuyển khoản/131 (Lưu, mở lại đúng) rồi trả về TM/1111.
+
+**14/11/2026 — đo trên data test (VietDA không cần ở trước):**
+
+- **Điền ô:** VietDA chỉ nhận chữ khi ô **có focus**. Đặt chữ lúc không focus thì đọc lại thấy đúng, nhưng rời ô (Lý do) hoặc Lưu (Ký hiệu, Thanh toán) bị trả về giá trị cũ, báo "Dữ liệu không thay đổi". Đây là lỗi máy kế toán 13/11: Lý do giữ "Bán hàng (ngày …)".
+  - Tool lấy focus thật bằng `AttachThreadInput + SetFocus` (`[VdForm]::FocusNoActivate`), đặt chữ vào ô **đang focus**, rồi Tab.
+  - VietDA **tạo lại combo** (đổi handle) khi ô nhận focus và khi rời ô, nên tool đọc lại ô bằng cách tìm lại theo nhãn.
+  - Chọn mục combo (`SelectCombo`) ra rỗng thì tool tự chuyển sang cách đặt chữ.
+- **Thu tiền (phiếu tiền mặt, `Invoke-ThuTien`):**
+  - Bấm trên phiếu **đã lưu**: VietDA tạo **và lưu ngay** "Phiếu thu tiền mặt" TM…, rồi ghi Thanh toán = Tổng hóa đơn lên phiếu XH.
+  - Bút toán của phiếu thu theo Ghi nợ phiếu XH: Nợ 131 → Nợ 1111 / Có 131; Nợ 1111 → Nợ 1111 / Có 5111 + Nợ 1111 / Có 33311.
+  - Sau đó tool bấm Lưu trên phiếu thu (VietDA báo "Dữ liệu không thay đổi" → OK), rồi Thoát.
+  - Đóng phiếu thu thì VietDA nhảy về tab đầu, phiếu XH bị ẩn → tool bấm lại tab bằng `TCM_GETITEMRECT` + click message (`Show-FormTab`).
+  - Bấm trên phiếu **chưa lưu** làm VietDA văng FormatException và lưu 1 phiếu XH rỗng. Tool chỉ bấm trên phiếu mở từ danh sách; hộp "Unhandled exception" → **Continue** (không Quit).
+  - Chỉ bấm khi Thanh toán < Tổng, để chạy lại không tạo phiếu thu thứ 2.
+- **Tiền thuế:** ô Tiền VAT trên **dòng** hàng không sửa được (VietDA tự tính lại). Sửa ô **Tiền thuế đầu phiếu** thì VietDA tự dồn ±1 đ vào 1 dòng: +1 vào dòng 1, −1 vào dòng 2 trong phép thử. HĐ 1 dòng thì luôn đúng.
+- **Nhiều hóa đơn (`Clear-ManyInvoices`):**
+  - Nút Xóa của hộp **không ăn** khi bấm bằng message. Tool chọn cả dòng (bấm ô đầu dòng) rồi gửi phím **Delete** vào lưới.
+  - Xóa xong phải **Lưu** ("Lưu dữ liệu thành công"); đóng hộp mà chưa Lưu thì VietDA hỏi "muốn lưu".
+  - Chỉ chạy khi đầu phiếu đã đúng Ký hiệu + Số HĐ theo XML.
+- **Thứ tự mỗi phiếu:** sửa đầu phiếu → Lưu → mở lại kiểm → xóa Nhiều hóa đơn → Thu tiền (tiền mặt) → mở lại kiểm Thanh toán = Tổng.
