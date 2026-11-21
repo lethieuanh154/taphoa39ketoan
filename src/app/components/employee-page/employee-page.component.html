@@ -1,90 +1,76 @@
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     EMPLOYEE PAGE - DANH MỤC NHÂN VIÊN (ledger-rs /api/ledger/partners, vai EMPLOYEE)
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+
 <div class="employee-page">
+
   <!-- HEADER -->
   <div class="page-header">
-    <div>
-      <h1 class="page-title">Danh Mục Nhân Viên</h1>
-      <p class="page-subtitle">Quản lý thông tin nhân viên, hợp đồng, bảo hiểm</p>
+    <div class="header-content">
+      <h1 class="page-title">Danh mục nhân viên</h1>
+      <p class="page-subtitle">Đối tượng theo dõi tạm ứng (TK 141) / phải trả người lao động — mã để trống thì tự cấp NV0001, NV0002…</p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-primary" (click)="openCreateModal()">
-        <span class="icon">➕</span> Thêm nhân viên
-      </button>
+      <button class="btn btn-secondary" (click)="exportExcel()"><i class="fa-solid fa-file-excel"></i> Xuất Excel</button>
+      <button class="btn btn-primary" (click)="openCreateModal()"><span class="icon">+</span> Thêm NV</button>
     </div>
   </div>
 
-  <!-- SUMMARY CARDS -->
-  <div class="summary-cards">
-    <div class="summary-card card-total">
-      <div class="card-icon">👥</div>
-      <div class="card-content">
-        <span class="card-label">Tổng nhân viên</span>
-        <span class="card-value">{{ stats.total }}</span>
+  <!-- Thông báo nổi cố định góc trên phải — không đẩy layout -->
+  <div class="toast-stack" aria-live="polite">
+    @if (errorMessage) {
+      <div class="page-alert alert-error">
+        <span><i class="fa-solid fa-circle-exclamation"></i> {{ errorMessage }}</span>
+        <button class="alert-close" (click)="dismissError()" title="Đóng">&times;</button>
       </div>
+    }
+    @if (successMessage) {
+      <div class="page-alert alert-success"><span><i class="fa-solid fa-circle-check"></i> {{ successMessage }}</span></div>
+    }
+  </div>
+
+  <!-- STATS CARDS -->
+  <div class="stats-cards">
+    <div class="stat-card card-total">
+      <div class="stat-icon">🧑‍💼</div>
+      <div class="stat-content"><span class="stat-label">Tổng số</span><span class="stat-value">{{ stats.total }}</span></div>
     </div>
-    <div class="summary-card card-working">
-      <div class="card-icon">✅</div>
-      <div class="card-content">
-        <span class="card-label">Đang làm việc</span>
-        <span class="card-value text-green">{{ stats.working }}</span>
-      </div>
+    <div class="stat-card card-active">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content"><span class="stat-label">Đang dùng</span><span class="stat-value">{{ stats.active }}</span></div>
     </div>
-    <div class="summary-card card-leave">
-      <div class="card-icon">🏖️</div>
-      <div class="card-content">
-        <span class="card-label">Nghỉ phép/thai sản</span>
-        <span class="card-value text-orange">{{ stats.onLeave }}</span>
-      </div>
+    <div class="stat-card card-inactive">
+      <div class="stat-icon">⏸️</div>
+      <div class="stat-content"><span class="stat-label">Ngừng dùng</span><span class="stat-value">{{ stats.inactive }}</span></div>
     </div>
-    <div class="summary-card card-salary">
-      <div class="card-icon">💰</div>
-      <div class="card-content">
-        <span class="card-label">Tổng quỹ lương</span>
-        <span class="card-value">{{ formatCurrency(stats.totalSalary) }}</span>
-      </div>
-    </div>
-    <div class="summary-card card-avg">
-      <div class="card-icon">📊</div>
-      <div class="card-content">
-        <span class="card-label">Lương TB</span>
-        <span class="card-value">{{ formatCurrency(stats.avgSalary) }}</span>
-      </div>
+    <div class="stat-card card-goods">
+      <div class="stat-icon">🧾</div>
+      <div class="stat-content"><span class="stat-label">Có MST</span><span class="stat-value">{{ stats.withTax }}</span></div>
     </div>
   </div>
 
-  <!-- FILTER SECTION -->
+  <!-- FILTERS -->
   <div class="filter-section">
     <div class="filter-row">
       <div class="filter-group filter-search">
         <label>Tìm kiếm</label>
-        <input type="text" [(ngModel)]="searchText" (input)="onSearch()"
-               placeholder="Mã NV, họ tên, SĐT, chức vụ...">
+        <input type="text" [(ngModel)]="search" (ngModelChange)="onFilterChange()" placeholder="Mã NV, MST, tên (có hoặc không dấu)...">
       </div>
       <div class="filter-group">
         <label>Trạng thái</label>
-        <select [(ngModel)]="filter.status" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let s of employeeStatuses" [value]="s.value">{{ s.label }}</option>
+        <select [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
+          <option value="">Tất cả</option>
+          <option value="ACTIVE">Đang dùng</option>
+          <option value="INACTIVE">Ngừng dùng</option>
         </select>
       </div>
-      <div class="filter-group">
-        <label>Loại NV</label>
-        <select [(ngModel)]="filter.employeeType" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let t of employeeTypes" [value]="t.value">{{ t.label }}</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>Loại HĐ</label>
-        <select [(ngModel)]="filter.contractType" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let c of contractTypes" [value]="c.value">{{ c.label }}</option>
-        </select>
-      </div>
-      <button class="btn btn-secondary btn-sm" (click)="clearFilters()">Xóa lọc</button>
+      @if (hasFilter) {
+        <button class="btn btn-secondary btn-sm" (click)="clearSearch()">Xóa lọc</button>
+      }
     </div>
   </div>
 
-  <!-- EMPLOYEE TABLE -->
+  <!-- TABLE -->
   <div class="table-container">
     <table class="data-table">
       <thead>
@@ -92,355 +78,212 @@
           <th class="col-no">STT</th>
           <th class="col-code">Mã NV</th>
           <th class="col-name">Họ tên</th>
+          <th class="col-tax">MST</th>
+          <th class="col-address">Địa chỉ</th>
           <th class="col-phone">Điện thoại</th>
-          <th class="col-dept">Phòng ban</th>
-          <th class="col-position">Chức vụ</th>
-          <th class="col-salary text-right">Lương cơ bản</th>
           <th class="col-status">Trạng thái</th>
           <th class="col-actions">Thao tác</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let emp of filteredEmployees; let i = index">
-          <td>{{ i + 1 }}</td>
-          <td><span class="emp-code">{{ emp.code }}</span></td>
-          <td>
-            <div class="emp-info">
-              <span class="emp-name">{{ emp.fullName }}</span>
-              <span class="emp-email">{{ emp.email }}</span>
-            </div>
-          </td>
-          <td>{{ emp.phone }}</td>
-          <td>{{ emp.departmentName || '-' }}</td>
-          <td>{{ emp.position }}</td>
-          <td class="text-right">{{ formatCurrency(emp.baseSalary) }}</td>
-          <td>
-            <span class="status-badge" [ngClass]="getStatusClass(emp.status)">
-              {{ getStatusLabel(emp.status) }}
-            </span>
-          </td>
-          <td>
-            <div class="action-buttons">
-              <button class="btn-icon btn-view" title="Xem" (click)="openViewModal(emp)">👁</button>
-              <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(emp)">✏️</button>
-              <button class="btn-icon btn-delete" title="Xóa" (click)="deleteEmployee(emp)">🗑️</button>
-            </div>
-          </td>
-        </tr>
+        @for (s of employees; track s.code; let i = $index) {
+          <tr [class.inactive]="s.status === 'INACTIVE'">
+            <td class="col-no">{{ i + 1 }}</td>
+            <td class="col-code"><span class="employee-code">{{ s.code }}</span></td>
+            <td class="col-name"><span class="employee-name">{{ s.name }}</span></td>
+            <td class="col-tax">{{ s.taxCode || '-' }}</td>
+            <td class="col-address">{{ s.address || '-' }}</td>
+            <td class="col-phone">{{ s.phone || '-' }}</td>
+            <td class="col-status"><span class="status-badge" [class]="getStatusClass(s.status)">{{ getStatusLabel(s.status) }}</span></td>
+            <td class="col-actions">
+              <div class="action-buttons">
+                <button class="btn-icon btn-view" title="Xem + lịch sử" (click)="viewDetail(s)">👁️</button>
+                <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(s)">✏️</button>
+                <button class="btn-icon btn-view" [title]="s.status === 'ACTIVE' ? 'Ngừng dùng' : 'Dùng lại'" (click)="toggleStatus(s)">
+                  {{ s.status === 'ACTIVE' ? '⏸️' : '▶️' }}
+                </button>
+                <button class="btn-icon btn-delete" title="Xóa hẳn" (click)="confirmDelete(s)">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        }
       </tbody>
     </table>
-
-    <!-- Empty State -->
-    <div class="empty-state" *ngIf="filteredEmployees.length === 0 && !isLoading">
-      <div class="empty-icon">👥</div>
-      <p>Không có nhân viên nào</p>
-      <button class="btn btn-primary" (click)="openCreateModal()">Thêm nhân viên đầu tiên</button>
-    </div>
+    @if (!loading && employees.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">🧑‍💼</div>
+        <p>{{ hasFilter ? 'Không có nhân viên nào khớp bộ lọc' : 'Chưa có nhân viên — bấm "Thêm NV"' }}</p>
+      </div>
+    }
   </div>
+</div>
 
-  <!-- MODAL -->
-  <div class="modal-overlay" *ngIf="showModal" (click)="closeModal()">
-    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+<!-- CREATE / EDIT MODAL -->
+@if (showFormModal) {
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'form')">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>
-          {{ modalMode === 'create' ? 'Thêm nhân viên mới' :
-             modalMode === 'edit' ? 'Chỉnh sửa nhân viên' : 'Thông tin nhân viên' }}
-        </h2>
-        <button class="btn-close" (click)="closeModal()">✕</button>
+        <h2>{{ isEditMode ? 'Sửa nhân viên ' + selected?.code : 'Thêm nhân viên' }}</h2>
+        <button class="btn-close" (click)="closeFormModal()">&times;</button>
       </div>
-
-      <!-- Tab Navigation -->
-      <div class="modal-tabs">
-        <button class="tab-btn" [class.active]="activeTab === 'info'" (click)="setTab('info')">Thông tin cá nhân</button>
-        <button class="tab-btn" [class.active]="activeTab === 'work'" (click)="setTab('work')">Công việc</button>
-        <button class="tab-btn" [class.active]="activeTab === 'salary'" (click)="setTab('salary')">Lương & Phụ thuộc</button>
-        <button class="tab-btn" [class.active]="activeTab === 'insurance'" (click)="setTab('insurance')">Bảo hiểm</button>
-        <button class="tab-btn" [class.active]="activeTab === 'bank'" (click)="setTab('bank')">Ngân hàng</button>
-      </div>
-
       <div class="modal-body">
-        <!-- Validation Errors -->
-        <div class="validation-errors" *ngIf="validationErrors.length > 0">
-          <p *ngFor="let err of validationErrors">⚠️ {{ err }}</p>
-        </div>
-
-        <!-- Tab: Thông tin cá nhân -->
-        <div class="tab-content" *ngIf="activeTab === 'info'">
-          <div class="form-row">
+        @if (formError) {
+          <div class="page-alert alert-error"><span><i class="fa-solid fa-circle-exclamation"></i> {{ formError }}</span></div>
+        }
+        <div class="form-section">
+          <div class="form-grid">
             <div class="form-group">
-              <label>Mã nhân viên <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="editingEmployee.code" [disabled]="modalMode === 'view'"
-                     placeholder="NV0001">
+              <label>Mã NV</label>
+              <input type="text" [(ngModel)]="form.code" [disabled]="isEditMode" placeholder="Để trống = tự cấp" maxlength="20">
+              @if (!isEditMode) { <span class="form-hint">Mã không sửa được sau khi tạo</span> }
             </div>
-            <div class="form-group">
-              <label>Họ và tên <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="editingEmployee.fullName" [disabled]="modalMode === 'view'"
-                     placeholder="Nguyễn Văn A">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Giới tính</label>
-              <select [(ngModel)]="editingEmployee.gender" [disabled]="modalMode === 'view'">
-                <option *ngFor="let g of genders" [value]="g.value">{{ g.label }}</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Ngày sinh</label>
-              <input type="date" [ngModel]="editingEmployee.dateOfBirth | date:'yyyy-MM-dd'"
-                     (ngModelChange)="onDateChange('dateOfBirth', $event)" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Nơi sinh</label>
-              <input type="text" [(ngModel)]="editingEmployee.placeOfBirth" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>CMND/CCCD <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="editingEmployee.idNumber" [disabled]="modalMode === 'view'"
-                     placeholder="001234567890">
-            </div>
-            <div class="form-group">
-              <label>Ngày cấp</label>
-              <input type="date" [ngModel]="editingEmployee.idIssueDate | date:'yyyy-MM-dd'"
-                     (ngModelChange)="onDateChange('idIssueDate', $event)" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Nơi cấp</label>
-              <input type="text" [(ngModel)]="editingEmployee.idIssuePlace" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Mã số thuế cá nhân</label>
-              <input type="text" [(ngModel)]="editingEmployee.taxCode" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Số điện thoại <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="editingEmployee.phone" [disabled]="modalMode === 'view'"
-                     placeholder="0901234567">
-            </div>
-            <div class="form-group">
-              <label>Email</label>
-              <input type="email" [(ngModel)]="editingEmployee.email" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group full-width">
-              <label>Địa chỉ hiện tại</label>
-              <input type="text" [(ngModel)]="editingEmployee.address" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group full-width">
-              <label>Địa chỉ thường trú</label>
-              <input type="text" [(ngModel)]="editingEmployee.permanentAddress" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab: Công việc -->
-        <div class="tab-content" *ngIf="activeTab === 'work'">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Phòng ban</label>
-              <input type="text" [(ngModel)]="editingEmployee.departmentName" [disabled]="modalMode === 'view'"
-                     placeholder="Kế toán">
-            </div>
-            <div class="form-group">
-              <label>Chức vụ <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="editingEmployee.position" [disabled]="modalMode === 'view'"
-                     placeholder="Kế toán viên">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Loại nhân viên</label>
-              <select [(ngModel)]="editingEmployee.employeeType" [disabled]="modalMode === 'view'">
-                <option *ngFor="let t of employeeTypes" [value]="t.value">{{ t.label }}</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Loại hợp đồng</label>
-              <select [(ngModel)]="editingEmployee.contractType" [disabled]="modalMode === 'view'">
-                <option *ngFor="let c of contractTypes" [value]="c.value">{{ c.label }}</option>
-              </select>
+            <div class="form-group col-span-2">
+              <label>Họ tên <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.name" placeholder="Nhập tên NV">
             </div>
             <div class="form-group">
               <label>Trạng thái</label>
-              <select [(ngModel)]="editingEmployee.status" [disabled]="modalMode === 'view'">
-                <option *ngFor="let s of employeeStatuses" [value]="s.value">{{ s.label }}</option>
+              <select [(ngModel)]="form.status">
+                <option value="ACTIVE">Đang dùng</option>
+                <option value="INACTIVE">Ngừng dùng</option>
               </select>
             </div>
-          </div>
-          <div class="form-row">
             <div class="form-group">
-              <label>Ngày vào làm <span class="required">*</span></label>
-              <input type="date" [ngModel]="editingEmployee.hireDate | date:'yyyy-MM-dd'"
-                     (ngModelChange)="onDateChange('hireDate', $event)" [disabled]="modalMode === 'view'">
+              <label>Mã số thuế</label>
+              <input type="text" [(ngModel)]="form.taxCode" (blur)="onTaxCodeBlur()" placeholder="10 / 10-3 / 12 số">
             </div>
-            <div class="form-group">
-              <label>Ngày bắt đầu HĐ</label>
-              <input type="date" [ngModel]="editingEmployee.contractStartDate | date:'yyyy-MM-dd'"
-                     (ngModelChange)="onDateChange('contractStartDate', $event)" [disabled]="modalMode === 'view'">
+            <div class="form-group col-span-3">
+              <label>Địa chỉ</label>
+              <input type="text" [(ngModel)]="form.address">
             </div>
-            <div class="form-group">
-              <label>Ngày kết thúc HĐ</label>
-              <input type="date" [ngModel]="editingEmployee.contractEndDate | date:'yyyy-MM-dd'"
-                     (ngModelChange)="onDateChange('contractEndDate', $event)" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-          <div class="form-row" *ngIf="editingEmployee.status === 'RESIGNED'">
-            <div class="form-group">
-              <label>Ngày nghỉ việc</label>
-              <input type="date" [ngModel]="editingEmployee.resignDate | date:'yyyy-MM-dd'"
-                     (ngModelChange)="onDateChange('resignDate', $event)" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group full-width">
-              <label>Ghi chú</label>
-              <textarea [(ngModel)]="editingEmployee.notes" [disabled]="modalMode === 'view'" rows="3"></textarea>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab: Lương & Phụ thuộc -->
-        <div class="tab-content" *ngIf="activeTab === 'salary'">
-          <h4>Thông tin lương</h4>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Lương cơ bản</label>
-              <input type="number" [(ngModel)]="editingEmployee.baseSalary" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Lương đóng BH</label>
-              <input type="number" [(ngModel)]="editingEmployee.insuranceSalary" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Hệ số lương</label>
-              <input type="number" [(ngModel)]="editingEmployee.salaryCoefficient" [disabled]="modalMode === 'view'" step="0.01">
-            </div>
-          </div>
-
-          <h4>Người phụ thuộc (giảm trừ gia cảnh) - {{ getDependentCount() }} người</h4>
-          <div class="dependent-list">
-            <div class="dependent-item" *ngFor="let dep of editingEmployee.dependents; let i = index">
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Họ tên</label>
-                  <input type="text" [(ngModel)]="dep.fullName" [disabled]="modalMode === 'view'">
-                </div>
-                <div class="form-group">
-                  <label>Quan hệ</label>
-                  <input type="text" [(ngModel)]="dep.relationship" [disabled]="modalMode === 'view'">
-                </div>
-                <div class="form-group">
-                  <label>Ngày sinh</label>
-                  <input type="date" [ngModel]="dep.dateOfBirth | date:'yyyy-MM-dd'"
-                         (ngModelChange)="onDependentDateChange(i, 'dateOfBirth', $event)" [disabled]="modalMode === 'view'">
-                </div>
-                <div class="form-group">
-                  <label>Giảm trừ từ</label>
-                  <input type="date" [ngModel]="dep.deductionFrom | date:'yyyy-MM-dd'"
-                         (ngModelChange)="onDependentDateChange(i, 'deductionFrom', $event)" [disabled]="modalMode === 'view'">
-                </div>
-                <div class="form-group checkbox-group">
-                  <label><input type="checkbox" [(ngModel)]="dep.isActive" [disabled]="modalMode === 'view'"> Đang giảm trừ</label>
-                </div>
-                <button class="btn-icon btn-delete" *ngIf="modalMode !== 'view'" (click)="removeDependent(i)">🗑️</button>
+            @if (taxDuplicate) {
+              <div class="form-group col-span-4">
+                <span class="form-warn">MST này đã dùng cho nhân viên <b>{{ taxDuplicate.code }}</b> — {{ taxDuplicate.name }}.</span>
               </div>
-            </div>
-          </div>
-          <button class="btn btn-secondary btn-sm" *ngIf="modalMode !== 'view'" (click)="addDependent()">
-            ➕ Thêm người phụ thuộc
-          </button>
-        </div>
-
-        <!-- Tab: Bảo hiểm -->
-        <div class="tab-content" *ngIf="activeTab === 'insurance'">
-          <div class="form-row">
+            }
+            @if (taxSuggestion) {
+              <div class="form-group col-span-4">
+                <span class="form-suggest">
+                  MST này đã có ở {{ roleName(taxSuggestion) }} <b>{{ taxSuggestion.code }}</b> — {{ taxSuggestion.name }}.
+                  <button class="btn btn-secondary btn-sm" (click)="applySuggestion()">Điền sẵn tên / địa chỉ</button>
+                </span>
+              </div>
+            }
             <div class="form-group">
-              <label>Số sổ BHXH</label>
-              <input type="text" [(ngModel)]="editingEmployee.insurance!.socialInsuranceNo" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Số thẻ BHYT</label>
-              <input type="text" [(ngModel)]="editingEmployee.insurance!.healthInsuranceNo" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Nơi KCB ban đầu</label>
-              <input type="text" [(ngModel)]="editingEmployee.insurance!.healthInsurancePlace" [disabled]="modalMode === 'view'">
+              <label>Điện thoại</label>
+              <input type="text" [(ngModel)]="form.phone">
             </div>
             <div class="form-group">
-              <label>Lương đóng BH</label>
-              <input type="number" [(ngModel)]="editingEmployee.insurance!.insuranceSalary" [disabled]="modalMode === 'view'">
+              <label>Email</label>
+              <input type="email" [(ngModel)]="form.email">
             </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Ngày tham gia BHXH</label>
-              <input type="date" [ngModel]="editingEmployee.insurance!.socialInsuranceDate | date:'yyyy-MM-dd'"
-                     (ngModelChange)="editingEmployee.insurance!.socialInsuranceDate = parseDate($event)" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Ngày tham gia BHYT</label>
-              <input type="date" [ngModel]="editingEmployee.insurance!.healthInsuranceDate | date:'yyyy-MM-dd'"
-                     (ngModelChange)="editingEmployee.insurance!.healthInsuranceDate = parseDate($event)" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Ngày tham gia BHTN</label>
-              <input type="date" [ngModel]="editingEmployee.insurance!.unemploymentInsuranceDate | date:'yyyy-MM-dd'"
-                     (ngModelChange)="editingEmployee.insurance!.unemploymentInsuranceDate = parseDate($event)" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab: Ngân hàng -->
-        <div class="tab-content" *ngIf="activeTab === 'bank'">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Ngân hàng</label>
-              <input type="text" [(ngModel)]="editingEmployee.bankAccount!.bankName" [disabled]="modalMode === 'view'"
-                     placeholder="Vietcombank">
-            </div>
-            <div class="form-group">
-              <label>Chi nhánh</label>
-              <input type="text" [(ngModel)]="editingEmployee.bankAccount!.branch" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Số tài khoản</label>
-              <input type="text" [(ngModel)]="editingEmployee.bankAccount!.accountNo" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Tên chủ TK</label>
-              <input type="text" [(ngModel)]="editingEmployee.bankAccount!.accountName" [disabled]="modalMode === 'view'"
-                     placeholder="NGUYEN VAN A">
+            <div class="form-group col-span-2">
+              <label>Ghi chú</label>
+              <input type="text" [(ngModel)]="form.note">
             </div>
           </div>
         </div>
       </div>
-
-      <div class="modal-footer" *ngIf="modalMode !== 'view'">
-        <button class="btn btn-secondary" (click)="closeModal()">Hủy</button>
-        <button class="btn btn-primary" (click)="saveEmployee()">
-          {{ modalMode === 'create' ? 'Thêm mới' : 'Cập nhật' }}
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeFormModal()" [disabled]="saving">Hủy</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving">
+          {{ saving ? 'Đang lưu...' : (isEditMode ? 'Lưu' : 'Thêm') }}
         </button>
-      </div>
-      <div class="modal-footer" *ngIf="modalMode === 'view'">
-        <button class="btn btn-secondary" (click)="closeModal()">Đóng</button>
-        <button class="btn btn-primary" (click)="modalMode = 'edit'">Chỉnh sửa</button>
       </div>
     </div>
   </div>
+}
 
-  <!-- Loading -->
-  <div class="loading-overlay" *ngIf="isLoading">
-    <div class="spinner"></div>
+<!-- DETAIL MODAL -->
+@if (showDetailModal && selected) {
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'detail')">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Nhân viên {{ selected.code }}</h2>
+        <button class="btn-close" (click)="closeDetailModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h4>Thông tin</h4>
+            <div class="detail-item"><label>Mã:</label><span>{{ selected.code }}</span></div>
+            <div class="detail-item"><label>Tên:</label><span>{{ selected.name }}</span></div>
+            <div class="detail-item"><label>MST:</label><span>{{ selected.taxCode || '-' }}</span></div>
+            <div class="detail-item"><label>Trạng thái:</label><span class="status-badge" [class]="getStatusClass(selected.status)">{{ getStatusLabel(selected.status) }}</span></div>
+          </div>
+          <div class="detail-section">
+            <h4>Liên hệ</h4>
+            <div class="detail-item"><label>Địa chỉ:</label><span>{{ selected.address || '-' }}</span></div>
+            <div class="detail-item"><label>Điện thoại:</label><span>{{ selected.phone || '-' }}</span></div>
+            <div class="detail-item"><label>Email:</label><span>{{ selected.email || '-' }}</span></div>
+          </div>
+          <div class="detail-section">
+            <h4>Sửa lần cuối</h4>
+            <div class="detail-item"><label>Lúc:</label><span>{{ selected.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span></div>
+            <div class="detail-item"><label>Bởi:</label><span>{{ selected.updatedBy }}</span></div>
+            <div class="detail-item"><label>Tạo bởi:</label><span>{{ selected.createdBy }}</span></div>
+          </div>
+        </div>
+        @if (selected.note) {
+          <div class="detail-note"><h4>Ghi chú</h4><p>{{ selected.note }}</p></div>
+        }
+
+        <div class="history-section">
+          <div class="section-header">
+            <h3 class="section-title">Lịch sử thay đổi</h3>
+            <button class="btn btn-secondary btn-sm" (click)="loadHistory()" [disabled]="historyLoading">
+              {{ historyLoading ? 'Đang tải...' : (history.length ? 'Tải lại' : 'Xem lịch sử') }}
+            </button>
+          </div>
+          @if (historyError) { <p class="form-warn">{{ historyError }}</p> }
+          @for (h of history; track h.id) {
+            <div class="history-item">
+              <div class="history-head">
+                <span class="history-action" [class]="'action-' + h.action">{{ getActionLabel(h.action) }}</span>
+                <span>{{ h.at | date:'dd/MM/yyyy HH:mm:ss' }}</span>
+                <span class="history-user">{{ h.userEmail }}</span>
+              </div>
+              @if (h.changes.length) {
+                <ul class="history-changes">
+                  @for (c of h.changes; track c.field) {
+                    <li><b>{{ getFieldLabel(c.field) }}</b>: {{ formatValue(c.field, c.old) }} → {{ formatValue(c.field, c.new) }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+        <button class="btn btn-primary" (click)="openEditModal(selected)">Sửa</button>
+      </div>
+    </div>
   </div>
-</div>
+}
+
+<!-- DELETE CONFIRM -->
+@if (showDeleteConfirm && selected) {
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'delete')">
+    <div class="modal modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Xóa nhân viên</h2>
+        <button class="btn-close" (click)="cancelDelete()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="warning-message">
+          <span class="warning-icon">⚠️</span>
+          <p>Xóa hẳn <strong>{{ selected.code }} — {{ selected.name }}</strong>? Lịch sử vẫn được giữ.
+            Đã có phát sinh thì không xóa được — dùng <b>Ngừng dùng</b>.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="cancelDelete()" [disabled]="saving">Hủy</button>
+        <button class="btn btn-danger" (click)="deleteSelected()" [disabled]="saving">{{ saving ? 'Đang xóa...' : 'Xóa' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+
+@if (loading) { <div class="loading-bar"></div> }

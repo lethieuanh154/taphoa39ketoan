@@ -9,7 +9,7 @@ import { httpErrorText } from '../../services/auth.service';
 import { PeriodService, formatVn } from '../../services/period.service';
 import { CompanyService } from '../../services/company.service';
 import {
-  AssignedCodeRow, CatalogStatus, FolderScan, HhCode, HhCodeStatus, HhMissingRow, OldCatalogResult, OldCodeSuggestion, OldUnmatchedRow, ReconciliationRun,
+  AssignedCodeRow, CatalogStatus, NeedFactorDetail, FolderScan, HhCode, HhCodeStatus, HhMissingRow, OldCatalogResult, OldCodeSuggestion, OldUnmatchedRow, ReconciliationRun,
   ReconciliationService, ReviewItem
 } from '../../services/reconciliation.service';
 import { expandArchives } from '../../utils/archive.util';
@@ -69,6 +69,8 @@ export class InvoiceReconciliationPageComponent implements OnInit {
   manualMaster: { [hh: string]: string } = {};
   /** mã master đã gán cho từng mã cũ trong phiên này — 1 mã HH gán được nhiều mã master (vd nhiều vị mì) */
   assignedOld: { [hh: string]: string[] | undefined } = {};
+  /** Khung "Rà mã HH": tab Mã cũ chưa ghép / Mã HH đã ghép (null = đóng) */
+  codeTab: 'unmatched' | 'assigned' | null = null;
   /** Bảng "Mã HH đã ghép" (17/11/2026) — rà / sửa / bỏ gán mã đã ghép */
   assigned: AssignedCodeRow[] | null = null;
   assignedLoading = false;
@@ -272,6 +274,7 @@ export class InvoiceReconciliationPageComponent implements OnInit {
         this.oldResult = r;
         this.loadHh(r.status);
         if (this.unmatched) this.loadUnmatched();
+        if (this.assigned) this.loadAssigned();
       },
       error: e => {
         this.oldBusy = false;
@@ -297,8 +300,61 @@ export class InvoiceReconciliationPageComponent implements OnInit {
     });
   }
 
+  // ───────────────────────────── Hệ số ĐVT Vietda (17/11/2026)
+
+  /** Gán mã HH; máy chủ báo ĐVT Vietda khác ĐVT nhỏ nhất KiotViet (409 need_factor) → hỏi hệ số rồi gửi lại.
+   *  cache: Gán chung — mỗi cặp ĐVT chỉ hỏi 1 lần. → null nếu người dùng hủy hỏi hệ số. */
+  private async saveCode(master: string, hh: string, cache?: Map<string, number>):
+    Promise<{ item: HhCode & { source: string }; status: HhCodeStatus } | null> {
+    try {
+      return await firstValueFrom(this.service.setManualCode(master, hh));
+    } catch (e: any) {
+      const d: NeedFactorDetail | null = e?.status === 409 && e?.error?.detail?.code === 'need_factor' ? e.error.detail : null;
+      if (!d) throw e;
+      const key = `${d.vd_unit}|${d.kv_unit}`.toLowerCase();
+      const f = cache?.get(key) ?? this.askFactor(d);
+      if (f === null) {
+        console.info(`${LOG} Gán ${hh} → ${master}: người dùng hủy nhập hệ số ĐVT`);
+        return null;
+      }
+      cache?.set(key, f);
+      return await firstValueFrom(this.service.setManualCode(master, hh, f));
+    }
+  }
+
+  /** Hỏi hệ số: "N" → 1 ĐVT Vietda = N ĐVT KiotViet; "/N" → 1 ĐVT KiotViet = N ĐVT Vietda (vd 1 lốc (4h) = 4 hộp). */
+  private askFactor(d: Pick<NeedFactorDetail, 'hh' | 'master_code' | 'vd_unit' | 'kv_unit' | 'suggested' | 'kv_units'>): number | null {
+    const fmt = (x: number) => String(Number(x.toFixed(4)));
+    const sug = d.suggested;
+    const def = sug ? (sug >= 1 ? fmt(sug) : '/' + fmt(1 / sug)) : '';
+    const msg = `${d.hh} → ${d.master_code}: ĐVT Vietda "${d.vd_unit}" khác ĐVT nhỏ nhất KiotViet "${d.kv_unit}".`
+      + (d.kv_units ? `
+KiotViet có: ${d.kv_units}` : '')
+      + `
+
+Nhập hệ số:
+• N   → 1 ${d.vd_unit} = N ${d.kv_unit}
+• /N  → 1 ${d.kv_unit} = N ${d.vd_unit}`
+      + `
+Cùng số lượng, chỉ khác tên ĐVT → 1` + (def ? `
+Gợi ý: ${def}` : '');
+    for (;;) {
+      const ans = prompt(msg, def);
+      if (ans === null) return null;
+      const m = ans.trim().replace(',', '.').match(/^(\/)?\s*(\d+(?:\.\d+)?)$/);
+      const n = m ? parseFloat(m[2]) : NaN;
+      if (m && n > 0) {
+        const f = m[1] ? 1 / n : n;
+        console.info(`${LOG} Hệ số ${d.hh} → ${d.master_code}: '${ans}' = 1 ${d.vd_unit} = ${f} ${d.kv_unit}`);
+        return f;
+      }
+      console.warn(`${LOG} Hệ số '${ans}' không hợp lệ`);
+      alert('Hệ số không hợp lệ — nhập số > 0, vd 4 hoặc /6');
+    }
+  }
+
   /** Gán mã HH cũ `row.hh` cho mã master (gợi ý hoặc gõ tay) */
-  assign(row: OldUnmatchedRow, master: string | OldCodeSuggestion): void {
+  async assign(row: OldUnmatchedRow, master: string | OldCodeSuggestion): Promise<void> {
     const code = (typeof master === 'string' ? master : master.master_code).trim();
     if (!code) {
       console.warn(`${LOG} Gán ${row.hh}: chưa nhập mã master`);
@@ -316,21 +372,28 @@ export class InvoiceReconciliationPageComponent implements OnInit {
     }
     this.assigning = row.hh;
     this.assignMsg = '';
-    this.service.setManualCode(code, row.hh).subscribe({
-      next: r => {
-        this.assigning = '';
-        const done = [...(this.assignedOld[row.hh] || []), code];
-        this.assignedOld = { ...this.assignedOld, [row.hh]: done };
-        this.manualMaster[row.hh] = '';
-        this.assignMsg = `Đã gán ${r.item.hh} cho mã master ${code} (${done.length} mã master). Gán thêm vị / mã khác nếu cần, xong bấm "Xong".`;
-        console.info(`${LOG} ${row.hh} đã gán ${done.length} mã master: ${done.join(', ')}`);
-        this.loadHh(r.status);
-      },
-      error: e => {
-        this.assigning = '';
-        this.assignMsg = `Gán ${row.hh} → ${code} lỗi: ${httpErrorText(e)}`;
+    try {
+      const r = await this.saveCode(code, row.hh);
+      if (!r) {
+        this.assignMsg = `Chưa gán ${row.hh} → ${code}: chưa nhập hệ số ĐVT.`;
+        return;
       }
-    });
+      const done = [...(this.assignedOld[row.hh] || []), code];
+      this.assignedOld = { ...this.assignedOld, [row.hh]: done };
+      this.manualMaster[row.hh] = '';
+      this.assignMsg = `Đã gán ${r.item.hh} cho mã master ${code} (${done.length} mã master)${this.factorNote(r.item)}. `
+        + 'Gán thêm vị / mã khác nếu cần, xong bấm "Xong".';
+      console.info(`${LOG} ${row.hh} đã gán ${done.length} mã master: ${done.join(', ')}`);
+      this.loadHh(r.status);
+    } catch (e) {
+      this.assignMsg = `Gán ${row.hh} → ${code} lỗi: ${httpErrorText(e)}`;
+    } finally {
+      this.assigning = '';
+    }
+  }
+
+  private factorNote(item: any): string {
+    return item?.he_so ? ` — 1 ${item.unit} = ${Number(Number(item.he_so).toFixed(4))} ${item.kv_unit}` : '';
   }
 
   /** Ẩn mã cũ khỏi bảng sau khi đã gán đủ mã master */
@@ -377,9 +440,25 @@ export class InvoiceReconciliationPageComponent implements OnInit {
     });
   }
 
-  closeAssigned(): void {
+  /** Mở khung "Rà mã HH" (2 tab chung 1 khung, 17/11/2026) — giữ tab đang xem nếu đã mở */
+  openCodes(): void {
+    this.setCodeTab(this.codeTab || 'unmatched');
+  }
+
+  setCodeTab(tab: 'unmatched' | 'assigned'): void {
+    console.info(`${LOG} Rà mã HH: tab ${tab}`);
+    this.codeTab = tab;
+    if (tab === 'unmatched' && !this.unmatched && !this.unmatchedLoading) this.loadUnmatched();
+    if (tab === 'assigned' && !this.assigned && !this.assignedLoading) this.loadAssigned();
+  }
+
+  closeCodes(): void {
+    this.codeTab = null;
+    this.unmatched = null;
     this.assigned = null;
+    this.assignMsg = '';
     this.assignedMsg = '';
+    this.assignedError = '';
   }
 
   /** Đổi mã HH của 1 mã master (hh rỗng = bỏ gán → mã master về "chưa có mã HH") */
@@ -408,22 +487,40 @@ Mã master này sẽ thành "chưa có mã HH" — XML quy đổi `
     this.saveAssigned(row, '', `Đã bỏ gán ${row.hh} khỏi ${row.master_code} — đối soát lại để thấy ở bảng "Hàng chưa có mã HH".`);
   }
 
-  private saveAssigned(row: AssignedCodeRow, code: string, okMsg: string): void {
+  private async saveAssigned(row: AssignedCodeRow, code: string, okMsg: string, heSo?: number): Promise<void> {
     this.assignedBusy = row.master_code;
     this.assignedMsg = '';
-    this.service.setManualCode(row.master_code, code).subscribe({
-      next: r => {
-        this.assignedBusy = '';
-        this.assignedMsg = okMsg;
-        this.editHh[row.master_code] = '';
-        this.loadHh(r.status);
-        this.loadAssigned();
-      },
-      error: e => {
-        this.assignedBusy = '';
-        this.assignedMsg = `${code ? 'Đổi ' + row.master_code + ' → ' + code : 'Bỏ gán ' + row.master_code} lỗi: ${httpErrorText(e)}`;
+    try {
+      const r = heSo !== undefined ? await firstValueFrom(this.service.setManualCode(row.master_code, code, heSo))
+        : await this.saveCode(row.master_code, code);
+      if (!r) {
+        this.assignedMsg = `Chưa đổi ${row.master_code}: chưa nhập hệ số ĐVT.`;
+        return;
       }
-    });
+      this.assignedMsg = okMsg + this.factorNote(r.item);
+      this.editHh[row.master_code] = '';
+      this.loadHh(r.status);
+      this.loadAssigned();
+    } catch (e) {
+      this.assignedMsg = `${code ? 'Đổi ' + row.master_code + ' → ' + code : 'Bỏ gán ' + row.master_code} lỗi: ${httpErrorText(e)}`;
+    } finally {
+      this.assignedBusy = '';
+    }
+  }
+
+  hasUnitFlag(row: AssignedCodeRow): boolean {
+    return row.flags.some(f => f.kind === 'unit');
+  }
+
+  /** Sửa hệ số ĐVT của 1 dòng đã ghép (giữ mã HH) */
+  changeFactor(row: AssignedCodeRow): void {
+    const f = this.askFactor({ hh: row.hh, master_code: row.master_code, vd_unit: row.vd_unit, kv_unit: row.kv_unit,
+      suggested: row.he_so, kv_units: '' });
+    if (f === null) {
+      console.info(`${LOG} Sửa hệ số ${row.hh} → ${row.master_code}: người dùng hủy`);
+      return;
+    }
+    void this.saveAssigned(row, row.hh, `Đã lưu hệ số ${row.hh} ↔ ${row.master_code}`, f);
   }
 
   async downloadAssigned(): Promise<void> {
@@ -480,7 +577,7 @@ Mã master này sẽ thành "chưa có mã HH" — XML quy đổi `
   }
 
   /** Gán mã HH (gợi ý hoặc gõ tay) cho 1 mã master */
-  assignHh(row: HhMissingRow, hh: string): void {
+  async assignHh(row: HhMissingRow, hh: string): Promise<void> {
     const code = hh.trim().toUpperCase();
     if (!code) {
       console.warn(`${LOG} Gán mã HH cho ${row.master_code}: chưa nhập mã`);
@@ -489,18 +586,20 @@ Mã master này sẽ thành "chưa có mã HH" — XML quy đổi `
     }
     this.hhAssigning = row.master_code;
     this.hhAssignMsg = '';
-    this.service.setManualCode(row.master_code, code).subscribe({
-      next: r => {
-        this.hhAssigning = '';
-        this.hhAssignMsg = `Đã gán ${r.item.hh} cho ${row.master_code} ${row.name}.`;
-        this.removeHhRow(row.master_code);
-        this.loadHh(r.status);
-      },
-      error: e => {
-        this.hhAssigning = '';
-        this.hhAssignMsg = `Gán ${code} → ${row.master_code} lỗi: ${httpErrorText(e)}`;
+    try {
+      const r = await this.saveCode(row.master_code, code);
+      if (!r) {
+        this.hhAssignMsg = `Chưa gán ${code} → ${row.master_code}: chưa nhập hệ số ĐVT.`;
+        return;
       }
-    });
+      this.hhAssignMsg = `Đã gán ${r.item.hh} cho ${row.master_code} ${row.name}${this.factorNote(r.item)}.`;
+      this.removeHhRow(row.master_code);
+      this.loadHh(r.status);
+    } catch (e) {
+      this.hhAssignMsg = `Gán ${code} → ${row.master_code} lỗi: ${httpErrorText(e)}`;
+    } finally {
+      this.hhAssigning = '';
+    }
   }
 
   /** 1 mã HH cho mọi mã master đã tick (gán lần lượt, dòng lỗi giữ lại) */
@@ -523,9 +622,14 @@ Mã master này sẽ thành "chưa có mã HH" — XML quy đổi `
     let ok = 0;
     let status: HhCodeStatus | null = null;
     const errors: string[] = [];
+    const factors = new Map<string, number>();   // mỗi cặp ĐVT Vietda ↔ KiotViet chỉ hỏi hệ số 1 lần
     for (const r of rows) {
       try {
-        const res = await firstValueFrom(this.service.setManualCode(r.master_code, code));
+        const res = await this.saveCode(r.master_code, code, factors);
+        if (!res) {
+          errors.push(`${r.master_code}: chưa nhập hệ số ĐVT`);
+          continue;
+        }
         status = res.status;
         ok++;
         this.removeHhRow(r.master_code);

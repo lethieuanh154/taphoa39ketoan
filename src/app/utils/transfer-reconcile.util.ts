@@ -246,8 +246,9 @@ function normalizeVi(s: string): string {
  * "16.2" | "146,8" (1–2 chữ số sau dấu) = số lẻ NGHÌN → { value: 16200, vnd: true }.
  */
 function readNumber(segment: string): NoteNumber | null {
-  const m = /(\d[\d.,]*)\s*(k|nghin|ngan)?/.exec(segment);
+  const m = /(\d[\d.,]*)\s*(k|nghin|ngan|dong|vnd|d(?![a-z]))?/.exec(segment);
   if (!m) return null;
+  const dong = !!m[2] && /^(dong|vnd|d)$/.test(m[2]);
   const raw = m[1].replace(/[.,]+$/, '');
   const dec = /^(\d+)[.,](\d{1,2})$/.exec(raw);
   if (dec) {
@@ -255,10 +256,11 @@ function readNumber(segment: string): NoteNumber | null {
     return value > 0 ? { value, hasK: true, vnd: true } : null;
   }
   const value = Number(raw.replace(/[.,]/g, ''));
-  return Number.isFinite(value) && value > 0 ? { value, hasK: !!m[2] } : null;
+  return Number.isFinite(value) && value > 0 ? { value, hasK: !!m[2] && !dong, ...(dong ? { dong } : {}) } : null;
 }
 
-type NoteNumber = { value: number; hasK: boolean; vnd?: boolean };
+/** `dong`: số có ghi đơn vị "đồng" / "vnd" / "đ" (vd "dư 400 đồng") — chỉ parseExcessTransferNote dùng (18/11/2026) */
+type NoteNumber = { value: number; hasK: boolean; vnd?: boolean; dong?: boolean };
 // Số < 1000 (hoặc có "k") = nghìn đồng
 const asThousand = (n: NoteNumber) => n.vnd ? n.value : n.hasK || n.value < 1000 ? n.value * 1000 : n.value;
 // Dự phòng khi tổng lệch: coi mọi số < 100.000 là nghìn (vd "1.270" → 1.270.000)
@@ -308,7 +310,13 @@ export function parseExcessTransferNote(note: string, total: number): ExcessTran
   const back = rest.length > 0 ? readNumber(rest.join(' ')) : null;
   if (bare && !back) return null;
   if (!sent) return { transferred: 0, refund: null, status: 'unparsed' };
-  if (!back) return { transferred: asThousand(sent), refund: null, status: 'unparsed' };
+  if (!back) {
+    const n = sent.dong ? sent.value : asThousand(sent);
+    // "chuyển khoản dư 400 đồng" (không có "trả"): số NHỎ HƠN tổng HĐ = phần DƯ → khách chuyển = tổng + dư
+    // (18/11/2026 HD448312 444.000 ⇄ GD 444.400; trước đọc thành "khách chuyển 400.000" → tìm GD 400.000, lệch cả 2 bên)
+    if (withKeyword && n < total) return { transferred: total + n, refund: n, status: 'ok' };
+    return { transferred: n, refund: null, status: 'unparsed' };
+  }
 
   let transferred = asThousand(sent);
   let refund = asThousand(back);

@@ -4,11 +4,24 @@
 .pxi-close { border: none; background: transparent; font-size: 1.1rem; color: #64748b; cursor: pointer; }
 .pxi-hint { margin: 0; color: #475569; line-height: 1.5; }
 .pxi-pick { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.pxi-pick .btn { cursor: pointer; margin: 0; }
-.pxi-pick .btn.disabled { opacity: 0.6; pointer-events: none; }
+/* Style nút riêng: CSS của trang (.btn…) bị đóng gói theo component, không áp vào đây */
+.btn { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.55rem 1rem; border-radius: 8px; border: 1px solid transparent;
+  font-size: 0.875rem; font-weight: 500; line-height: 1.2; cursor: pointer; margin: 0; user-select: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; }
+.btn:hover:not(:disabled):not(.disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12); }
+.btn:disabled, .btn.disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
+.btn-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.btn-primary:hover:not(:disabled):not(.disabled) { background: #1d4ed8; }
+.btn-outline-primary { background: #fff; border-color: #2563eb; color: #2563eb; }
+.btn-outline-primary:hover:not(:disabled):not(.disabled) { background: #eff6ff; }
+.btn-outline-secondary { background: #fff; border-color: #cbd5e1; color: #475569; }
+.btn-outline-secondary:hover:not(:disabled):not(.disabled) { background: #f8fafc; }
 .pxi-alert { padding: 0.55rem 0.75rem; border-radius: 6px; }
 .pxi-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 .pxi-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.pxi-warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.pxi-cached { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
+  padding: 0.6rem 0.75rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; color: #1e3a8a; }
 .pxi-stats { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; padding: 0.5rem 0.75rem; background: #f8fafc; border-radius: 6px; }
 .pxi-stats .warn { color: #b45309; }
 .pxi-stats .muted { color: #64748b; }
@@ -20,3 +33,9 @@
 .pxi-table .code { font-family: ui-monospace, Consolas, monospace; white-space: nowrap; }
 .pxi-table .num { text-align: right; white-space: nowrap; }
 .pxi-actions { display: flex; gap: 0.5rem; }
+.pxi-sub { font-weight: 400; font-size: 0.8rem; color: #64748b; }
+.pxi-table .chk { width: 32px; text-align: center; }
+.pxi-table tr.picked { background: #eff6ff; }
+.pxi-table .old { color: #64748b; text-decoration: line-through; }
+.pxi-table .new { color: #15803d; font-weight: 500; }
+.pxi-table .addr { font-size: 0.8rem; }

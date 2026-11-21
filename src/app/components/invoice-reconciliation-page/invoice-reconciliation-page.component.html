@@ -66,53 +66,70 @@
         <input type="file" accept=".xlsx" (change)="onOldCatalogSelected($event)" [disabled]="oldBusy" hidden>
       </label>
       @if (hhStatus?.old?.count) {
-      <button type="button" class="btn" (click)="loadUnmatched()" [disabled]="unmatchedLoading">
-        <i class="fa-solid" [ngClass]="unmatchedLoading ? 'fa-spinner fa-spin' : 'fa-list-check'"></i> Mã cũ chưa ghép
-      </button>
-      <button type="button" class="btn" (click)="loadAssigned()" [disabled]="assignedLoading"
-        title="Rà các mã master đã có mã HH — đổi mã / bỏ gán khi ghép sai">
-        <i class="fa-solid" [ngClass]="assignedLoading ? 'fa-spinner fa-spin' : 'fa-magnifying-glass'"></i> Mã HH đã ghép
+      <button type="button" class="btn" (click)="openCodes()" [disabled]="unmatchedLoading || assignedLoading"
+        title="Mã cũ chưa ghép (gán tay) · Mã HH đã ghép (rà / đổi / bỏ gán)">
+        <i class="fa-solid" [ngClass]="unmatchedLoading || assignedLoading ? 'fa-spinner fa-spin' : 'fa-list-check'"></i> Rà mã HH
       </button>
       }
     </div>
     <div class="hint indent">Xuất từ Vietda: Hệ thống &gt; Cập nhật danh mục &gt; Vật tư, hàng hóa &gt; Excel. Máy ghép mã cũ khi tên
       trùng + ĐVT Vietda = ĐVT nhỏ nhất KiotViet; còn lại gán tay ở bảng "Hàng chưa có mã HH" của kết quả đối soát (hoặc "Mã cũ
-      chưa ghép"). Thêm mã mới trong Vietda → xuất lại danh mục → tải lên lại. Sau khi tải / gán: <b>Đối soát</b> lại thư mục XML rồi
+      chưa ghép" trong <b>Rà mã HH</b>). Thêm mã mới trong Vietda → xuất lại danh mục → tải lên lại. Sau khi tải / gán: <b>Đối soát</b> lại thư mục XML rồi
       <b>Tải XML quy đổi</b>.</div>
     @if (oldResult) {
     <div class="msg ok"><i class="fa-solid fa-circle-check"></i>
       Đọc {{ oldResult.old_count | number }} mã HH / KM · dùng mã cũ cho {{ oldResult.old_used | number }} mã
       (ghép thêm lần này {{ oldResult.remapped | number }})
       @if (reasonsText(oldResult.skipped)) { · bỏ qua: {{ reasonsText(oldResult.skipped) }} }
-      @if (reasonsText(oldResult.unmatched)) { <br>Chưa ghép: {{ reasonsText(oldResult.unmatched) }} → bấm "Mã cũ chưa ghép" để gán tay }
+      @if (reasonsText(oldResult.unmatched)) { <br>Chưa ghép: {{ reasonsText(oldResult.unmatched) }} → bấm "Rà mã HH" để gán tay }
     </div>
     }
     @if (oldError) {
     <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ oldError }}</div>
     }
-    @if (unmatched) {
+    @if (codeTab) {
+    <div class="code-panel">
+    <nav class="code-tabs">
+      <button type="button" [class.active]="codeTab === 'unmatched'" (click)="setCodeTab('unmatched')">
+        <i class="fa-solid fa-link-slash"></i> Mã cũ chưa ghép @if (unmatched) { ({{ unmatched.length | number }}) }
+      </button>
+      <button type="button" [class.active]="codeTab === 'assigned'" (click)="setCodeTab('assigned')">
+        <i class="fa-solid fa-link"></i> Mã HH đã ghép
+        @if (assigned) { ({{ assigned.length | number }} · <span class="warn">{{ assignedCount('flagged') | number }} đáng ngờ</span>) }
+      </button>
+      <span class="spacer"></span>
+      <button type="button" (click)="closeCodes()" title="Đóng bảng"><i class="fa-solid fa-xmark"></i> Đóng</button>
+    </nav>
+    <div class="side-legend">Màu cột: <span class="side-chip vd">Vietda (kế toán, theo HĐ đầu vào)</span>
+      <span class="side-chip kv">KiotViet (cửa hàng bán)</span></div>
+    @if (codeTab === 'unmatched') {
+    @if (unmatchedLoading && !unmatched) {
+    <div class="hint">Đang tải...</div>
+    } @else if (unmatched) {
     <div class="row">
       <b>{{ unmatched.length | number }}</b>&nbsp;/ {{ unmatchedTotal | number }} mã cũ chưa ghép
       <input type="text" class="input" [(ngModel)]="unmatchedFilter" placeholder="Lọc mã / tên / lý do">
       @if (unmatchedFiltered.length > unmatchedShow) {
       <span class="hint">hiện {{ unmatchedShow }} dòng đầu / {{ unmatchedFiltered.length | number }} — gõ lọc để tìm</span>
       }
-      <button type="button" class="btn small" (click)="unmatched = null">Đóng</button>
+      <button type="button" class="btn small" (click)="loadUnmatched()" [disabled]="unmatchedLoading">
+        <i class="fa-solid fa-rotate" [class.fa-spin]="unmatchedLoading"></i> Tải lại</button>
     </div>
     @if (assignMsg) { <div class="hint indent">{{ assignMsg }}</div> }
-    <div class="runs-wrap">
-      <table class="runs">
+    <div class="runs-wrap review-frame">
+      <table class="runs review">
         <thead>
-          <tr><th>Mã cũ</th><th>Tên trên Vietda</th><th>ĐVT</th><th>Lý do chưa ghép</th><th>Gán cho mã master KiotViet (bấm được nhiều mã)</th></tr>
+          <tr><th class="vd">Mã cũ Vietda</th><th class="vd">Tên trên Vietda</th><th class="vd">ĐVT Vietda</th><th>Lý do chưa ghép</th>
+            <th class="kv">Gán cho mã master KiotViet (bấm được nhiều mã)</th></tr>
         </thead>
         <tbody>
           @for (r of unmatchedFiltered.slice(0, unmatchedShow); track r.hh) {
           <tr>
-            <td>{{ r.hh }}</td>
-            <td>{{ r.name }}</td>
-            <td>{{ r.unit }}</td>
+            <td class="vd">{{ r.hh }}</td>
+            <td class="vd">{{ r.name }}</td>
+            <td class="vd">{{ r.unit }}</td>
             <td>{{ r.reason }}</td>
-            <td>
+            <td class="kv">
               @for (s of r.suggestions; track s.master_code) {
               <div>
                 <button type="button" class="btn small" (click)="assign(r, s)"
@@ -121,7 +138,7 @@
                   @if (assignedOld[r.hh]?.includes(s.master_code)) { <i class="fa-solid fa-check"></i> }
                   {{ s.master_code }}</button>
                 {{ s.name }} ({{ s.unit }})
-                @if (!s.unit_ok) { <span class="warn">ĐVT khác</span> }
+                @if (!s.unit_ok) { <span class="warn" title="Bấm gán sẽ hỏi hệ số: 1 ĐVT Vietda = ? ĐVT KiotViet">ĐVT khác — sẽ hỏi hệ số</span> }
               </div>
               }
               <div>
@@ -143,14 +160,17 @@
       </table>
     </div>
     }
+    } @else {
     @if (assignedError) {
     <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ assignedError }}</div>
     }
-    @if (assigned) {
-    <h3 class="review-title">Mã HH đã ghép ({{ assigned.length | number }} mã master)</h3>
+    @if (assignedLoading && !assigned) {
+    <div class="hint">Đang tải...</div>
+    } @else if (assigned) {
     <p class="hint">Dòng <b>Đáng ngờ</b>: quy cách (ml / g) khác nhau, tên khác xa, ĐVT lệch, sai loại HH / KM, hoặc mã master không
       còn trên KiotViet. Máy không phân biệt được hương vị / màu — lọc theo tên để rà thêm. Ghép sai: gõ mã đúng → <b>Đổi</b>, hoặc
-      <b>Bỏ gán</b> (mã master về "chưa có mã HH"). Xong <b>Đối soát</b> lại thư mục XML.</p>
+      <b>Bỏ gán</b> (mã master về "chưa có mã HH"). ĐVT Vietda khác ĐVT KiotViet (vd KiotViet bán "lốc (4h)", Vietda tính "Hộp")
+      → <b>Hệ số ĐVT</b> (1 lốc = 4 hộp): XML quy đổi ghi theo ĐVT Vietda, đơn giá chia theo. Xong <b>Đối soát</b> lại thư mục XML.</p>
     @if (!assignedHasCatalog) {
     <div class="msg error"><i class="fa-solid fa-triangle-exclamation"></i> Chưa có bảng quy đổi KiotViet trên máy chủ — không so
       được tên KiotViet, không có cờ đáng ngờ.</div>
@@ -172,26 +192,34 @@
         <i class="fa-solid fa-file-excel"></i> Tải Excel</button>
       <button type="button" class="btn small" (click)="loadAssigned()" [disabled]="assignedLoading">
         <i class="fa-solid fa-rotate" [class.fa-spin]="assignedLoading"></i> Tải lại</button>
-      <button type="button" class="btn small" (click)="closeAssigned()">Đóng</button>
     </div>
     @if (assignedMsg) { <div class="hint indent">{{ assignedMsg }}</div> }
     <div class="runs-wrap review-frame">
       <table class="runs review">
         <thead>
           <tr>
-            <th>Mã master</th><th>Tên KiotViet</th><th>ĐVT</th><th>Mã HH</th><th>Tên Vietda</th><th>ĐVT Vietda</th>
+            <th class="kv">Mã master</th><th class="kv">Tên KiotViet</th><th class="kv">ĐVT KiotViet</th>
+            <th class="vd">Mã HH</th><th class="vd">Tên Vietda</th><th class="vd">ĐVT Vietda</th>
+            <th title="1 ĐVT Vietda = ? ĐVT nhỏ nhất KiotViet (chỉ khi 2 ĐVT khác nhau)">Hệ số ĐVT</th>
             <th>Nguồn</th><th>Cảnh báo</th><th>Đổi mã / bỏ gán</th>
           </tr>
         </thead>
         <tbody>
           @for (r of assignedVisible; track r.master_code) {
           <tr>
-            <td>{{ r.master_code }}</td>
-            <td class="wrap">{{ r.kv_name }}</td>
-            <td>{{ r.kv_unit }}</td>
-            <td>{{ r.hh }}@if (r.shared > 1) { <br><small title="Số mã master dùng chung mã HH này">dùng chung {{ r.shared }}</small> }</td>
-            <td class="wrap">{{ r.vd_name }}</td>
-            <td>{{ r.vd_unit }}</td>
+            <td class="kv">{{ r.master_code }}</td>
+            <td class="kv wrap">{{ r.kv_name }}</td>
+            <td class="kv">{{ r.kv_unit }}</td>
+            <td class="vd">{{ r.hh }}@if (r.shared > 1) { <br><small title="Số mã master dùng chung mã HH này">dùng chung {{ r.shared }}</small> }</td>
+            <td class="vd wrap">{{ r.vd_name }}</td>
+            <td class="vd">{{ r.vd_unit }}</td>
+            <td>
+              {{ r.he_so_text }}
+              @if (r.he_so || hasUnitFlag(r)) {
+              <button type="button" class="btn small" (click)="changeFactor(r)" [disabled]="!!assignedBusy"
+                title="Sửa hệ số: 1 ĐVT Vietda = ? ĐVT KiotViet">{{ r.he_so ? 'Sửa' : 'Nhập hệ số' }}</button>
+              }
+            </td>
             <td>{{ r.source === 'manual' ? 'Gán tay' : 'Máy ghép' }}</td>
             <td class="wrap">
               @for (f of r.flags; track f.kind) { <div class="warn">{{ f.text }}</div> }
@@ -204,10 +232,13 @@
             </td>
           </tr>
           } @empty {
-          <tr><td colspan="9" class="empty">{{ assignedView === 'flagged' ? 'Không còn dòng đáng ngờ.' : 'Không có dòng nào.' }}</td></tr>
+          <tr><td colspan="10" class="empty">{{ assignedView === 'flagged' ? 'Không còn dòng đáng ngờ.' : 'Không có dòng nào.' }}</td></tr>
           }
         </tbody>
       </table>
+    </div>
+    }
+    }
     </div>
     }
     @if (catalogInfo) {
@@ -404,7 +435,7 @@
                 <button type="button" class="btn small" (click)="assignHh(r, s.hh)" [disabled]="!!hhAssigning"
                   [title]="'Điểm giống tên ' + s.score">{{ s.hh }}</button>
                 {{ s.name }} ({{ s.unit }})
-                @if (!s.unit_ok) { <span class="warn">ĐVT khác — máy chủ sẽ từ chối</span> }
+                @if (!s.unit_ok) { <span class="warn" title="Bấm gán sẽ hỏi hệ số: 1 ĐVT Vietda = ? ĐVT KiotViet">ĐVT khác — sẽ hỏi hệ số</span> }
               </div>
               } @empty { <span class="hint">Không có mã gần giống — thêm mã mới vào Vietda</span> }
             </td>

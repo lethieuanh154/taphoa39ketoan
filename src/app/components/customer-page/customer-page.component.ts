@@ -2,310 +2,469 @@
  * ═══════════════════════════════════════════════════════════════════════════════
  * CUSTOMER PAGE COMPONENT - DANH MỤC KHÁCH HÀNG
  * ═══════════════════════════════════════════════════════════════════════════════
+ * Dữ liệu thật ở ledger-rs `/api/ledger/partners` (vai CUSTOMER, spec 002-danh-muc-doi-tuong). Mã để trống → BE tự cấp KH0001…;
+ * MST trùng cùng vai / mã trùng / sai định dạng do BE kiểm → hiện đúng lý do BE trả về.
+ * Log chỉ mã + số lượng — KHÔNG log MST, SĐT, địa chỉ, từ khóa tìm kiếm.
  */
 
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subject, takeUntil } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Subject, debounceTime, switchMap, takeUntil, catchError, of, tap } from 'rxjs';
 
-import { CustomerService } from '../../services/customer.service';
+import { PartnerService } from '../../services/partner.service';
+import { httpErrorText } from '../../services/auth.service';
 import {
-  Customer,
-  CustomerType,
-  CustomerGroup,
-  CustomerStatus,
-  CustomerFilter,
-  ContactInfo,
-  BankAccount,
-  CUSTOMER_TYPES,
-  CUSTOMER_GROUPS,
-  CUSTOMER_STATUS,
-  formatFullAddress
-} from '../../models/customer.models';
+  Partner,
+  PartnerHistoryEntry,
+  PartnerPatch,
+  PartnerStatus,
+  PARTNER_CODE_RE,
+  TAX_CODE_RE,
+  getPartnerRoleName,
+  getPartnerStatusName,
+  normalizeTaxCode
+} from '../../models/partner.models';
+import { PartnerXmlImportComponent } from '../shared/partner-xml-import/partner-xml-import.component';
+
+const LOG = '[CustomerPage]';
+const ROLE = 'CUSTOMER' as const;
+
+interface PartnerForm {
+  code: string;
+  name: string;
+  taxCode: string;
+  address: string;
+  phone: string;
+  email: string;
+  status: PartnerStatus;
+  note: string;
+}
+
+const EMPTY_FORM: PartnerForm = { code: '', name: '', taxCode: '', address: '', phone: '', email: '', status: 'ACTIVE', note: '' };
+
+const FIELD_LABELS: Record<string, string> = {
+  code: 'Mã', role: 'Vai', name: 'Tên', tax_code: 'MST', address: 'Địa chỉ', phone: 'Điện thoại', email: 'Email',
+  note: 'Ghi chú', status: 'Trạng thái', bank_account_no: 'Số tài khoản', bank_name: 'Ngân hàng', bank_branch: 'Chi nhánh'
+};
 
 @Component({
   selector: 'app-customer-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PartnerXmlImportComponent],
   templateUrl: './customer-page.component.html',
   styleUrl: './customer-page.component.css'
 })
 export class CustomerPageComponent implements OnInit, OnDestroy {
-
+  private partnerService = inject(PartnerService);
   private destroy$ = new Subject<void>();
+  /** chỉ phát khi có từ khóa (gọi BE); lọc trạng thái làm tại máy */
+  private searchChange$ = new Subject<void>();
+  private successTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // STATE
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  customers: Customer[] = [];
-  filteredCustomers: Customer[] = [];
+  /** toàn bộ KH (cho thống kê) */
+  allCustomers: Partner[] = [];
+  /** kết quả lọc ở BE */
+  customers: Partner[] = [];
   loading = false;
+  saving = false;
 
-  // Filter
-  filter: CustomerFilter = {
-    search: '',
-    status: 'ACTIVE'
-  };
+  search = '';
+  statusFilter: PartnerStatus | '' = '';
 
-  // Selected
-  selectedCustomer: Customer | null = null;
+  errorMessage = '';
+  successMessage = '';
+  formError = '';
 
-  // Modals
-  showCreateModal = false;
+  selected: Partner | null = null;
+  showFormModal = false;
   showDetailModal = false;
   showDeleteConfirm = false;
+  showImport = false;
   isEditMode = false;
+  form: PartnerForm = { ...EMPTY_FORM };
 
-  // Form
-  formData: Partial<Customer> = {};
-  formContacts: ContactInfo[] = [];
-  formBankAccounts: BankAccount[] = [];
+  /** MST đang nhập đã có ở vai khác → gợi ý điền sẵn (R3) */
+  taxSuggestion: Partner | null = null;
+  /** MST đang nhập đã có ở KH khác → BE sẽ từ chối */
+  taxDuplicate: Partner | null = null;
 
-  // Reference data
-  customerTypes = CUSTOMER_TYPES;
-  customerGroups = CUSTOMER_GROUPS;
-  customerStatus = CUSTOMER_STATUS;
+  history: PartnerHistoryEntry[] = [];
+  historyLoading = false;
+  historyError = '';
 
-  // Stats
-  stats = {
-    total: 0,
-    active: 0,
-    inactive: 0,
-    byGroup: {} as Record<CustomerGroup, number>
-  };
+  get stats() {
+    const active = this.allCustomers.filter(s => s.status === 'ACTIVE').length;
+    return {
+      total: this.allCustomers.length,
+      active,
+      inactive: this.allCustomers.length - active,
+      withTax: this.allCustomers.filter(s => !!s.taxCode).length
+    };
+  }
 
-  constructor(private customerService: CustomerService) {}
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LIFECYCLE
-  // ═══════════════════════════════════════════════════════════════════════════
+  get hasFilter(): boolean {
+    return !!this.search.trim() || !!this.statusFilter;
+  }
 
   ngOnInit(): void {
-    this.loadCustomers();
-    this.loadStats();
-
-    this.customerService.loading$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(loading => this.loading = loading);
+    // Có từ khóa → gọi BE (tìm không dấu bằng unaccent ở Postgres). Không có → lọc trạng thái tại máy trên allCustomers (0 request).
+    this.searchChange$.pipe(
+      debounceTime(300),
+      tap(() => this.loading = true),
+      switchMap(() => this.partnerService.getPartners({
+        role: ROLE,
+        search: this.search,
+        status: this.statusFilter || undefined
+      }).pipe(catchError(err => {
+        this.errorMessage = this.reasonText(err, 'Tìm khách hàng');
+        return of(null);
+      }))),
+      takeUntil(this.destroy$)
+    ).subscribe(rows => {
+      this.loading = false;
+      // đã xóa từ khóa trong lúc chờ BE → bỏ kết quả cũ (bảng đang lọc tại máy)
+      if (!rows || !this.search.trim()) return;
+      this.customers = rows;
+      console.info(`${LOG} tìm (gọi BE): ${rows.length} dòng`);
+    });
+    this.reload();
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.successTimer) clearTimeout(this.successTimer);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DATA LOADING
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  loadCustomers(): void {
-    this.customerService.getCustomers(this.filter)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(customers => {
-        this.customers = customers;
-        this.filteredCustomers = customers;
-      });
+  /** Tải toàn bộ khách hàng 1 lần (thống kê + bảng) rồi áp lại bộ lọc đang chọn */
+  reload(): void {
+    this.loading = true;
+    this.partnerService.getPartners({ role: ROLE }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: rows => {
+        this.allCustomers = rows;
+        this.loading = false;
+        this.applyFilter();
+      },
+      error: err => {
+        this.loading = false;
+        this.errorMessage = this.reasonText(err, 'Tải danh sách khách hàng');
+      }
+    });
   }
 
-  loadStats(): void {
-    this.customerService.customers$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(customers => {
-        this.stats.total = customers.length;
-        this.stats.active = customers.filter(c => c.status === 'ACTIVE').length;
-        this.stats.inactive = customers.filter(c => c.status === 'INACTIVE').length;
-      });
-
-    this.customerService.getCountByGroup()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(counts => this.stats.byGroup = counts);
+  /** Không có từ khóa → lọc trạng thái tại máy; có từ khóa → gọi BE (debounce 300ms) */
+  private applyFilter(): void {
+    if (this.search.trim()) {
+      this.searchChange$.next();
+      return;
+    }
+    this.customers = this.statusFilter ? this.allCustomers.filter(p => p.status === this.statusFilter) : this.allCustomers;
+    console.debug(`${LOG} lọc tại máy: ${this.customers.length}/${this.allCustomers.length}`);
   }
 
   onFilterChange(): void {
-    this.loadCustomers();
+    this.applyFilter();
   }
 
-  onStatusFilterChange(status: CustomerStatus | ''): void {
-    this.filter.status = status || undefined;
-    this.loadCustomers();
+  clearSearch(): void {
+    this.search = '';
+    this.statusFilter = '';
+    this.applyFilter();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CREATE / EDIT
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ─── THÊM / SỬA ────────────────────────────────────────────────────────────
 
   openCreateModal(): void {
     this.isEditMode = false;
-    this.customerService.getNextCustomerCode()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(code => {
-        this.formData = {
-          code,
-          customerType: 'COMPANY',
-          customerGroup: 'RETAIL',
-          status: 'ACTIVE',
-          paymentTermDays: 0,
-          accountCode: '131'
-        };
-        this.formContacts = [];
-        this.formBankAccounts = [];
-        this.showCreateModal = true;
-      });
+    this.selected = null;
+    this.form = { ...EMPTY_FORM };
+    this.resetFormHints();
+    this.showFormModal = true;
   }
 
-  openEditModal(customer: Customer): void {
+  openEditModal(p: Partner): void {
     this.isEditMode = true;
-    this.selectedCustomer = customer;
-    this.formData = { ...customer };
-    this.formContacts = [...(customer.contacts || [])];
-    this.formBankAccounts = [...(customer.bankAccounts || [])];
-    this.showCreateModal = true;
-  }
-
-  closeCreateModal(): void {
-    this.showCreateModal = false;
-    this.formData = {};
-    this.formContacts = [];
-    this.formBankAccounts = [];
-    this.selectedCustomer = null;
-    this.isEditMode = false;
-  }
-
-  // Contact management
-  addContact(): void {
-    this.formContacts.push({ name: '', position: '', phone: '', email: '' });
-  }
-
-  removeContact(index: number): void {
-    this.formContacts.splice(index, 1);
-  }
-
-  // Bank account management
-  addBankAccount(): void {
-    this.formBankAccounts.push({ bankName: '', accountNumber: '', accountHolder: '', branch: '' });
-  }
-
-  removeBankAccount(index: number): void {
-    this.formBankAccounts.splice(index, 1);
-  }
-
-  saveCustomer(): void {
-    if (!this.validateForm()) return;
-
-    const customerData: Partial<Customer> = {
-      ...this.formData,
-      contacts: this.formContacts.filter(c => c.name),
-      bankAccounts: this.formBankAccounts.filter(b => b.bankName && b.accountNumber)
+    this.selected = p;
+    this.form = {
+      code: p.code, name: p.name, taxCode: p.taxCode ?? '', address: p.address, phone: p.phone,
+      email: p.email, status: p.status, note: p.note
     };
+    this.resetFormHints();
+    this.showDetailModal = false;
+    this.showFormModal = true;
+  }
 
-    if (this.isEditMode && this.selectedCustomer) {
-      this.customerService.updateCustomer(this.selectedCustomer.id, customerData)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: () => {
-            this.closeCreateModal();
-            this.loadCustomers();
-            this.loadStats();
-          },
-          error: (err) => alert(err.message)
-        });
+  closeFormModal(): void {
+    if (this.saving) return;
+    this.showFormModal = false;
+    this.resetFormHints();
+  }
+
+  private resetFormHints(): void {
+    this.formError = '';
+    this.taxSuggestion = null;
+    this.taxDuplicate = null;
+  }
+
+  /** Rời ô MST: tìm đối tượng cùng MST (vai khác → gợi ý điền sẵn; cùng vai → cảnh báo trùng) */
+  onTaxCodeBlur(): void {
+    const tax = normalizeTaxCode(this.form.taxCode);
+    this.taxSuggestion = null;
+    this.taxDuplicate = null;
+    if (!TAX_CODE_RE.test(tax) || (this.isEditMode && tax === (this.selected?.taxCode ?? ''))) return;
+    this.partnerService.getPartners({ search: tax }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: rows => {
+        const same = rows.filter(r => r.taxCode === tax && r.code !== this.selected?.code);
+        this.taxDuplicate = same.find(r => r.role === ROLE) ?? null;
+        this.taxSuggestion = this.taxDuplicate ? null : (same.find(r => r.role !== ROLE) ?? null);
+        if (same.length) console.info(`${LOG} MST đang nhập đã có ở ${same.map(r => r.code).join(', ')}`);
+      },
+      error: err => console.warn(`${LOG} kiểm MST trùng lỗi — ${httpErrorText(err)}`)
+    });
+  }
+
+  /** Điền sẵn tên / địa chỉ / SĐT / email từ đối tượng vai khác cùng MST */
+  applySuggestion(): void {
+    const s = this.taxSuggestion;
+    if (!s) return;
+    this.form = { ...this.form, name: this.form.name || s.name, address: this.form.address || s.address,
+      phone: this.form.phone || s.phone, email: this.form.email || s.email };
+    console.info(`${LOG} điền sẵn từ ${s.code}`);
+    this.taxSuggestion = null;
+  }
+
+  roleName(p: Partner): string {
+    return getPartnerRoleName(p.role);
+  }
+
+  private validate(): string {
+    if (!this.form.name.trim()) return 'Nhập tên khách hàng.';
+    const code = this.form.code.trim().toUpperCase();
+    if (!this.isEditMode && code && !PARTNER_CODE_RE.test(code)) {
+      return 'Mã chỉ gồm chữ A–Z, số, "-", "_", tối đa 20 ký tự (để trống = tự cấp).';
+    }
+    const tax = normalizeTaxCode(this.form.taxCode);
+    if (tax && !TAX_CODE_RE.test(tax)) return 'MST gồm 10 số, 10 số-3 số (chi nhánh) hoặc 12 số (cá nhân).';
+    const email = this.form.email.trim();
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return 'Email không đúng định dạng.';
+    return '';
+  }
+
+  save(): void {
+    if (this.saving) return;
+    this.formError = this.validate();
+    if (this.formError) {
+      console.warn(`${LOG} form không hợp lệ: ${this.formError}`);
+      return;
+    }
+    this.saving = true;
+    const f = this.form;
+    if (this.isEditMode && this.selected) {
+      const before = this.selected;
+      const changes: PartnerPatch = {};
+      const set = <K extends keyof PartnerPatch>(k: K, now: PartnerPatch[K], old: PartnerPatch[K]) => { if (now !== old) changes[k] = now; };
+      set('name', f.name.trim(), before.name);
+      set('taxCode', normalizeTaxCode(f.taxCode), before.taxCode ?? '');
+      set('address', f.address.trim(), before.address);
+      set('phone', f.phone.trim(), before.phone);
+      set('email', f.email.trim(), before.email);
+      set('status', f.status, before.status);
+      set('note', f.note.trim(), before.note);
+      if (!Object.keys(changes).length) {
+        this.saving = false;
+        this.showFormModal = false;
+        return;
+      }
+      this.partnerService.updatePartner(before.code, changes).pipe(takeUntil(this.destroy$)).subscribe({
+        next: p => this.afterSave(`Đã lưu ${p.code}.`),
+        error: err => this.failSave(err, `Sửa ${before.code}`)
+      });
     } else {
-      this.customerService.createCustomer(customerData)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: () => {
-            this.closeCreateModal();
-            this.loadCustomers();
-            this.loadStats();
-          },
-          error: (err) => alert(err.message)
-        });
+      this.partnerService.addPartner({
+        role: ROLE, code: f.code.trim().toUpperCase(), name: f.name.trim(), taxCode: normalizeTaxCode(f.taxCode),
+        address: f.address, phone: f.phone, email: f.email, status: f.status, note: f.note
+      }).pipe(takeUntil(this.destroy$)).subscribe({
+        next: p => this.afterSave(`Đã thêm khách hàng ${p.code}.`),
+        error: err => this.failSave(err, 'Thêm khách hàng')
+      });
     }
   }
 
-  validateForm(): boolean {
-    if (!this.formData.code?.trim()) {
-      alert('Vui lòng nhập mã khách hàng');
-      return false;
-    }
-    if (!this.formData.name?.trim()) {
-      alert('Vui lòng nhập tên khách hàng');
-      return false;
-    }
-    if (!this.formData.address?.trim()) {
-      alert('Vui lòng nhập địa chỉ');
-      return false;
-    }
-    return true;
+  private afterSave(msg: string): void {
+    this.saving = false;
+    this.showFormModal = false;
+    this.showSuccess(msg);
+    this.reload();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // VIEW DETAIL
-  // ═══════════════════════════════════════════════════════════════════════════
+  private failSave(err: unknown, action: string): void {
+    this.saving = false;
+    this.formError = this.reasonText(err, action);
+  }
 
-  viewDetail(customer: Customer): void {
-    this.selectedCustomer = customer;
+  // ─── NGỪNG DÙNG / XÓA ──────────────────────────────────────────────────────
+
+  toggleStatus(p: Partner): void {
+    const status: PartnerStatus = p.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    this.partnerService.updatePartner(p.code, { status }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.showSuccess(`${p.code}: ${getPartnerStatusName(status).toLowerCase()}.`);
+        this.reload();
+      },
+      error: err => this.errorMessage = this.reasonText(err, `Đổi trạng thái ${p.code}`)
+    });
+  }
+
+  confirmDelete(p: Partner): void {
+    this.selected = p;
+    this.showDeleteConfirm = true;
+  }
+
+  cancelDelete(): void {
+    this.showDeleteConfirm = false;
+  }
+
+  deleteSelected(): void {
+    const p = this.selected;
+    if (!p || this.saving) return;
+    this.saving = true;
+    this.partnerService.deletePartner(p.code).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.saving = false;
+        this.showDeleteConfirm = false;
+        this.selected = null;
+        this.showSuccess(`Đã xóa ${p.code}.`);
+        this.reload();
+      },
+      error: err => {
+        this.saving = false;
+        this.showDeleteConfirm = false;
+        this.errorMessage = this.reasonText(err, `Xóa ${p.code}`);
+      }
+    });
+  }
+
+  // ─── CHI TIẾT + LỊCH SỬ ───────────────────────────────────────────────────
+
+  viewDetail(p: Partner): void {
+    this.selected = p;
+    this.history = [];
+    this.historyError = '';
     this.showDetailModal = true;
   }
 
   closeDetailModal(): void {
     this.showDetailModal = false;
-    this.selectedCustomer = null;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DELETE
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  confirmDelete(customer: Customer): void {
-    this.selectedCustomer = customer;
-    this.showDeleteConfirm = true;
+  loadHistory(): void {
+    const p = this.selected;
+    if (!p) return;
+    this.historyLoading = true;
+    this.historyError = '';
+    this.partnerService.getHistory(p.code).pipe(takeUntil(this.destroy$)).subscribe({
+      next: rows => { this.history = rows; this.historyLoading = false; },
+      error: err => { this.historyError = this.reasonText(err, 'Tải lịch sử'); this.historyLoading = false; }
+    });
   }
 
-  deleteCustomer(): void {
-    if (!this.selectedCustomer) return;
-
-    this.customerService.deleteCustomer(this.selectedCustomer.id)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.showDeleteConfirm = false;
-          this.selectedCustomer = null;
-          this.loadCustomers();
-          this.loadStats();
-        },
-        error: (err) => alert(err.message)
-      });
+  getActionLabel(a: PartnerHistoryEntry['action']): string {
+    return a === 'INSERT' ? 'Thêm' : a === 'UPDATE' ? 'Sửa' : 'Xóa';
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // UTILITIES
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  getCustomerTypeLabel(type: CustomerType): string {
-    return CUSTOMER_TYPES.find(t => t.value === type)?.label || type;
+  getFieldLabel(f: string): string {
+    return FIELD_LABELS[f] ?? f;
   }
 
-  getCustomerGroupLabel(group: CustomerGroup): string {
-    return CUSTOMER_GROUPS.find(g => g.value === group)?.label || group;
+  formatValue(field: string, v: unknown): string {
+    if (v === null || v === undefined || v === '') return '(trống)';
+    if (field === 'status') return getPartnerStatusName(v as PartnerStatus);
+    return String(v);
   }
 
-  getStatusLabel(status: CustomerStatus): string {
-    return status === 'ACTIVE' ? 'Hoạt động' : 'Ngừng HĐ';
+  // ─── XUẤT EXCEL / TẠO TỪ XML ───────────────────────────────────────────────
+
+  exportExcel(): void {
+    this.partnerService.exportExcel(ROLE).pipe(takeUntil(this.destroy$)).subscribe({
+      next: blob => {
+        const d = new Date();
+        const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `khach-hang-${stamp}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: err => this.errorMessage = this.reasonText(err, 'Xuất Excel')
+    });
   }
 
-  getStatusClass(status: CustomerStatus): string {
-    return status === 'ACTIVE' ? 'status-active' : 'status-inactive';
+  openImport(): void {
+    this.showImport = true;
   }
 
-  formatCurrency(amount: number | undefined): string {
-    if (!amount) return '-';
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  closeImport(): void {
+    this.showImport = false;
   }
 
-  formatFullAddress(customer: Customer): string {
-    return formatFullAddress(customer);
+  onImported(n: number): void {
+    console.info(`${LOG} tạo từ XML: ${n} KH`);
+    if (n) this.reload();
+  }
+
+  // ─── ĐÓNG MODAL KHI BẤM NỀN ────────────────────────────────────────────────
+  // Chỉ đóng khi CẢ mousedown lẫn click đều trên nền: bôi đen chữ trong ô nhập rồi thả chuột ra ngoài modal
+  // sinh sự kiện click trên nền → trước đây modal tự đóng, mất dữ liệu đang nhập.
+
+  private backdropDown = false;
+
+  onBackdropDown(e: MouseEvent): void {
+    this.backdropDown = e.target === e.currentTarget;
+  }
+
+  onBackdropClick(e: MouseEvent, which: 'form' | 'detail' | 'delete'): void {
+    const close = this.backdropDown && e.target === e.currentTarget;
+    this.backdropDown = false;
+    if (!close) return;
+    if (which === 'form') this.closeFormModal();
+    else if (which === 'detail') this.closeDetailModal();
+    else this.cancelDelete();
+  }
+
+  // ─── THÔNG BÁO ─────────────────────────────────────────────────────────────
+
+  dismissError(): void {
+    this.errorMessage = '';
+  }
+
+  getStatusLabel(s: PartnerStatus): string {
+    return getPartnerStatusName(s);
+  }
+
+  getStatusClass(s: PartnerStatus): string {
+    return s === 'ACTIVE' ? 'status-active' : 'status-inactive';
+  }
+
+  private showSuccess(msg: string): void {
+    this.errorMessage = '';
+    this.successMessage = msg;
+    if (this.successTimer) clearTimeout(this.successTimer);
+    this.successTimer = setTimeout(() => this.successMessage = '', 4000);
+  }
+
+  /** Lý do cho người dùng: mất kết nối / hết phiên / không quyền / lỗi máy chủ / lý do BE (vd "MST … đã dùng cho KH0003") */
+  private reasonText(err: unknown, action: string): string {
+    if (err instanceof HttpErrorResponse) {
+      if (err.status === 0) return `${action}: không kết nối được máy chủ ledger — kiểm tra mạng / ledger-rs.`;
+      if (err.status === 401) return `${action}: phiên đăng nhập hết hạn — đăng nhập lại.`;
+      if (err.status === 403) return `${action}: email này không có quyền dùng kế toán chi tiết.`;
+      if (err.status >= 500) return `${action}: lỗi máy chủ, thử lại sau.`;
+      return `${action}: ${err.error?.detail || httpErrorText(err)}`;
+    }
+    console.error(`${LOG} ${action}: lỗi không mong đợi`, err);
+    return `${action}: ${(err as Error)?.message || err}`;
   }
 }

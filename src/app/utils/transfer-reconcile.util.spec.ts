@@ -67,6 +67,18 @@ describe('transfer-reconcile.util', () => {
       expect(parseExcessTransferNote('chuyển khoản dư', 99000)?.status).toBe('unparsed');
     });
 
+    it('"chuyển khoản dư X" không có "trả", X < tổng HĐ = phần DƯ (mẫu thật HD448312 18/11: 444.000 ⇄ GD 444.400)', () => {
+      expect(parseExcessTransferNote('chuyển khoản dư 400 đồng', 444000)).toEqual({ transferred: 444400, refund: 400, status: 'ok' });
+      expect(parseExcessTransferNote('chuyển khoản dư 400đ', 444000)).toEqual({ transferred: 444400, refund: 400, status: 'ok' });
+      expect(parseExcessTransferNote('ck dư 5k', 120000)).toEqual({ transferred: 125000, refund: 5000, status: 'ok' });
+      const pairs = reconcileByAmount(expandInvoiceItems([inv('HD448312', 444000, '18/11/2026 17:46:10', 'chuyển khoản dư 400 đồng')]),
+        [txn('T1', 444400, '18/11/2026 17:45:50', 'NGO KIM QUANG'), txn('T2', 400000, '18/11/2026 17:30:00')]);
+      expect(pairs.find(p => p.item)!.txn?.code).toBe('T1');
+      expect(pairs.find(p => p.txn?.code === 'T2')!.kind).toBe('bank_only');
+      // ghi chú nhiều lần không bị ảnh hưởng bởi đơn vị "đồng"
+      expect(parseMultiTransferNote('chuyển khoản 2 lần 45 + 12', 57000)?.parts).toEqual([45000, 12000]);
+    });
+
     it('không có chữ "dư" nhưng đúng cấu trúc "chuyển khoản X, trả lại khách Y"', () => {
       expect(parseExcessTransferNote('chuyển khoản 990, trả lại khách 891', 99000))
         .toEqual({ transferred: 990000, refund: 891000, status: 'ok' });

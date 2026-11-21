@@ -13,6 +13,7 @@
 | IncomeStatementService | services/income-statement.service.ts | 16 KB | Báo cáo KQKD |
 | CashFlowService | services/cash-flow.service.ts | 18 KB | LCTT |
 | ChartOfAccountsService | services/chart-of-accounts.service.ts | — | Hệ thống TK (ledger-rs) |
+| PartnerService | services/partner.service.ts | — | Danh mục đối tượng KH / NCC / NV / NH (ledger-rs) |
 | CashVoucherService | services/cash-voucher.service.ts | 17 KB | Phiếu thu/chi |
 | InvoiceService | **models**/invoice.service.ts | 28 KB | Hóa đơn |
 | AuditLogService | services/audit-log.service.ts | 13 KB | Audit trail |
@@ -509,3 +510,24 @@ setManualUrl('in', {seller_mst, template, series, number}, url)    // PUT  /manu
 Hàm thuần ở `invoice-lookup.util.ts` (có spec): `applyPortal(portal, code)` → `{url, direct}`; `linkTemplate(linkDán, mã)` → thay mã
 bằng `{code}` ('' nếu link không chứa mã); `looksInvoiceSpecific(url)` → cảnh báo link riêng 1 HĐ; `isHttpUrl`.
 
+## PartnerService — danh mục đối tượng (ledger-rs, 17/11/2026)
+
+**File**: `services/partner.service.ts` · model `models/partner.models.ts` · spec `TapHoa39KeToanBackEnd/specs/002-danh-muc-doi-tuong/`
+
+- Gọi `${environment.ledgerUrl}/api/ledger/partners*` (HttpClient → `authInterceptor` gắn `X-Id-Token`), DTO snake_case → `Partner`.
+- Mỗi bản ghi đúng 1 vai (`role` = loại đối tượng chi tiết của TK). 1 công ty vừa mua vừa bán = 2 bản ghi (KH… + NCC…) cùng MST.
+- Lỗi 4xx → `console.warn` chỉ ghi MÃ LỖI `LA…` (detail BE có thể chứa MST / số TK), khác → `console.error`; ném lại `HttpErrorResponse`.
+- KHÔNG log MST, SĐT, số TK, địa chỉ, từ khóa tìm kiếm (list chỉ log `có search=true/false`).
+
+```typescript
+getPartners(filter?: PartnerFilter): Observable<Partner[]>          // search (mã / MST / tên không dấu), role, status — lọc ở BE
+getPartner(code): Observable<Partner | null>                         // 404 → null
+getForAccount(accountCode): Observable<Partner[]>                    // đối tượng ACTIVE hợp lệ cho 1 TK (TK không theo dõi → [])
+addPartner(input: NewPartnerInput): Observable<Partner>              // code trống → BE tự cấp (KH0001 / NCC0001 / NV0001 / NH0001)
+updatePartner(code, changes: PartnerPatch): Observable<Partner>      // không nhận mã / vai; chuỗi rỗng = xóa giá trị
+deletePartner(code): Observable<void>                                // chỉ khi chưa phát sinh (BE kiểm)
+getHistory(code): Observable<PartnerHistoryEntry[]>                  // chỉ từ lần tạo gần nhất của mã
+exportExcel(role?): Observable<Blob>                                 // xlsx do BE tạo
+importXml(role, items, dryRun, updateCodes = []): Observable<PartnerImportResult>
+  // dryRun → xem trước {create, update, skip}; ghi thật → tạo mới + cập nhật các mã trong updateCodes (≤ 5000 MST / lần)
+```

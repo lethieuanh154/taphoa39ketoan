@@ -445,3 +445,21 @@ interface JournalEntry {
   createdBy: string;
 }
 ```
+
+## partner.models.ts — danh mục đối tượng (17/11/2026)
+
+```typescript
+type PartnerRole = 'CUSTOMER' | 'SUPPLIER' | 'EMPLOYEE' | 'BANK';   // = detailType của TK (131 / 331 / 141 / 1121…)
+interface Partner {
+  code; role; name; taxCode?;            // MST 10 / 10-3 / 12 số, không trùng trong cùng vai
+  address; phone; email; note;
+  bankAccountNo?; bankName?; bankBranch?; // chỉ vai BANK (1 tài khoản NH của công ty)
+  status: 'ACTIVE' | 'INACTIVE'; createdAt; updatedAt; createdBy; updatedBy;
+}
+NewPartnerInput   // code? (trống = tự cấp) + role + các trường trên
+PartnerPatch      // mọi trường trừ code / role; '' = xóa giá trị
+PartnerImportItem { taxCode; name; address? }
+PartnerImportResult { dryRun; create[]; update: PartnerImportChange[]; skip[] }
+PartnerImportChange { code; taxCode; oldName; newName; oldAddress; newAddress; fields: ('name'|'address')[]; applied }
+PARTNER_ROLES (nhãn + tiền tố KH / NCC / NV / NH), TAX_CODE_RE, PARTNER_CODE_RE, normalizeTaxCode()   // regex giống CHECK ở DB
+```

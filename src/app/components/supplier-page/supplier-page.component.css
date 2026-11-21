@@ -147,6 +147,8 @@
 /* 17/11/2026 — partners (ledger-rs) */
 .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .page-alert { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+.toast-stack { position: fixed; top: 16px; right: 16px; z-index: 3000; display: flex; flex-direction: column; gap: 8px; max-width: min(440px, calc(100vw - 32px)); pointer-events: none; }
+.toast-stack .page-alert { margin: 0; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15); pointer-events: auto; }
 .alert-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 .alert-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
 .alert-close { border: none; background: transparent; font-size: 20px; color: inherit; cursor: pointer; }

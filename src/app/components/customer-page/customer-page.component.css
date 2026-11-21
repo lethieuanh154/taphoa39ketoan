@@ -685,3 +685,29 @@
     border-radius: 0;
   }
 }
+
+/* 17/11/2026 — partners (ledger-rs) */
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.page-alert { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+.toast-stack { position: fixed; top: 16px; right: 16px; z-index: 3000; display: flex; flex-direction: column; gap: 8px; max-width: min(440px, calc(100vw - 32px)); pointer-events: none; }
+.toast-stack .page-alert { margin: 0; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15); pointer-events: auto; }
+.alert-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.alert-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.alert-close { border: none; background: transparent; font-size: 20px; color: inherit; cursor: pointer; }
+.stats-cards { grid-template-columns: repeat(4, 1fr); }
+.col-address { min-width: 200px; color: #64748b; }
+.form-hint { font-size: 12px; color: #94a3b8; }
+.form-warn { color: #b45309; font-size: 13px; }
+.form-suggest { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; background: #eff6ff; border-radius: 8px; color: #1e40af; font-size: 13px; }
+.form-group.col-span-4 { grid-column: 1 / -1; }
+.history-section { margin-top: 8px; }
+.history-item { padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+.history-head { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; color: #475569; }
+.history-user { color: #64748b; }
+.history-action { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.action-INSERT { background: #dcfce7; color: #16a34a; }
+.action-UPDATE { background: #dbeafe; color: #2563eb; }
+.action-DELETE { background: #fee2e2; color: #dc2626; }
+.history-changes { margin: 6px 0 0; padding-left: 18px; color: #334155; }
+.loading-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #8b5cf6, #06b6d4); animation: lb 1s linear infinite; z-index: 2000; }
+@keyframes lb { from { opacity: 0.4; } 50% { opacity: 1; } to { opacity: 0.4; } }

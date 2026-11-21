@@ -85,10 +85,19 @@ export interface OldCodeSuggestion {
 /** Mã HH cũ chưa ghép mã master nào → kế toán gán tay */
 export interface OldUnmatchedRow { hh: string; name: string; unit: string; reason: string; suggestions: OldCodeSuggestion[]; }
 
+/** PUT /api/vietda-codes/manual → 409 detail khi ĐVT Vietda khác ĐVT nhỏ nhất KiotViet mà chưa gửi he_so (17/11/2026) */
+export interface NeedFactorDetail {
+  message: string; code: 'need_factor'; hh: string; master_code: string; vd_unit: string; kv_unit: string;
+  /** 1 ĐVT Vietda = suggested ĐVT KiotViet (từ quy đổi ĐVT KiotViet), null = không suy ra được */
+  suggested: number | null; kv_units: string;
+}
+
 /** GET /api/vietda-codes/assigned — mã master đang có mã HH + cờ đáng ngờ (17/11/2026) */
 export type AssignedFlagKind = 'size' | 'name' | 'unit' | 'kind' | 'no_kv';
 export interface AssignedCodeRow {
   master_code: string; kv_name: string; kv_unit: string; hh: string; vd_name: string; vd_unit: string;
+  /** Hệ số ĐVT (17/11/2026): 1 ĐVT Vietda = he_so ĐVT nhỏ nhất KiotViet; null = cùng ĐVT / chưa có */
+  he_so: number | null; he_so_text: string;
   source: 'vietda' | 'manual'; shared: number; flags: { kind: AssignedFlagKind; text: string }[];
 }
 export interface AssignedCodesResult {
@@ -336,12 +345,14 @@ export class ReconciliationService {
   }
 
   /** Gán tay mã HH cũ cho 1 mã master (hh rỗng = bỏ gán → chưa có mã). 1 mã HH gán được cho nhiều mã master (16/11/2026) */
-  setManualCode(masterCode: string, hh: string): Observable<{ item: HhCode & { source: string }; status: HhCodeStatus }> {
-    return this.http.put<any>(`${HH_BASE}/manual`, { master_code: masterCode, hh }).pipe(
+  setManualCode(masterCode: string, hh: string, heSo?: number): Observable<{ item: HhCode & { source: string }; status: HhCodeStatus }> {
+    const body = heSo === undefined ? { master_code: masterCode, hh } : { master_code: masterCode, hh, he_so: heSo };
+    return this.http.put<any>(`${HH_BASE}/manual`, body).pipe(
       map(r => ({ item: r.item, status: r.status as HhCodeStatus })),
       tap({
         next: r => console.info(`${LOG} Gán ${r.item.hh || '(bỏ gán)'} (${r.item.source}) cho mã master ${masterCode}`),
-        error: e => console.warn(`${LOG} Gán ${hh || '(bỏ gán)'} → ${masterCode} lỗi: ${httpErrorText(e)}`)
+        error: e => console.warn(`${LOG} Gán ${hh || '(bỏ gán)'} → ${masterCode}`
+          + (heSo === undefined ? '' : ` (hệ số ${heSo})`) + ` lỗi: ${httpErrorText(e)}`)
       })
     );
   }

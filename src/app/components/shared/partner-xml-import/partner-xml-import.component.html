@@ -5,15 +5,29 @@
   </div>
 
   <p class="pxi-hint">
-    Chọn thư mục / file ZIP, RAR chứa XML <b>{{ dirLabel }}</b>. Lấy MST, tên, địa chỉ {{ isSupplier ? 'người bán' : 'người mua có MST' }};
-    MST đã có ở danh mục {{ roleLabel }} thì bỏ qua (không ghi đè thông tin đã sửa).
+    Dùng XML <b>{{ dirLabel }}</b> đã đọc (chung với {{ sourceLabel }}) hoặc chọn thư mục / ZIP, RAR mới. Lấy MST, tên, địa chỉ
+    {{ isSupplier ? 'người bán' : 'người mua có MST' }}; MST đã có mà tên / địa chỉ khác thì liệt kê để tick cập nhật.
     MST công ty: <b>{{ companyMst || '(chưa nhập)' }}</b>.
   </p>
 
+  @if (cached) {
+    <div class="pxi-cached">
+      <span><i class="fa-solid fa-database"></i> XML đã đọc: <b>{{ cached.folder }}</b> — {{ cached.invoices }} HĐ, đọc lúc {{ cachedAtText }}</span>
+      <button type="button" class="btn btn-primary" (click)="useCached()" [disabled]="busy">
+        <i class="fa-solid fa-bolt"></i> Dùng XML này
+      </button>
+    </div>
+  }
+  @if (noAddress) {
+    <div class="pxi-alert pxi-warn">
+      <i class="fa-solid fa-triangle-exclamation"></i> XML này đọc từ trước 17/11/2026 nên không có địa chỉ — chọn lại thư mục nếu cần địa chỉ.
+    </div>
+  }
+
   <div class="pxi-pick">
-    <label class="btn btn-primary" [class.disabled]="busy">
+    <label class="btn" [class.btn-primary]="!cached" [class.btn-outline-primary]="!!cached" [class.disabled]="busy">
       <i class="fa-solid" [class.fa-spinner]="busy" [class.fa-spin]="busy" [class.fa-folder-open]="!busy"></i>
-      {{ busy ? ('Đang ' + (progress || 'xử lý') + '...') : 'Chọn thư mục XML' }}
+      {{ busy ? ('Đang ' + (progressText || 'xử lý') + '...') : (cached ? 'Chọn thư mục khác' : 'Chọn thư mục XML') }}
       <input type="file" webkitdirectory multiple (change)="onFilesSelected($event)" [disabled]="busy" hidden>
     </label>
     <label class="btn btn-outline-primary" [class.disabled]="busy" title="Chọn 1 hoặc nhiều file .zip / .rar (hoặc .xml) — giải nén ngay trên máy">
@@ -61,6 +75,46 @@
       </div>
     }
 
+    @if (preview.update.length) {
+      <h4>
+        Khác thông tin {{ preview.update.length }} {{ roleLabel }}
+        <span class="pxi-sub">{{ preview.dryRun ? '— tick dòng muốn cập nhật theo XML (không tick = giữ bản đang lưu)' : '' }}</span>
+      </h4>
+      <div class="pxi-table-wrap">
+        <table class="pxi-table">
+          <thead>
+            <tr>
+              @if (preview.dryRun) {
+                <th class="chk"><input type="checkbox" [checked]="allUpdatesSelected" (change)="toggleAllUpdates()" title="Chọn tất cả"></th>
+              }
+              <th>Mã</th><th>MST</th><th>Đang lưu</th><th>Trong XML</th>
+              @if (!preview.dryRun) { <th>Kết quả</th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of preview.update; track u.code) {
+              <tr [class.picked]="preview.dryRun && selectedUpdates.has(u.code)">
+                @if (preview.dryRun) {
+                  <td class="chk"><input type="checkbox" [checked]="selectedUpdates.has(u.code)" (change)="toggleUpdate(u.code)"></td>
+                }
+                <td class="code">{{ u.code }}</td>
+                <td class="code">{{ u.taxCode }}</td>
+                <td>
+                  @if (u.fields.includes('name')) { <div class="old">{{ u.oldName }}</div> }
+                  @if (u.fields.includes('address')) { <div class="old addr">{{ u.oldAddress || '(trống)' }}</div> }
+                </td>
+                <td>
+                  @if (u.fields.includes('name')) { <div class="new">{{ u.newName }}</div> }
+                  @if (u.fields.includes('address')) { <div class="new addr">{{ u.newAddress }}</div> }
+                </td>
+                @if (!preview.dryRun) { <td>{{ u.applied ? 'Đã cập nhật' : 'Giữ nguyên' }}</td> }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
     @if (preview.skip.length) {
       <h4>Bỏ qua {{ preview.skip.length }} MST</h4>
       <div class="pxi-table-wrap">
@@ -81,8 +135,12 @@
 
     @if (preview.dryRun) {
       <div class="pxi-actions">
-        <button type="button" class="btn btn-primary" (click)="confirm()" [disabled]="busy || !preview.create.length">
-          <i class="fa-solid fa-check"></i> Tạo {{ preview.create.length }} {{ roleLabel }}
+        <button type="button" class="btn btn-primary" (click)="confirm()" [disabled]="busy || !canConfirm">
+          <i class="fa-solid fa-check"></i>
+          @if (preview.create.length) { Tạo {{ preview.create.length }} {{ roleLabel }} }
+          @if (preview.create.length && selectedUpdates.size) { + }
+          @if (selectedUpdates.size) { Cập nhật {{ selectedUpdates.size }} }
+          @if (!preview.create.length && !selectedUpdates.size) { Không có gì để ghi }
         </button>
         <button type="button" class="btn btn-outline-secondary" (click)="close()" [disabled]="busy">Hủy</button>
       </div>

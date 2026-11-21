@@ -14,7 +14,7 @@ const LOG = '[EinvoiceCheck]';
 
 export type IssueLevel = 'error' | 'warn' | 'info';
 export type BillLevel = IssueLevel | 'ok';
-export type CheckScope = 'draft' | 'accepted';
+export type CheckScope = 'today' | 'draft' | 'accepted';
 
 export interface CheckIssue {
   level: IssueLevel; kind: string; message: string;
@@ -24,6 +24,8 @@ export interface CheckIssue {
 
 export interface CheckBill {
   id: string; code: string; series: string; number: string; date: string; payment: string;
+  /** trạng thái einvoice (GHI_TAM, DA_TIEP_NHAN…) — từ 21/11/2026, lần kiểm cũ không có */
+  status?: string;
   amount: number; amount_vat: number; total: number; n_lines: number; level: BillLevel; issues: CheckIssue[];
   /** Tổng HĐ bán KiotViet cùng mã (đã so) */
   kv_total?: number;
@@ -44,6 +46,8 @@ export interface CheckCounts {
   catalog_refreshed?: boolean; rate_masters?: number; rate_manual?: number; kv_compared?: number | null;
   /** Kiểm PDF lúc phát hành (30/10/2026): null = BE tắt; pdf_single = HĐ không khớp PDF gộp phải đọc riêng */
   pdf_checked?: number | null; pdf_errors?: number; pdf_single?: number;
+  /** số HĐ theo trạng thái einvoice (21/11/2026) */
+  statuses?: { [status: string]: number };
 }
 
 export interface CheckRun {

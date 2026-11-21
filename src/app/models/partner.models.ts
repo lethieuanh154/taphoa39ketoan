@@ -62,9 +62,22 @@ export interface PartnerImportItem {
   address?: string;
 }
 
+/** MST đã có cùng vai nhưng tên / địa chỉ trong XML khác bản đang lưu (giá trị XML rỗng không tính là khác) */
+export interface PartnerImportChange {
+  code: string;
+  taxCode: string;
+  oldName: string;
+  newName: string;
+  oldAddress: string;
+  newAddress: string;
+  fields: ('name' | 'address')[];
+  applied: boolean;          // true = đã cập nhật theo XML (chỉ khi ghi thật + kế toán đã tick)
+}
+
 export interface PartnerImportResult {
   dryRun: boolean;
   create: { code?: string; taxCode: string; name: string }[];   // code chỉ có khi ghi thật
+  update: PartnerImportChange[];
   skip: { taxCode: string; name: string; reason: string; code?: string }[];
 }
 

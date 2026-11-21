@@ -51,6 +51,10 @@ interface HistoryDto {
 interface ImportResultDto {
   dry_run: boolean;
   create: { code: string | null; tax_code: string; name: string }[];
+  update: {
+    code: string; tax_code: string; old_name: string; new_name: string; old_address: string; new_address: string;
+    fields: ('name' | 'address')[]; applied: boolean;
+  }[];
   skip: { tax_code: string; name: string; reason: string; code: string | null }[];
 }
 
@@ -186,21 +190,29 @@ export class PartnerService {
   /**
    * Tạo NCC / KH từ MST trong XML hóa đơn. `dryRun=true` → xem trước (không ghi, không cấp mã);
    * `false` → ghi thật, BE tính lại từ đầu (MST vừa bị thêm giữa 2 lần gọi → vào skip). Tối đa 5000 dòng / lần.
+   * MST đã có mà tên / địa chỉ khác → nhóm `update`; chỉ cập nhật các mã trong `updateCodes` khi ghi thật (kế toán tick).
    */
-  importXml(role: 'SUPPLIER' | 'CUSTOMER', items: PartnerImportItem[], dryRun: boolean): Observable<PartnerImportResult> {
+  importXml(role: 'SUPPLIER' | 'CUSTOMER', items: PartnerImportItem[], dryRun: boolean,
+            updateCodes: string[] = []): Observable<PartnerImportResult> {
     const body = {
       role,
       dry_run: dryRun,
-      items: items.map(i => ({ tax_code: i.taxCode, name: i.name, address: i.address ?? null }))
+      items: items.map(i => ({ tax_code: i.taxCode, name: i.name, address: i.address ?? null })),
+      update_codes: updateCodes
     };
     return this.http.post<ImportResultDto>(`${BASE}/import-xml`, body).pipe(
       map(r => ({
         dryRun: r.dry_run,
         create: r.create.map(c => ({ code: c.code ?? undefined, taxCode: c.tax_code, name: c.name })),
+        update: (r.update ?? []).map(u => ({
+          code: u.code, taxCode: u.tax_code, oldName: u.old_name, newName: u.new_name,
+          oldAddress: u.old_address, newAddress: u.new_address, fields: u.fields, applied: u.applied
+        })),
         skip: r.skip.map(s => ({ taxCode: s.tax_code, name: s.name, reason: s.reason, code: s.code ?? undefined }))
       })),
       tap(r => console.info(
-        `${LOG} importXml ${role} ${dryRun ? '(xem trước)' : '(ghi)'}: gửi ${items.length}, tạo ${r.create.length}, bỏ qua ${r.skip.length}`
+        `${LOG} importXml ${role} ${dryRun ? '(xem trước)' : '(ghi)'}: gửi ${items.length}, tạo ${r.create.length}, ` +
+        `khác thông tin ${r.update.length} (cập nhật ${r.update.filter(u => u.applied).length}, tick ${updateCodes.length}), bỏ qua ${r.skip.length}`
       )),
       catchError(err => this.fail(`importXml ${role}`, err))
     );

@@ -19,15 +19,18 @@
     </div>
   </div>
 
-  @if (errorMessage) {
-    <div class="page-alert alert-error">
-      <span><i class="fa-solid fa-circle-exclamation"></i> {{ errorMessage }}</span>
-      <button class="alert-close" (click)="dismissError()" title="Đóng">&times;</button>
-    </div>
-  }
-  @if (successMessage) {
-    <div class="page-alert alert-success"><span><i class="fa-solid fa-circle-check"></i> {{ successMessage }}</span></div>
-  }
+  <!-- Thông báo nổi cố định góc trên phải — không đẩy layout -->
+  <div class="toast-stack" aria-live="polite">
+    @if (errorMessage) {
+      <div class="page-alert alert-error">
+        <span><i class="fa-solid fa-circle-exclamation"></i> {{ errorMessage }}</span>
+        <button class="alert-close" (click)="dismissError()" title="Đóng">&times;</button>
+      </div>
+    }
+    @if (successMessage) {
+      <div class="page-alert alert-success"><span><i class="fa-solid fa-circle-check"></i> {{ successMessage }}</span></div>
+    }
+  </div>
 
   <!-- STATS CARDS -->
   <div class="stats-cards">
@@ -120,7 +123,7 @@
 
 <!-- CREATE / EDIT MODAL -->
 @if (showFormModal) {
-  <div class="modal-overlay" (click)="closeFormModal()">
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'form')">
     <div class="modal modal-large" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <h2>{{ isEditMode ? 'Sửa nhà cung cấp ' + selected?.code : 'Thêm nhà cung cấp' }}</h2>
@@ -196,7 +199,7 @@
 
 <!-- DETAIL MODAL -->
 @if (showDetailModal && selected) {
-  <div class="modal-overlay" (click)="closeDetailModal()">
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'detail')">
     <div class="modal modal-large" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <h2>Nhà cung cấp {{ selected.code }}</h2>
@@ -264,7 +267,7 @@
 
 <!-- DELETE CONFIRM -->
 @if (showDeleteConfirm && selected) {
-  <div class="modal-overlay" (click)="cancelDelete()">
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'delete')">
     <div class="modal modal-small" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <h2>Xóa nhà cung cấp</h2>

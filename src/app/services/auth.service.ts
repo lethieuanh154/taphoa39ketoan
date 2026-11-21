@@ -24,7 +24,9 @@ const LOG = '[Auth]';
 
 /** Lỗi HTTP từ BE → "HTTP 403 — Email không được phép truy cập" (để log / hiện cho người dùng). */
 export function httpErrorText(e: any): string {
-  const detail = e?.error?.detail || e?.error?.error || e?.message || '';
+  const raw = e?.error?.detail || e?.error?.error || e?.message || '';
+  // detail dạng object {message, code...} (vd 409 need_factor của /api/vietda-codes/manual, 17/11/2026)
+  const detail = typeof raw === 'object' ? (raw.message || JSON.stringify(raw)) : raw;
   return `HTTP ${e?.status ?? '?'}${detail ? ' — ' + detail : ''}`;
 }
 

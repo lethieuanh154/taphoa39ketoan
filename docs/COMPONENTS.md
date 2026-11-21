@@ -318,11 +318,22 @@ HĐ mua vào: Nợ 156, 152, 642, 133 / Có 331
   soát lại thư mục XML (lần chạy này không có XML quy đổi). Bỏ dòng "mã mới tiếp theo" / "cấp mới".
 - **Mã cũ chưa ghép — gán nhiều mã master** (17/11/2026): gán 1 mã cũ không xóa dòng nữa; nút đã gán có ✓ (`assignedOld`), bấm
   tiếp gợi ý khác / gõ mã master khác để dùng chung 1 mã HH (vd 3 vị Mì Siukay), bấm **Xong** (`finishOld`) để ẩn dòng.
-- **Mã HH đã ghép** (17/11/2026, nút cạnh "Mã cũ chưa ghép"): `assignedCodes()` (`GET /api/vietda-codes/assigned`) → bảng mã
+- **Rà mã HH** (17/11/2026): 1 nút mở khung `code-panel` có 2 tab (`codeTab`, kiểu tab như Đối soát CK) **Mã cũ chưa ghép** /
+  **Mã HH đã ghép** — tab tải dữ liệu lần đầu khi mở (`setCodeTab`), mỗi bảng cuộn trong khung `review-frame` (60vh, tiêu đề
+  dính), "Đóng" (`closeCodes`) bỏ dữ liệu cả 2 tab. Tải danh mục Vietda lên lại → tải lại tab đã mở.
+- **Mã HH đã ghép** (17/11/2026, tab trong "Rà mã HH"): `assignedCodes()` (`GET /api/vietda-codes/assigned`) → bảng mã
   master ↔ mã HH (tên + ĐVT KiotViet / Vietda, nguồn máy ghép / gán tay, số mã master dùng chung, cờ đáng ngờ của BE: quy cách
   ml/g khác, tên khác xa, ĐVT lệch, sai loại HH/KM, không còn trên KiotViet). Lọc nhanh Đáng ngờ (mặc định) / Dùng chung mã /
   Gán tay / Tất cả + ô lọc không dấu, hiện 100 dòng đầu. Mỗi dòng: gõ mã → **Đổi**, **Bỏ gán** (confirm; mã master về "chưa có
   mã HH") qua `setManualCode`, xong tải lại bảng. "Tải Excel" → `downloadAssignedCodes()` (`/assigned/export`).
+- **Hệ số ĐVT Vietda** (17/11/2026): mọi chỗ gán mã (Mã cũ chưa ghép, Hàng chưa có mã HH + Gán chung, Đổi ở Mã HH đã ghép) đi
+  qua `saveCode()` — BE trả 409 `need_factor` (ĐVT Vietda khác ĐVT nhỏ nhất KiotViet) → `askFactor()` (prompt, điền sẵn
+  `suggested`): "N" = 1 ĐVT Vietda = N ĐVT KiotViet, "/N" = 1 ĐVT KiotViet = N ĐVT Vietda (vd "/4": 1 lốc (4h) = 4 hộp, gửi
+  1/N chính xác) → gửi lại `setManualCode(master, hh, heSo)`. Gán chung hỏi 1 lần / cặp ĐVT. Bảng Mã HH đã ghép thêm cột
+  **Hệ số ĐVT** (`he_so_text`) + nút Sửa / Nhập hệ số (`changeFactor`). Chữ "ĐVT khác — máy chủ sẽ từ chối" → "sẽ hỏi hệ số".
+  `httpErrorText` đọc được `detail` dạng object (`detail.message`).
+- **Màu cột Vietda / KiotViet** (17/11/2026, 2 tab Rà mã HH): class `vd` (cam) / `kv` (xanh) trên `th` + `td`, chú thích
+  `side-legend` dưới hàng tab.
 - **Kỳ "Toàn bộ HĐ trong thư mục"** (mặc định, 02/11/2026): gửi `toan_bo=true` → BE lấy kỳ = ngày HĐ sớm nhất → muộn nhất.
   Lý do: thư mục MuaVao (tháng 9–10) + BanRa (tháng 11) bị "tự nhận quý" chọn Q4 → bỏ 16/20 HĐ vào tháng 9.
 - **ZIP XML quy đổi tách hình thức thanh toán**: `Dau vao (quy doi)/Chuyen khoan|Tien mat/…`, `Dau ra (quy doi)/…` —
@@ -478,6 +489,9 @@ chưa có bản lưu. 2 tab, chip Tất cả / Lệch / Ghi chú lệch, ô tìm
 - (26/10/2026) Xóa lần kiểm: ô chọn từng dòng + chọn nhanh Tất cả / Lịch tự động / Người bấm → **Xóa đã chọn**; nút thùng rác
   từng dòng. Có hỏi xác nhận; lần đang chạy không chọn / xóa được. Xóa lần đang xem → mở lần mới nhất còn lại. Máy chủ vẫn tự
   giữ 60 lần gần nhất (`EINVOICE_CHECK_KEEP_RUNS`).
+- (21/11/2026) "Kiểm tra ngay" + lịch tự động kiểm **HĐ hôm nay mọi trạng thái** (scope `today`; mốc 00:00 kiểm cả hôm qua),
+  không kiểm lại HĐ cũ. Bảng có cột **Trạng thái** (Nháp / Phát hành lỗi / Gửi CQT lỗi / Đã gửi CQT / CQT chấp nhận / CQT từ chối)
+  + chip lọc theo trạng thái kèm số HĐ (`statusFilter`, chỉ hiện trạng thái có trong lần kiểm). Lần kiểm cũ không có `status` → `—`.
 - (30/10/2026) **Kiểm PDF lúc phát hành**: máy chủ lấy PDF einvoice dựng khi bấm "Phát hành" (gộp 5 HĐ / lần như phát hành nhiều HĐ)
   rồi so với dữ liệu HĐ → lỗi loại `PDF: ...` hiện chung bảng lỗi (không cần UI riêng). Tóm tắt lần kiểm thêm dòng "Đã so PDF lúc phát
   hành của n HĐ" (`counts.pdf_checked`, `pdf_single`, `pdf_errors`). Chi tiết: `TapHoa39KeToanBackEnd/docs/TIEN-ICH-JOBS.md`.
@@ -607,3 +621,26 @@ Giống "Chuyển khoản HĐ đầu ra" nhưng HĐ là HĐ **mua vào** và ti�
   ngày hiện thành bảng Giờ / Người gửi / Tiêu đề + nút **"Mở Gmail"** (`countEmailUrl`). Link là thẻ `<a>` (Ctrl/bấm giữa mở tab
   mới, không bị chặn popup), mở đúng hộp thư hóa đơn bằng `?authuser=<GMAIL_INVOICE_ACCOUNT>` (lấy từ `/api/gmail/auth/status`; lỗi → `/u/1/`).
   ⚠ KHÔNG dùng `/mail/u/<email>/` (email trong path) — Gmail trả "Temporary Error (404)" (user báo 28/10/2026).
+
+## Danh mục đối tượng — CustomerPage / SupplierPage / EmployeePage / BankPage (17/11/2026)
+
+`components/{customer,supplier,employee,bank}-page/*` — cùng khuôn, mỗi trang 1 vai qua `PartnerService` (ledger-rs `/api/ledger/partners`).
+- Lọc qua BE (debounce 300ms + switchMap): tìm mã / MST / tên (có hoặc không dấu), trạng thái. Thống kê từ danh sách đủ của vai.
+- Thêm (mã để trống = tự cấp, mã khóa sau khi tạo) / sửa (chỉ gửi trường đổi) / Ngừng dùng – Dùng lại / Xóa hẳn (đã phát sinh → dùng
+  Ngừng dùng) / chi tiết + lịch sử (cũ → mới) / Xuất Excel.
+- KH / NCC / NV: rời ô MST → tìm cùng MST: cùng vai → cảnh báo trùng kèm mã; vai khác → nút "Điền sẵn tên / địa chỉ".
+- Ngân hàng: mỗi dòng = 1 tài khoản của công ty; form Tên gợi nhớ / Số TK / Ngân hàng (bắt buộc) / Chi nhánh; số TK chuẩn hóa như DB.
+- Modal chỉ đóng khi mousedown + click đều trên nền (`onBackdropDown` / `onBackdropClick`) — bôi đen chữ thả chuột ra ngoài không đóng.
+- Thông báo thành công / lỗi = toast cố định góc trên phải (`.toast-stack`), không đẩy layout.
+- Log prefix `[CustomerPage]` / `[SupplierPage]` / `[EmployeePage]` / `[BankPage]`.
+
+## PartnerXmlImportComponent — tạo NCC / KH từ XML hóa đơn (17/11/2026)
+
+`components/shared/partner-xml-import/*` (standalone) — nhúng ở trang NCC (`role="SUPPLIER"`) và KH (`role="CUSTOMER"`).
+- Input `role`; output `imported` (số tạo + cập nhật → trang tải lại), `closed`.
+- Chọn thư mục / ZIP / RAR → `readInvoiceFiles` trên trình duyệt. Tách vào / ra theo `CompanyService.mst()` (chưa có → báo nhập MST công
+  ty): NCC = HĐ đầu vào (người bán), KH = HĐ đầu ra (người mua CÓ MST). HĐ sai chiều / không của công ty / không MST đếm riêng.
+- Gộp theo MST, chỉ gửi `{taxCode, name, address}`. Xem trước: "Sẽ tạo", "Khác thông tin" (đang lưu → trong XML, checkbox mặc định
+  bỏ trống + chọn tất cả), "Bỏ qua" (lý do). Xác nhận = ghi thật, BE tính lại từ đầu.
+- Style nút riêng trong component (CSS `.btn` của trang không áp vào component con).
+- Log `[PartnerXmlImport]` số file / HĐ / MST.

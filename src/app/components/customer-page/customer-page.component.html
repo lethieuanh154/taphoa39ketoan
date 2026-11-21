@@ -1,5 +1,5 @@
 <!-- ═══════════════════════════════════════════════════════════════════════════════
-     CUSTOMER PAGE - DANH MỤC KHÁCH HÀNG
+     CUSTOMER PAGE - DANH MỤC KHÁCH HÀNG (ledger-rs /api/ledger/partners, vai CUSTOMER)
      ═══════════════════════════════════════════════════════════════════════════════ -->
 
 <div class="customer-page">
@@ -8,52 +8,47 @@
   <div class="page-header">
     <div class="header-content">
       <h1 class="page-title">Danh mục khách hàng</h1>
-      <p class="page-subtitle">Quản lý thông tin khách hàng - Công nợ phải thu (TK 131)</p>
+      <p class="page-subtitle">Đối tượng theo dõi công nợ phải thu (TK 131) — mã để trống thì tự cấp KH0001, KH0002…</p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-primary" (click)="openCreateModal()">
-        <span class="icon">+</span>
-        Thêm khách hàng
+      <button class="btn btn-secondary" (click)="openImport()" title="Tạo KH theo MST người mua trong XML hóa đơn đầu ra">
+        <i class="fa-solid fa-file-import"></i> Tạo từ XML
       </button>
+      <button class="btn btn-secondary" (click)="exportExcel()"><i class="fa-solid fa-file-excel"></i> Xuất Excel</button>
+      <button class="btn btn-primary" (click)="openCreateModal()"><span class="icon">+</span> Thêm KH</button>
     </div>
+  </div>
+
+  <!-- Thông báo nổi cố định góc trên phải — không đẩy layout -->
+  <div class="toast-stack" aria-live="polite">
+    @if (errorMessage) {
+      <div class="page-alert alert-error">
+        <span><i class="fa-solid fa-circle-exclamation"></i> {{ errorMessage }}</span>
+        <button class="alert-close" (click)="dismissError()" title="Đóng">&times;</button>
+      </div>
+    }
+    @if (successMessage) {
+      <div class="page-alert alert-success"><span><i class="fa-solid fa-circle-check"></i> {{ successMessage }}</span></div>
+    }
   </div>
 
   <!-- STATS CARDS -->
   <div class="stats-cards">
     <div class="stat-card card-total">
       <div class="stat-icon">👥</div>
-      <div class="stat-content">
-        <span class="stat-label">Tổng số</span>
-        <span class="stat-value">{{ stats.total }}</span>
-      </div>
+      <div class="stat-content"><span class="stat-label">Tổng số</span><span class="stat-value">{{ stats.total }}</span></div>
     </div>
     <div class="stat-card card-active">
       <div class="stat-icon">✅</div>
-      <div class="stat-content">
-        <span class="stat-label">Đang hoạt động</span>
-        <span class="stat-value">{{ stats.active }}</span>
-      </div>
+      <div class="stat-content"><span class="stat-label">Đang dùng</span><span class="stat-value">{{ stats.active }}</span></div>
     </div>
     <div class="stat-card card-inactive">
       <div class="stat-icon">⏸️</div>
-      <div class="stat-content">
-        <span class="stat-label">Ngừng hoạt động</span>
-        <span class="stat-value">{{ stats.inactive }}</span>
-      </div>
-    </div>
-    <div class="stat-card card-wholesale">
-      <div class="stat-icon">🏢</div>
-      <div class="stat-content">
-        <span class="stat-label">Bán buôn</span>
-        <span class="stat-value">{{ stats.byGroup['WHOLESALE'] || 0 }}</span>
-      </div>
+      <div class="stat-content"><span class="stat-label">Ngừng dùng</span><span class="stat-value">{{ stats.inactive }}</span></div>
     </div>
     <div class="stat-card card-retail">
-      <div class="stat-icon">🛒</div>
-      <div class="stat-content">
-        <span class="stat-label">Bán lẻ</span>
-        <span class="stat-value">{{ stats.byGroup['RETAIL'] || 0 }}</span>
-      </div>
+      <div class="stat-icon">🧾</div>
+      <div class="stat-content"><span class="stat-label">Có MST</span><span class="stat-value">{{ stats.withTax }}</span></div>
     </div>
   </div>
 
@@ -62,40 +57,23 @@
     <div class="filter-row">
       <div class="filter-group filter-search">
         <label>Tìm kiếm</label>
-        <input type="text"
-               [(ngModel)]="filter.search"
-               (input)="onFilterChange()"
-               placeholder="Mã KH, tên, MST, SĐT...">
+        <input type="text" [(ngModel)]="search" (ngModelChange)="onFilterChange()" placeholder="Mã KH, MST, tên (có hoặc không dấu)...">
       </div>
-
-      <div class="filter-group">
-        <label>Loại KH</label>
-        <select [(ngModel)]="filter.customerType" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let type of customerTypes" [value]="type.value">{{ type.label }}</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label>Nhóm KH</label>
-        <select [(ngModel)]="filter.customerGroup" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let group of customerGroups" [value]="group.value">{{ group.label }}</option>
-        </select>
-      </div>
-
       <div class="filter-group">
         <label>Trạng thái</label>
-        <select [ngModel]="filter.status || ''" (ngModelChange)="onStatusFilterChange($event)">
+        <select [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
           <option value="">Tất cả</option>
-          <option value="ACTIVE">Đang hoạt động</option>
-          <option value="INACTIVE">Ngừng hoạt động</option>
+          <option value="ACTIVE">Đang dùng</option>
+          <option value="INACTIVE">Ngừng dùng</option>
         </select>
       </div>
+      @if (hasFilter) {
+        <button class="btn btn-secondary btn-sm" (click)="clearSearch()">Xóa lọc</button>
+      }
     </div>
   </div>
 
-  <!-- CUSTOMER TABLE -->
+  <!-- TABLE -->
   <div class="table-container">
     <table class="data-table">
       <thead>
@@ -104,401 +82,221 @@
           <th class="col-code">Mã KH</th>
           <th class="col-name">Tên khách hàng</th>
           <th class="col-tax">MST</th>
-          <th class="col-type">Loại</th>
-          <th class="col-group">Nhóm</th>
+          <th class="col-address">Địa chỉ</th>
           <th class="col-phone">Điện thoại</th>
-          <th class="col-term">Hạn TT</th>
-          <th class="col-limit">Hạn mức CN</th>
           <th class="col-status">Trạng thái</th>
           <th class="col-actions">Thao tác</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let customer of filteredCustomers; let i = index"
-            [class.inactive]="customer.status === 'INACTIVE'">
-          <td class="col-no">{{ i + 1 }}</td>
-          <td class="col-code">
-            <span class="customer-code">{{ customer.code }}</span>
-          </td>
-          <td class="col-name">
-            <div class="customer-info">
-              <span class="customer-name">{{ customer.name }}</span>
-              <span class="customer-short" *ngIf="customer.shortName">({{ customer.shortName }})</span>
-            </div>
-          </td>
-          <td class="col-tax">{{ customer.taxCode || '-' }}</td>
-          <td class="col-type">{{ getCustomerTypeLabel(customer.customerType) }}</td>
-          <td class="col-group">
-            <span class="group-badge" [class]="'group-' + customer.customerGroup.toLowerCase()">
-              {{ getCustomerGroupLabel(customer.customerGroup) }}
-            </span>
-          </td>
-          <td class="col-phone">{{ customer.phone || '-' }}</td>
-          <td class="col-term">{{ customer.paymentTermDays }} ngày</td>
-          <td class="col-limit text-right">{{ formatCurrency(customer.creditLimit) }}</td>
-          <td class="col-status">
-            <span class="status-badge" [class]="getStatusClass(customer.status)">
-              {{ getStatusLabel(customer.status) }}
-            </span>
-          </td>
-          <td class="col-actions">
-            <div class="action-buttons">
-              <button class="btn-icon btn-view" title="Xem chi tiết" (click)="viewDetail(customer)">👁️</button>
-              <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(customer)">✏️</button>
-              <button class="btn-icon btn-delete" title="Xóa" (click)="confirmDelete(customer)">🗑️</button>
-            </div>
-          </td>
-        </tr>
+        @for (s of customers; track s.code; let i = $index) {
+          <tr [class.inactive]="s.status === 'INACTIVE'">
+            <td class="col-no">{{ i + 1 }}</td>
+            <td class="col-code"><span class="customer-code">{{ s.code }}</span></td>
+            <td class="col-name"><span class="customer-name">{{ s.name }}</span></td>
+            <td class="col-tax">{{ s.taxCode || '-' }}</td>
+            <td class="col-address">{{ s.address || '-' }}</td>
+            <td class="col-phone">{{ s.phone || '-' }}</td>
+            <td class="col-status"><span class="status-badge" [class]="getStatusClass(s.status)">{{ getStatusLabel(s.status) }}</span></td>
+            <td class="col-actions">
+              <div class="action-buttons">
+                <button class="btn-icon btn-view" title="Xem + lịch sử" (click)="viewDetail(s)">👁️</button>
+                <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(s)">✏️</button>
+                <button class="btn-icon btn-view" [title]="s.status === 'ACTIVE' ? 'Ngừng dùng' : 'Dùng lại'" (click)="toggleStatus(s)">
+                  {{ s.status === 'ACTIVE' ? '⏸️' : '▶️' }}
+                </button>
+                <button class="btn-icon btn-delete" title="Xóa hẳn" (click)="confirmDelete(s)">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        }
       </tbody>
     </table>
-
-    <div class="empty-state" *ngIf="filteredCustomers.length === 0">
-      <div class="empty-icon">👥</div>
-      <p>Không có khách hàng nào</p>
-    </div>
+    @if (!loading && customers.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <p>{{ hasFilter ? 'Không có khách hàng nào khớp bộ lọc' : 'Chưa có khách hàng — bấm "Thêm KH" hoặc "Tạo từ XML"' }}</p>
+      </div>
+    }
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════════
-     CREATE/EDIT MODAL
-     ═══════════════════════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
-  <div class="modal modal-large" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h2>{{ isEditMode ? 'Sửa khách hàng' : 'Thêm khách hàng mới' }}</h2>
-      <button class="btn-close" (click)="closeCreateModal()">&times;</button>
-    </div>
-
-    <div class="modal-body">
-      <!-- Basic Info -->
-      <div class="form-section">
-        <h3 class="section-title">Thông tin cơ bản</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Mã khách hàng <span class="required">*</span></label>
-            <input type="text" [(ngModel)]="formData.code" [disabled]="isEditMode">
-          </div>
-          <div class="form-group col-span-2">
-            <label>Tên khách hàng <span class="required">*</span></label>
-            <input type="text" [(ngModel)]="formData.name" placeholder="Nhập tên khách hàng">
-          </div>
-          <div class="form-group">
-            <label>Tên viết tắt</label>
-            <input type="text" [(ngModel)]="formData.shortName" placeholder="VD: ABC">
-          </div>
-          <div class="form-group">
-            <label>Loại khách hàng</label>
-            <select [(ngModel)]="formData.customerType">
-              <option *ngFor="let type of customerTypes" [value]="type.value">{{ type.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Nhóm khách hàng</label>
-            <select [(ngModel)]="formData.customerGroup">
-              <option *ngFor="let group of customerGroups" [value]="group.value">{{ group.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Trạng thái</label>
-            <select [(ngModel)]="formData.status">
-              <option *ngFor="let s of customerStatus" [value]="s.value">{{ s.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Mã số thuế</label>
-            <input type="text" [(ngModel)]="formData.taxCode" placeholder="0123456789">
+<!-- CREATE / EDIT MODAL -->
+@if (showFormModal) {
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'form')">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ isEditMode ? 'Sửa khách hàng ' + selected?.code : 'Thêm khách hàng' }}</h2>
+        <button class="btn-close" (click)="closeFormModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        @if (formError) {
+          <div class="page-alert alert-error"><span><i class="fa-solid fa-circle-exclamation"></i> {{ formError }}</span></div>
+        }
+        <div class="form-section">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Mã KH</label>
+              <input type="text" [(ngModel)]="form.code" [disabled]="isEditMode" placeholder="Để trống = tự cấp" maxlength="20">
+              @if (!isEditMode) { <span class="form-hint">Mã không sửa được sau khi tạo</span> }
+            </div>
+            <div class="form-group col-span-2">
+              <label>Tên khách hàng <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.name" placeholder="Nhập tên KH">
+            </div>
+            <div class="form-group">
+              <label>Trạng thái</label>
+              <select [(ngModel)]="form.status">
+                <option value="ACTIVE">Đang dùng</option>
+                <option value="INACTIVE">Ngừng dùng</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Mã số thuế</label>
+              <input type="text" [(ngModel)]="form.taxCode" (blur)="onTaxCodeBlur()" placeholder="10 / 10-3 / 12 số">
+            </div>
+            <div class="form-group col-span-3">
+              <label>Địa chỉ</label>
+              <input type="text" [(ngModel)]="form.address">
+            </div>
+            @if (taxDuplicate) {
+              <div class="form-group col-span-4">
+                <span class="form-warn">MST này đã dùng cho khách hàng <b>{{ taxDuplicate.code }}</b> — {{ taxDuplicate.name }}.</span>
+              </div>
+            }
+            @if (taxSuggestion) {
+              <div class="form-group col-span-4">
+                <span class="form-suggest">
+                  MST này đã có ở {{ roleName(taxSuggestion) }} <b>{{ taxSuggestion.code }}</b> — {{ taxSuggestion.name }}.
+                  <button class="btn btn-secondary btn-sm" (click)="applySuggestion()">Điền sẵn tên / địa chỉ</button>
+                </span>
+              </div>
+            }
+            <div class="form-group">
+              <label>Điện thoại</label>
+              <input type="text" [(ngModel)]="form.phone">
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" [(ngModel)]="form.email">
+            </div>
+            <div class="form-group col-span-2">
+              <label>Ghi chú</label>
+              <input type="text" [(ngModel)]="form.note">
+            </div>
           </div>
         </div>
       </div>
-
-      <!-- Address -->
-      <div class="form-section">
-        <h3 class="section-title">Địa chỉ</h3>
-        <div class="form-grid">
-          <div class="form-group col-span-3">
-            <label>Địa chỉ <span class="required">*</span></label>
-            <input type="text" [(ngModel)]="formData.address" placeholder="Số nhà, đường...">
-          </div>
-          <div class="form-group">
-            <label>Phường/Xã</label>
-            <input type="text" [(ngModel)]="formData.ward">
-          </div>
-          <div class="form-group">
-            <label>Quận/Huyện</label>
-            <input type="text" [(ngModel)]="formData.district">
-          </div>
-          <div class="form-group">
-            <label>Tỉnh/Thành phố</label>
-            <input type="text" [(ngModel)]="formData.province">
-          </div>
-        </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeFormModal()" [disabled]="saving">Hủy</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving">
+          {{ saving ? 'Đang lưu...' : (isEditMode ? 'Lưu' : 'Thêm') }}
+        </button>
       </div>
-
-      <!-- Contact -->
-      <div class="form-section">
-        <h3 class="section-title">Liên hệ</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Điện thoại</label>
-            <input type="text" [(ngModel)]="formData.phone" placeholder="028-xxxx-xxxx">
-          </div>
-          <div class="form-group">
-            <label>Email</label>
-            <input type="email" [(ngModel)]="formData.email" placeholder="email@company.com">
-          </div>
-          <div class="form-group">
-            <label>Website</label>
-            <input type="text" [(ngModel)]="formData.website" placeholder="www.company.com">
-          </div>
-          <div class="form-group">
-            <label>Fax</label>
-            <input type="text" [(ngModel)]="formData.fax">
-          </div>
-        </div>
-      </div>
-
-      <!-- Payment Terms -->
-      <div class="form-section">
-        <h3 class="section-title">Điều khoản thanh toán</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Số ngày được nợ</label>
-            <input type="number" [(ngModel)]="formData.paymentTermDays" min="0">
-          </div>
-          <div class="form-group">
-            <label>Hạn mức công nợ</label>
-            <input type="number" [(ngModel)]="formData.creditLimit" min="0" placeholder="0 = Không giới hạn">
-          </div>
-          <div class="form-group">
-            <label>TK công nợ</label>
-            <input type="text" [(ngModel)]="formData.accountCode" value="131">
-          </div>
-        </div>
-      </div>
-
-      <!-- Contacts List -->
-      <div class="form-section">
-        <div class="section-header">
-          <h3 class="section-title">Người liên hệ</h3>
-          <button class="btn btn-secondary btn-sm" (click)="addContact()">+ Thêm</button>
-        </div>
-        <div class="contacts-list" *ngIf="formContacts.length > 0">
-          <div class="contact-item" *ngFor="let contact of formContacts; let i = index">
-            <input type="text" [(ngModel)]="contact.name" placeholder="Họ tên">
-            <input type="text" [(ngModel)]="contact.position" placeholder="Chức vụ">
-            <input type="text" [(ngModel)]="contact.phone" placeholder="Điện thoại">
-            <input type="email" [(ngModel)]="contact.email" placeholder="Email">
-            <button class="btn-icon btn-remove" (click)="removeContact(i)">✕</button>
-          </div>
-        </div>
-        <p class="empty-text" *ngIf="formContacts.length === 0">Chưa có người liên hệ</p>
-      </div>
-
-      <!-- Bank Accounts -->
-      <div class="form-section">
-        <div class="section-header">
-          <h3 class="section-title">Tài khoản ngân hàng</h3>
-          <button class="btn btn-secondary btn-sm" (click)="addBankAccount()">+ Thêm</button>
-        </div>
-        <div class="bank-list" *ngIf="formBankAccounts.length > 0">
-          <div class="bank-item" *ngFor="let bank of formBankAccounts; let i = index">
-            <input type="text" [(ngModel)]="bank.bankName" placeholder="Tên ngân hàng">
-            <input type="text" [(ngModel)]="bank.accountNumber" placeholder="Số tài khoản">
-            <input type="text" [(ngModel)]="bank.accountHolder" placeholder="Chủ tài khoản">
-            <input type="text" [(ngModel)]="bank.branch" placeholder="Chi nhánh">
-            <button class="btn-icon btn-remove" (click)="removeBankAccount(i)">✕</button>
-          </div>
-        </div>
-        <p class="empty-text" *ngIf="formBankAccounts.length === 0">Chưa có tài khoản ngân hàng</p>
-      </div>
-
-      <!-- Note -->
-      <div class="form-section">
-        <div class="form-group">
-          <label>Ghi chú</label>
-          <textarea [(ngModel)]="formData.note" rows="2" placeholder="Ghi chú thêm..."></textarea>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="closeCreateModal()">Hủy</button>
-      <button class="btn btn-primary" (click)="saveCustomer()" [disabled]="loading">
-        {{ loading ? 'Đang lưu...' : (isEditMode ? 'Cập nhật' : 'Thêm mới') }}
-      </button>
     </div>
   </div>
-</div>
+}
 
-<!-- ═══════════════════════════════════════════════════════════════════════════════
-     DETAIL MODAL
-     ═══════════════════════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" *ngIf="showDetailModal && selectedCustomer" (click)="closeDetailModal()">
-  <div class="modal modal-large" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h2>Chi tiết khách hàng: {{ selectedCustomer.code }}</h2>
-      <button class="btn-close" (click)="closeDetailModal()">&times;</button>
-    </div>
-
-    <div class="modal-body">
-      <div class="detail-grid">
-        <!-- Basic Info -->
-        <div class="detail-section">
-          <h4>Thông tin cơ bản</h4>
-          <div class="detail-item">
-            <label>Mã KH:</label>
-            <span>{{ selectedCustomer.code }}</span>
+<!-- DETAIL MODAL -->
+@if (showDetailModal && selected) {
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'detail')">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Khách hàng {{ selected.code }}</h2>
+        <button class="btn-close" (click)="closeDetailModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h4>Thông tin</h4>
+            <div class="detail-item"><label>Mã:</label><span>{{ selected.code }}</span></div>
+            <div class="detail-item"><label>Tên:</label><span>{{ selected.name }}</span></div>
+            <div class="detail-item"><label>MST:</label><span>{{ selected.taxCode || '-' }}</span></div>
+            <div class="detail-item"><label>Trạng thái:</label><span class="status-badge" [class]="getStatusClass(selected.status)">{{ getStatusLabel(selected.status) }}</span></div>
           </div>
-          <div class="detail-item">
-            <label>Tên:</label>
-            <span>{{ selectedCustomer.name }}</span>
+          <div class="detail-section">
+            <h4>Liên hệ</h4>
+            <div class="detail-item"><label>Địa chỉ:</label><span>{{ selected.address || '-' }}</span></div>
+            <div class="detail-item"><label>Điện thoại:</label><span>{{ selected.phone || '-' }}</span></div>
+            <div class="detail-item"><label>Email:</label><span>{{ selected.email || '-' }}</span></div>
           </div>
-          <div class="detail-item" *ngIf="selectedCustomer.shortName">
-            <label>Tên viết tắt:</label>
-            <span>{{ selectedCustomer.shortName }}</span>
-          </div>
-          <div class="detail-item">
-            <label>Loại:</label>
-            <span>{{ getCustomerTypeLabel(selectedCustomer.customerType) }}</span>
-          </div>
-          <div class="detail-item">
-            <label>Nhóm:</label>
-            <span>{{ getCustomerGroupLabel(selectedCustomer.customerGroup) }}</span>
-          </div>
-          <div class="detail-item" *ngIf="selectedCustomer.taxCode">
-            <label>MST:</label>
-            <span>{{ selectedCustomer.taxCode }}</span>
-          </div>
-          <div class="detail-item">
-            <label>Trạng thái:</label>
-            <span class="status-badge" [class]="getStatusClass(selectedCustomer.status)">
-              {{ getStatusLabel(selectedCustomer.status) }}
-            </span>
+          <div class="detail-section">
+            <h4>Sửa lần cuối</h4>
+            <div class="detail-item"><label>Lúc:</label><span>{{ selected.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span></div>
+            <div class="detail-item"><label>Bởi:</label><span>{{ selected.updatedBy }}</span></div>
+            <div class="detail-item"><label>Tạo bởi:</label><span>{{ selected.createdBy }}</span></div>
           </div>
         </div>
+        @if (selected.note) {
+          <div class="detail-note"><h4>Ghi chú</h4><p>{{ selected.note }}</p></div>
+        }
 
-        <!-- Address & Contact -->
-        <div class="detail-section">
-          <h4>Địa chỉ & Liên hệ</h4>
-          <div class="detail-item">
-            <label>Địa chỉ:</label>
-            <span>{{ formatFullAddress(selectedCustomer) }}</span>
+        <div class="history-section">
+          <div class="section-header">
+            <h3 class="section-title">Lịch sử thay đổi</h3>
+            <button class="btn btn-secondary btn-sm" (click)="loadHistory()" [disabled]="historyLoading">
+              {{ historyLoading ? 'Đang tải...' : (history.length ? 'Tải lại' : 'Xem lịch sử') }}
+            </button>
           </div>
-          <div class="detail-item" *ngIf="selectedCustomer.phone">
-            <label>Điện thoại:</label>
-            <span>{{ selectedCustomer.phone }}</span>
-          </div>
-          <div class="detail-item" *ngIf="selectedCustomer.email">
-            <label>Email:</label>
-            <span>{{ selectedCustomer.email }}</span>
-          </div>
-          <div class="detail-item" *ngIf="selectedCustomer.website">
-            <label>Website:</label>
-            <span>{{ selectedCustomer.website }}</span>
-          </div>
-        </div>
-
-        <!-- Payment Terms -->
-        <div class="detail-section">
-          <h4>Điều khoản thanh toán</h4>
-          <div class="detail-item">
-            <label>Số ngày nợ:</label>
-            <span>{{ selectedCustomer.paymentTermDays }} ngày</span>
-          </div>
-          <div class="detail-item">
-            <label>Hạn mức CN:</label>
-            <span>{{ formatCurrency(selectedCustomer.creditLimit) }}</span>
-          </div>
-          <div class="detail-item">
-            <label>TK công nợ:</label>
-            <span>{{ selectedCustomer.accountCode }}</span>
-          </div>
+          @if (historyError) { <p class="form-warn">{{ historyError }}</p> }
+          @for (h of history; track h.id) {
+            <div class="history-item">
+              <div class="history-head">
+                <span class="history-action" [class]="'action-' + h.action">{{ getActionLabel(h.action) }}</span>
+                <span>{{ h.at | date:'dd/MM/yyyy HH:mm:ss' }}</span>
+                <span class="history-user">{{ h.userEmail }}</span>
+              </div>
+              @if (h.changes.length) {
+                <ul class="history-changes">
+                  @for (c of h.changes; track c.field) {
+                    <li><b>{{ getFieldLabel(c.field) }}</b>: {{ formatValue(c.field, c.old) }} → {{ formatValue(c.field, c.new) }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          }
         </div>
       </div>
-
-      <!-- Contacts -->
-      <div class="detail-list" *ngIf="selectedCustomer.contacts && selectedCustomer.contacts.length > 0">
-        <h4>Người liên hệ</h4>
-        <table class="sub-table">
-          <thead>
-            <tr>
-              <th>Họ tên</th>
-              <th>Chức vụ</th>
-              <th>Điện thoại</th>
-              <th>Email</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let contact of selectedCustomer.contacts">
-              <td>{{ contact.name }}</td>
-              <td>{{ contact.position || '-' }}</td>
-              <td>{{ contact.phone || '-' }}</td>
-              <td>{{ contact.email || '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+        <button class="btn btn-primary" (click)="openEditModal(selected)">Sửa</button>
       </div>
-
-      <!-- Bank Accounts -->
-      <div class="detail-list" *ngIf="selectedCustomer.bankAccounts && selectedCustomer.bankAccounts.length > 0">
-        <h4>Tài khoản ngân hàng</h4>
-        <table class="sub-table">
-          <thead>
-            <tr>
-              <th>Ngân hàng</th>
-              <th>Số tài khoản</th>
-              <th>Chủ tài khoản</th>
-              <th>Chi nhánh</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let bank of selectedCustomer.bankAccounts">
-              <td>{{ bank.bankName }}</td>
-              <td>{{ bank.accountNumber }}</td>
-              <td>{{ bank.accountHolder }}</td>
-              <td>{{ bank.branch || '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Note -->
-      <div class="detail-note" *ngIf="selectedCustomer.note">
-        <h4>Ghi chú</h4>
-        <p>{{ selectedCustomer.note }}</p>
-      </div>
-    </div>
-
-    <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
-      <button class="btn btn-primary" (click)="openEditModal(selectedCustomer); closeDetailModal()">Sửa</button>
     </div>
   </div>
-</div>
+}
 
-<!-- ═══════════════════════════════════════════════════════════════════════════════
-     DELETE CONFIRM MODAL
-     ═══════════════════════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" *ngIf="showDeleteConfirm" (click)="showDeleteConfirm = false">
-  <div class="modal modal-small" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h2>Xác nhận xóa</h2>
-      <button class="btn-close" (click)="showDeleteConfirm = false">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="warning-message">
-        <span class="warning-icon">⚠️</span>
-        <p>Bạn có chắc muốn xóa khách hàng <strong>{{ selectedCustomer?.name }}</strong>?</p>
+<!-- DELETE CONFIRM -->
+@if (showDeleteConfirm && selected) {
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'delete')">
+    <div class="modal modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Xóa khách hàng</h2>
+        <button class="btn-close" (click)="cancelDelete()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="warning-message">
+          <span class="warning-icon">⚠️</span>
+          <p>Xóa hẳn <strong>{{ selected.code }} — {{ selected.name }}</strong>? Lịch sử vẫn được giữ.
+            Đã có phát sinh thì không xóa được — dùng <b>Ngừng dùng</b>.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="cancelDelete()" [disabled]="saving">Hủy</button>
+        <button class="btn btn-danger" (click)="deleteSelected()" [disabled]="saving">{{ saving ? 'Đang xóa...' : 'Xóa' }}</button>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="showDeleteConfirm = false">Hủy</button>
-      <button class="btn btn-danger" (click)="deleteCustomer()">Xóa</button>
+  </div>
+}
+
+<!-- TẠO TỪ XML -->
+@if (showImport) {
+  <div class="modal-overlay">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-body">
+        <app-partner-xml-import role="CUSTOMER" (imported)="onImported($event)" (closed)="closeImport()"></app-partner-xml-import>
+      </div>
     </div>
   </div>
-</div>
+}
 
-<!-- Loading -->
-<div class="loading-overlay" *ngIf="loading">
-  <div class="spinner"></div>
-</div>
+@if (loading) { <div class="loading-bar"></div> }

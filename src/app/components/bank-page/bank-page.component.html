@@ -1,290 +1,271 @@
+<!-- ═══════════════════════════════════════════════════════════════════════════════
+     BANK PAGE - DANH MỤC TÀI KHOẢN NGÂN HÀNG (ledger-rs /api/ledger/partners, vai BANK)
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+
 <div class="bank-page">
+
   <!-- HEADER -->
   <div class="page-header">
-    <div>
-      <h1 class="page-title">Danh Mục Ngân Hàng</h1>
-      <p class="page-subtitle">Quản lý tài khoản ngân hàng của doanh nghiệp - TK 112</p>
+    <div class="header-content">
+      <h1 class="page-title">Danh mục tài khoản ngân hàng</h1>
+      <p class="page-subtitle">Mỗi dòng = 1 tài khoản ngân hàng của công ty (TK 1121 / 1122) — mã để trống thì tự cấp NH0001, NH0002…</p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-primary" (click)="openCreateModal()">
-        <span class="icon">➕</span> Thêm tài khoản
-      </button>
+      <button class="btn btn-secondary" (click)="exportExcel()"><i class="fa-solid fa-file-excel"></i> Xuất Excel</button>
+      <button class="btn btn-primary" (click)="openCreateModal()"><span class="icon">+</span> Thêm NH</button>
     </div>
   </div>
 
-  <!-- SUMMARY CARDS -->
-  <div class="summary-cards">
-    <div class="summary-card card-total">
-      <div class="card-icon">🏦</div>
-      <div class="card-content">
-        <span class="card-label">Tổng TK</span>
-        <span class="card-value">{{ stats.totalAccounts }}</span>
+  <!-- Thông báo nổi cố định góc trên phải — không đẩy layout -->
+  <div class="toast-stack" aria-live="polite">
+    @if (errorMessage) {
+      <div class="page-alert alert-error">
+        <span><i class="fa-solid fa-circle-exclamation"></i> {{ errorMessage }}</span>
+        <button class="alert-close" (click)="dismissError()" title="Đóng">&times;</button>
       </div>
+    }
+    @if (successMessage) {
+      <div class="page-alert alert-success"><span><i class="fa-solid fa-circle-check"></i> {{ successMessage }}</span></div>
+    }
+  </div>
+
+  <!-- STATS CARDS -->
+  <div class="stats-cards">
+    <div class="stat-card card-total">
+      <div class="stat-icon">🏦</div>
+      <div class="stat-content"><span class="stat-label">Tổng số</span><span class="stat-value">{{ stats.total }}</span></div>
     </div>
-    <div class="summary-card card-active">
-      <div class="card-icon">✅</div>
-      <div class="card-content">
-        <span class="card-label">Đang hoạt động</span>
-        <span class="card-value text-green">{{ stats.activeAccounts }}</span>
-      </div>
+    <div class="stat-card card-active">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content"><span class="stat-label">Đang dùng</span><span class="stat-value">{{ stats.active }}</span></div>
     </div>
-    <div class="summary-card card-balance">
-      <div class="card-icon">💰</div>
-      <div class="card-content">
-        <span class="card-label">Tổng số dư (VNĐ)</span>
-        <span class="card-value text-blue">{{ formatCurrency(stats.totalBalance) }}</span>
-      </div>
+    <div class="stat-card card-inactive">
+      <div class="stat-icon">⏸️</div>
+      <div class="stat-content"><span class="stat-label">Ngừng dùng</span><span class="stat-value">{{ stats.inactive }}</span></div>
     </div>
-    <div class="summary-card card-banks" *ngFor="let bank of stats.byBank.slice(0, 2)">
-      <div class="card-icon">🏛️</div>
-      <div class="card-content">
-        <span class="card-label">{{ bank.bankName }}</span>
-        <span class="card-value">{{ formatCurrency(bank.balance) }}</span>
-      </div>
+    <div class="stat-card card-goods">
+      <div class="stat-icon">🏛️</div>
+      <div class="stat-content"><span class="stat-label">Ngân hàng</span><span class="stat-value">{{ stats.banks }}</span></div>
     </div>
   </div>
 
-  <!-- FILTER SECTION -->
+  <!-- FILTERS -->
   <div class="filter-section">
     <div class="filter-row">
       <div class="filter-group filter-search">
         <label>Tìm kiếm</label>
-        <input type="text" [(ngModel)]="searchText" (input)="onSearch()"
-               placeholder="Số TK, tên TK, ngân hàng...">
-      </div>
-      <div class="filter-group">
-        <label>Ngân hàng</label>
-        <select [(ngModel)]="filter.bankId" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let bank of banks" [value]="bank.id">{{ bank.shortName }}</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>Loại TK</label>
-        <select [(ngModel)]="filter.accountType" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let t of accountTypes" [value]="t.value">{{ t.label }}</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>Tiền tệ</label>
-        <select [(ngModel)]="filter.currency" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let c of currencies" [value]="c.value">{{ c.label }}</option>
-        </select>
+        <input type="text" [(ngModel)]="search" (ngModelChange)="onFilterChange()" placeholder="Mã NH, tên gợi nhớ (có hoặc không dấu)...">
       </div>
       <div class="filter-group">
         <label>Trạng thái</label>
-        <select [(ngModel)]="filter.status" (change)="onFilterChange()">
-          <option [ngValue]="undefined">Tất cả</option>
-          <option *ngFor="let s of accountStatuses" [value]="s.value">{{ s.label }}</option>
+        <select [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
+          <option value="">Tất cả</option>
+          <option value="ACTIVE">Đang dùng</option>
+          <option value="INACTIVE">Ngừng dùng</option>
         </select>
       </div>
-      <button class="btn btn-secondary btn-sm" (click)="clearFilters()">Xóa lọc</button>
+      @if (hasFilter) {
+        <button class="btn btn-secondary btn-sm" (click)="clearSearch()">Xóa lọc</button>
+      }
     </div>
   </div>
 
-  <!-- BANK ACCOUNTS TABLE -->
+  <!-- TABLE -->
   <div class="table-container">
     <table class="data-table">
       <thead>
         <tr>
           <th class="col-no">STT</th>
-          <th class="col-bank">Ngân hàng</th>
-          <th class="col-account">Số tài khoản</th>
-          <th class="col-name">Tên chủ TK</th>
-          <th class="col-type">Loại TK</th>
-          <th class="col-currency">Tiền tệ</th>
-          <th class="col-balance text-right">Số dư hiện tại</th>
+          <th class="col-code">Mã NH</th>
+          <th class="col-name">Tên gợi nhớ</th>
+          <th class="col-tax">Số tài khoản</th>
+          <th class="col-address">Ngân hàng</th>
+          <th class="col-phone">Chi nhánh</th>
           <th class="col-status">Trạng thái</th>
           <th class="col-actions">Thao tác</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let acc of filteredAccounts; let i = index" [class.default-row]="acc.isDefault">
-          <td>{{ i + 1 }}</td>
-          <td>
-            <div class="bank-info">
-              <span class="bank-name">{{ acc.bankName }}</span>
-              <span class="bank-branch">{{ acc.branch }}</span>
-            </div>
-          </td>
-          <td>
-            <span class="account-no">{{ formatAccountNo(acc.accountNo) }}</span>
-            <span class="default-badge" *ngIf="acc.isDefault">Mặc định</span>
-          </td>
-          <td>{{ acc.accountName }}</td>
-          <td>{{ getAccountTypeLabel(acc.accountType) }}</td>
-          <td><span class="currency-badge">{{ acc.currency }}</span></td>
-          <td class="text-right">
-            <span class="balance" [class.balance-usd]="acc.currency !== 'VND'">
-              {{ formatCurrency(acc.currentBalance, acc.currency) }}
-            </span>
-          </td>
-          <td>
-            <span class="status-badge" [ngClass]="getStatusClass(acc.status)">
-              {{ getStatusLabel(acc.status) }}
-            </span>
-          </td>
-          <td>
-            <div class="action-buttons">
-              <button class="btn-icon btn-view" title="Xem" (click)="openViewModal(acc)">👁</button>
-              <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(acc)">✏️</button>
-              <button class="btn-icon btn-default" title="Đặt mặc định" *ngIf="!acc.isDefault && acc.status === 'ACTIVE'" (click)="setAsDefault(acc)">⭐</button>
-              <button class="btn-icon btn-delete" title="Xóa" (click)="deleteAccount(acc)">🗑️</button>
-            </div>
-          </td>
-        </tr>
+        @for (s of banks; track s.code; let i = $index) {
+          <tr [class.inactive]="s.status === 'INACTIVE'">
+            <td class="col-no">{{ i + 1 }}</td>
+            <td class="col-code"><span class="bank-code">{{ s.code }}</span></td>
+            <td class="col-name"><span class="bank-name">{{ s.name }}</span></td>
+            <td class="col-tax"><span class="acc-no">{{ s.bankAccountNo }}</span></td>
+            <td class="col-address">{{ s.bankName }}</td>
+            <td class="col-phone">{{ s.bankBranch || '-' }}</td>
+            <td class="col-status"><span class="status-badge" [class]="getStatusClass(s.status)">{{ getStatusLabel(s.status) }}</span></td>
+            <td class="col-actions">
+              <div class="action-buttons">
+                <button class="btn-icon btn-view" title="Xem + lịch sử" (click)="viewDetail(s)">👁️</button>
+                <button class="btn-icon btn-edit" title="Sửa" (click)="openEditModal(s)">✏️</button>
+                <button class="btn-icon btn-view" [title]="s.status === 'ACTIVE' ? 'Ngừng dùng' : 'Dùng lại'" (click)="toggleStatus(s)">
+                  {{ s.status === 'ACTIVE' ? '⏸️' : '▶️' }}
+                </button>
+                <button class="btn-icon btn-delete" title="Xóa hẳn" (click)="confirmDelete(s)">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        }
       </tbody>
     </table>
-
-    <!-- Empty State -->
-    <div class="empty-state" *ngIf="filteredAccounts.length === 0 && !isLoading">
-      <div class="empty-icon">🏦</div>
-      <p>Chưa có tài khoản ngân hàng nào</p>
-      <button class="btn btn-primary" (click)="openCreateModal()">Thêm tài khoản đầu tiên</button>
-    </div>
-  </div>
-
-  <!-- MODAL -->
-  <div class="modal-overlay" *ngIf="showModal" (click)="closeModal()">
-    <div class="modal-content" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h2>
-          {{ modalMode === 'create' ? 'Thêm tài khoản ngân hàng' :
-             modalMode === 'edit' ? 'Chỉnh sửa tài khoản' : 'Thông tin tài khoản' }}
-        </h2>
-        <button class="btn-close" (click)="closeModal()">✕</button>
+    @if (!loading && banks.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">🏦</div>
+        <p>{{ hasFilter ? 'Không có tài khoản ngân hàng nào khớp bộ lọc' : 'Chưa có tài khoản ngân hàng — bấm "Thêm NH"' }}</p>
       </div>
+    }
+  </div>
+</div>
 
+<!-- CREATE / EDIT MODAL -->
+@if (showFormModal) {
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'form')">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ isEditMode ? 'Sửa tài khoản ' + selected?.code : 'Thêm tài khoản ngân hàng' }}</h2>
+        <button class="btn-close" (click)="closeFormModal()">&times;</button>
+      </div>
       <div class="modal-body">
-        <!-- Validation Errors -->
-        <div class="validation-errors" *ngIf="validationErrors.length > 0">
-          <p *ngFor="let err of validationErrors">⚠️ {{ err }}</p>
-        </div>
-
+        @if (formError) {
+          <div class="page-alert alert-error"><span><i class="fa-solid fa-circle-exclamation"></i> {{ formError }}</span></div>
+        }
         <div class="form-section">
-          <h4>Thông tin ngân hàng</h4>
-          <div class="form-row">
+          <div class="form-grid">
             <div class="form-group">
-              <label>Ngân hàng <span class="required">*</span></label>
-              <select [(ngModel)]="editingAccount.bankId" (change)="onBankChange()" [disabled]="modalMode === 'view'">
-                <option [ngValue]="undefined">-- Chọn ngân hàng --</option>
-                <option *ngFor="let bank of banks" [value]="bank.id">{{ bank.shortName }} - {{ bank.name }}</option>
-              </select>
+              <label>Mã NH</label>
+              <input type="text" [(ngModel)]="form.code" [disabled]="isEditMode" placeholder="Để trống = tự cấp" maxlength="20">
+              @if (!isEditMode) { <span class="form-hint">Mã không sửa được sau khi tạo</span> }
             </div>
-            <div class="form-group">
-              <label>Chi nhánh</label>
-              <input type="text" [(ngModel)]="editingAccount.branch" [disabled]="modalMode === 'view'"
-                     placeholder="Chi nhánh Hà Nội">
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <h4>Thông tin tài khoản</h4>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Số tài khoản <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="editingAccount.accountNo" [disabled]="modalMode === 'view'"
-                     placeholder="0011234567890">
-            </div>
-            <div class="form-group">
-              <label>Tên chủ tài khoản <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="editingAccount.accountName" [disabled]="modalMode === 'view'"
-                     placeholder="CONG TY TNHH ABC">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Loại tài khoản</label>
-              <select [(ngModel)]="editingAccount.accountType" [disabled]="modalMode === 'view'">
-                <option *ngFor="let t of accountTypes" [value]="t.value">{{ t.label }}</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Loại tiền tệ</label>
-              <select [(ngModel)]="editingAccount.currency" (change)="onCurrencyChange()" [disabled]="modalMode === 'view'">
-                <option *ngFor="let c of currencies" [value]="c.value">{{ c.label }}</option>
-              </select>
+            <div class="form-group col-span-2">
+              <label>Tên gợi nhớ <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.name" placeholder="VD: VCB - TK chính">
             </div>
             <div class="form-group">
               <label>Trạng thái</label>
-              <select [(ngModel)]="editingAccount.status" [disabled]="modalMode === 'view'">
-                <option *ngFor="let s of accountStatuses" [value]="s.value">{{ s.label }}</option>
+              <select [(ngModel)]="form.status">
+                <option value="ACTIVE">Đang dùng</option>
+                <option value="INACTIVE">Ngừng dùng</option>
               </select>
             </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <h4>Số dư & Kế toán</h4>
-          <div class="form-row">
             <div class="form-group">
-              <label>Số dư đầu kỳ</label>
-              <input type="number" [(ngModel)]="editingAccount.openingBalance" [disabled]="modalMode === 'view'">
+              <label>Số tài khoản <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.bankAccountNo" placeholder="Chỉ số / chữ, bỏ qua dấu cách" maxlength="40">
             </div>
             <div class="form-group">
-              <label>Số dư hiện tại</label>
-              <input type="number" [(ngModel)]="editingAccount.currentBalance" [disabled]="modalMode === 'view' || modalMode === 'edit'">
+              <label>Ngân hàng <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.bankName" placeholder="VD: Vietcombank">
             </div>
-            <div class="form-group">
-              <label>Tài khoản kế toán <span class="required">*</span></label>
-              <select [(ngModel)]="editingAccount.glAccount" [disabled]="modalMode === 'view'">
-                <option *ngFor="let gl of glAccounts" [value]="gl.code">{{ gl.code }} - {{ gl.name }}</option>
-              </select>
+            <div class="form-group col-span-2">
+              <label>Chi nhánh</label>
+              <input type="text" [(ngModel)]="form.bankBranch">
             </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <h4>Thông tin bổ sung</h4>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Người liên hệ tại NH</label>
-              <input type="text" [(ngModel)]="editingAccount.contactPerson" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group">
-              <label>Số điện thoại</label>
-              <input type="text" [(ngModel)]="editingAccount.contactPhone" [disabled]="modalMode === 'view'">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Username Internet Banking</label>
-              <input type="text" [(ngModel)]="editingAccount.ibUsername" [disabled]="modalMode === 'view'">
-            </div>
-            <div class="form-group checkbox-group">
-              <label>
-                <input type="checkbox" [(ngModel)]="editingAccount.isDefault" [disabled]="modalMode === 'view'">
-                Đặt làm tài khoản mặc định
-              </label>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group full-width">
+            <div class="form-group col-span-4">
               <label>Ghi chú</label>
-              <textarea [(ngModel)]="editingAccount.notes" [disabled]="modalMode === 'view'" rows="3"></textarea>
+              <input type="text" [(ngModel)]="form.note">
             </div>
           </div>
         </div>
       </div>
-
-      <div class="modal-footer" *ngIf="modalMode !== 'view'">
-        <button class="btn btn-secondary" (click)="closeModal()">Hủy</button>
-        <button class="btn btn-primary" (click)="saveAccount()">
-          {{ modalMode === 'create' ? 'Thêm mới' : 'Cập nhật' }}
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeFormModal()" [disabled]="saving">Hủy</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving">
+          {{ saving ? 'Đang lưu...' : (isEditMode ? 'Lưu' : 'Thêm') }}
         </button>
-      </div>
-      <div class="modal-footer" *ngIf="modalMode === 'view'">
-        <button class="btn btn-secondary" (click)="closeModal()">Đóng</button>
-        <button class="btn btn-primary" (click)="modalMode = 'edit'">Chỉnh sửa</button>
       </div>
     </div>
   </div>
+}
 
-  <!-- Loading -->
-  <div class="loading-overlay" *ngIf="isLoading">
-    <div class="spinner"></div>
+<!-- DETAIL MODAL -->
+@if (showDetailModal && selected) {
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'detail')">
+    <div class="modal modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Tài khoản ngân hàng {{ selected.code }}</h2>
+        <button class="btn-close" (click)="closeDetailModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h4>Thông tin</h4>
+            <div class="detail-item"><label>Mã:</label><span>{{ selected.code }}</span></div>
+            <div class="detail-item"><label>Tên:</label><span>{{ selected.name }}</span></div>
+            <div class="detail-item"><label>Trạng thái:</label><span class="status-badge" [class]="getStatusClass(selected.status)">{{ getStatusLabel(selected.status) }}</span></div>
+          </div>
+          <div class="detail-section">
+            <h4>Tài khoản</h4>
+            <div class="detail-item"><label>Số TK:</label><span class="acc-no">{{ selected.bankAccountNo }}</span></div>
+            <div class="detail-item"><label>Ngân hàng:</label><span>{{ selected.bankName }}</span></div>
+            <div class="detail-item"><label>Chi nhánh:</label><span>{{ selected.bankBranch || '-' }}</span></div>
+          </div>
+          <div class="detail-section">
+            <h4>Sửa lần cuối</h4>
+            <div class="detail-item"><label>Lúc:</label><span>{{ selected.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span></div>
+            <div class="detail-item"><label>Bởi:</label><span>{{ selected.updatedBy }}</span></div>
+            <div class="detail-item"><label>Tạo bởi:</label><span>{{ selected.createdBy }}</span></div>
+          </div>
+        </div>
+        @if (selected.note) {
+          <div class="detail-note"><h4>Ghi chú</h4><p>{{ selected.note }}</p></div>
+        }
+
+        <div class="history-section">
+          <div class="section-header">
+            <h3 class="section-title">Lịch sử thay đổi</h3>
+            <button class="btn btn-secondary btn-sm" (click)="loadHistory()" [disabled]="historyLoading">
+              {{ historyLoading ? 'Đang tải...' : (history.length ? 'Tải lại' : 'Xem lịch sử') }}
+            </button>
+          </div>
+          @if (historyError) { <p class="form-warn">{{ historyError }}</p> }
+          @for (h of history; track h.id) {
+            <div class="history-item">
+              <div class="history-head">
+                <span class="history-action" [class]="'action-' + h.action">{{ getActionLabel(h.action) }}</span>
+                <span>{{ h.at | date:'dd/MM/yyyy HH:mm:ss' }}</span>
+                <span class="history-user">{{ h.userEmail }}</span>
+              </div>
+              @if (h.changes.length) {
+                <ul class="history-changes">
+                  @for (c of h.changes; track c.field) {
+                    <li><b>{{ getFieldLabel(c.field) }}</b>: {{ formatValue(c.field, c.old) }} → {{ formatValue(c.field, c.new) }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
+        <button class="btn btn-primary" (click)="openEditModal(selected)">Sửa</button>
+      </div>
+    </div>
   </div>
-</div>
+}
+
+<!-- DELETE CONFIRM -->
+@if (showDeleteConfirm && selected) {
+  <div class="modal-overlay" (mousedown)="onBackdropDown($event)" (click)="onBackdropClick($event, 'delete')">
+    <div class="modal modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Xóa tài khoản ngân hàng</h2>
+        <button class="btn-close" (click)="cancelDelete()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="warning-message">
+          <span class="warning-icon">⚠️</span>
+          <p>Xóa hẳn <strong>{{ selected.code }} — {{ selected.name }}</strong>? Lịch sử vẫn được giữ.
+            Đã có phát sinh thì không xóa được — dùng <b>Ngừng dùng</b>.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="cancelDelete()" [disabled]="saving">Hủy</button>
+        <button class="btn btn-danger" (click)="deleteSelected()" [disabled]="saving">{{ saving ? 'Đang xóa...' : 'Xóa' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+
+@if (loading) { <div class="loading-bar"></div> }

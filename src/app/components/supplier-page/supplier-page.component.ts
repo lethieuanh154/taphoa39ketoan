@@ -11,7 +11,7 @@ import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Subject, debounceTime, startWith, switchMap, takeUntil, catchError, of, tap } from 'rxjs';
+import { Subject, debounceTime, switchMap, takeUntil, catchError, of, tap } from 'rxjs';
 
 import { PartnerService } from '../../services/partner.service';
 import { httpErrorText } from '../../services/auth.service';
@@ -59,7 +59,8 @@ const FIELD_LABELS: Record<string, string> = {
 export class SupplierPageComponent implements OnInit, OnDestroy {
   private partnerService = inject(PartnerService);
   private destroy$ = new Subject<void>();
-  private filterChange$ = new Subject<void>();
+  /** chỉ phát khi có từ khóa (gọi BE); lọc trạng thái làm tại máy */
+  private searchChange$ = new Subject<void>();
   private successTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** toàn bộ NCC (cho thống kê) */
@@ -108,8 +109,8 @@ export class SupplierPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.filterChange$.pipe(
-      startWith(undefined),
+    // Có từ khóa → gọi BE (tìm không dấu bằng unaccent ở Postgres). Không có → lọc trạng thái tại máy trên allSuppliers (0 request).
+    this.searchChange$.pipe(
       debounceTime(300),
       tap(() => this.loading = true),
       switchMap(() => this.partnerService.getPartners({
@@ -117,15 +118,18 @@ export class SupplierPageComponent implements OnInit, OnDestroy {
         search: this.search,
         status: this.statusFilter || undefined
       }).pipe(catchError(err => {
-        this.errorMessage = this.reasonText(err, 'Tải danh sách nhà cung cấp');
+        this.errorMessage = this.reasonText(err, 'Tìm nhà cung cấp');
         return of(null);
       }))),
       takeUntil(this.destroy$)
     ).subscribe(rows => {
       this.loading = false;
-      if (rows) this.suppliers = rows;
+      // đã xóa từ khóa trong lúc chờ BE → bỏ kết quả cũ (bảng đang lọc tại máy)
+      if (!rows || !this.search.trim()) return;
+      this.suppliers = rows;
+      console.info(`${LOG} tìm (gọi BE): ${rows.length} dòng`);
     });
-    this.loadAll();
+    this.reload();
   }
 
   ngOnDestroy(): void {
@@ -134,27 +138,40 @@ export class SupplierPageComponent implements OnInit, OnDestroy {
     if (this.successTimer) clearTimeout(this.successTimer);
   }
 
-  /** Tải lại toàn bộ (thống kê) + danh sách đang lọc */
+  /** Tải toàn bộ nhà cung cấp 1 lần (thống kê + bảng) rồi áp lại bộ lọc đang chọn */
   reload(): void {
-    this.loadAll();
-    this.filterChange$.next();
-  }
-
-  private loadAll(): void {
+    this.loading = true;
     this.partnerService.getPartners({ role: ROLE }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: rows => this.allSuppliers = rows,
-      error: err => this.errorMessage = this.reasonText(err, 'Tải thống kê nhà cung cấp')
+      next: rows => {
+        this.allSuppliers = rows;
+        this.loading = false;
+        this.applyFilter();
+      },
+      error: err => {
+        this.loading = false;
+        this.errorMessage = this.reasonText(err, 'Tải danh sách nhà cung cấp');
+      }
     });
   }
 
+  /** Không có từ khóa → lọc trạng thái tại máy; có từ khóa → gọi BE (debounce 300ms) */
+  private applyFilter(): void {
+    if (this.search.trim()) {
+      this.searchChange$.next();
+      return;
+    }
+    this.suppliers = this.statusFilter ? this.allSuppliers.filter(p => p.status === this.statusFilter) : this.allSuppliers;
+    console.debug(`${LOG} lọc tại máy: ${this.suppliers.length}/${this.allSuppliers.length}`);
+  }
+
   onFilterChange(): void {
-    this.filterChange$.next();
+    this.applyFilter();
   }
 
   clearSearch(): void {
     this.search = '';
     this.statusFilter = '';
-    this.filterChange$.next();
+    this.applyFilter();
   }
 
   // ─── THÊM / SỬA ────────────────────────────────────────────────────────────
@@ -396,6 +413,25 @@ export class SupplierPageComponent implements OnInit, OnDestroy {
   onImported(n: number): void {
     console.info(`${LOG} tạo từ XML: ${n} NCC`);
     if (n) this.reload();
+  }
+
+  // ─── ĐÓNG MODAL KHI BẤM NỀN ────────────────────────────────────────────────
+  // Chỉ đóng khi CẢ mousedown lẫn click đều trên nền: bôi đen chữ trong ô nhập rồi thả chuột ra ngoài modal
+  // sinh sự kiện click trên nền → trước đây modal tự đóng, mất dữ liệu đang nhập.
+
+  private backdropDown = false;
+
+  onBackdropDown(e: MouseEvent): void {
+    this.backdropDown = e.target === e.currentTarget;
+  }
+
+  onBackdropClick(e: MouseEvent, which: 'form' | 'detail' | 'delete'): void {
+    const close = this.backdropDown && e.target === e.currentTarget;
+    this.backdropDown = false;
+    if (!close) return;
+    if (which === 'form') this.closeFormModal();
+    else if (which === 'detail') this.closeDetailModal();
+    else this.cancelDelete();
   }
 
   // ─── THÔNG BÁO ─────────────────────────────────────────────────────────────

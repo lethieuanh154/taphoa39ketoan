@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { EMPTY, Subject, catchError, debounceTime, startWith, switchMap, takeUntil } from 'rxjs';
+import { EMPTY, Subject, catchError, debounceTime, switchMap, takeUntil } from 'rxjs';
 import { ChartOfAccountsService } from '../../services/chart-of-accounts.service';
 import { httpErrorText } from '../../services/auth.service';
 import {
@@ -39,12 +39,13 @@ const LOG = '[ChartOfAccountsPage]';
 export class ChartOfAccountsPageComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
-  private filterChange$ = new Subject<void>();
+  /** chỉ phát khi có từ khóa (gọi BE — tìm không dấu bằng unaccent); loại / trạng thái / chỉ TK hạch toán lọc tại máy */
+  private searchChange$ = new Subject<void>();
 
   // === DATA STATE ===
-  accounts: Account[] = [];              // toàn bộ danh mục (thống kê, chọn TK cha)
-  accountGroups: AccountGroup[] = [];
-  filteredAccounts: Account[] = [];      // kết quả lọc từ BE
+  accounts: Account[] = [];              // toàn bộ danh mục — tải 1 lần (thống kê, nhóm, cây, chọn TK cha)
+  accountGroups: AccountGroup[] = [];    // tính tại máy từ `accounts`
+  filteredAccounts: Account[] = [];      // lọc tại máy, hoặc kết quả BE khi có từ khóa
 
   // === FILTER STATE ===
   filter: AccountFilter = {};
@@ -118,9 +119,8 @@ export class ChartOfAccountsPageComponent implements OnInit, OnDestroy {
   constructor(private coaService: ChartOfAccountsService) { }
 
   ngOnInit(): void {
-    // Tìm kiếm + lọc gọi BE (R12); gõ liên tục chỉ gửi request cuối
-    this.filterChange$.pipe(
-      startWith(undefined),
+    // Có từ khóa → gọi BE (R12, tìm không dấu); gõ liên tục chỉ gửi request cuối. Không từ khóa → applyFilter() lọc tại máy.
+    this.searchChange$.pipe(
       debounceTime(300),
       switchMap(() => {
         const filter = this.buildFilter();
@@ -129,19 +129,17 @@ export class ChartOfAccountsPageComponent implements OnInit, OnDestroy {
           catchError(err => {
             this.isLoading = false;
             this.errorMessage = `Không tải được danh mục tài khoản: ${this.reasonText(err)}`;
-            console.warn(`${LOG} lọc TK lỗi — ${httpErrorText(err)}`, filter);
+            console.warn(`${LOG} tìm TK lỗi — ${httpErrorText(err)}`, filter);
             return EMPTY;
           })
         );
       }),
       takeUntil(this.destroy$)
     ).subscribe(accounts => {
-      this.filteredAccounts = accounts;
       this.isLoading = false;
-      if (this.hasFilter) {
-        accounts.filter(a => a.isParent).forEach(a => this.expandedCodes.add(a.code));
-      }
-      console.info(`${LOG} hiển thị ${accounts.length} TK`, this.filter);
+      // đã xóa từ khóa trong lúc chờ BE → bỏ kết quả cũ (bảng đang lọc tại máy)
+      if (!this.searchText.trim()) return;
+      this.showFiltered(accounts, 'gọi BE');
     });
     this.loadAccounts();
   }
@@ -155,40 +153,56 @@ export class ChartOfAccountsPageComponent implements OnInit, OnDestroy {
   // DATA LOADING
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /** Toàn bộ danh mục (thống kê, nhóm, chọn TK cha) + làm mới danh sách đang lọc */
+  /** Tải toàn bộ danh mục 1 lần → thống kê, nhóm Loại 1–9, cây, chọn TK cha; rồi áp lại bộ lọc đang chọn */
   loadAccounts(): void {
     this.errorMessage = '';
+    this.isLoading = true;
     this.coaService.getAccounts()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (accounts) => {
           const first = this.accounts.length === 0;
           this.accounts = accounts;
+          this.accountGroups = this.buildGroups(accounts);
+          this.isLoading = false;
           if (first) {
             accounts.filter(a => a.level === 1).forEach(a => this.expandedCodes.add(a.code));
           }
-          console.info(`${LOG} tải ${accounts.length} TK`);
+          console.info(`${LOG} tải ${accounts.length} TK (1 request: thống kê + nhóm + cây)`);
+          this.applyFilter();
         },
         error: (err) => {
+          this.isLoading = false;
           console.warn(`${LOG} tải danh mục lỗi — ${httpErrorText(err)}`);
           this.errorMessage = `Không tải được danh mục tài khoản: ${this.reasonText(err)}`;
         }
       });
-    this.loadAccountGroups();
-    this.filterChange$.next();
   }
 
-  loadAccountGroups(): void {
-    this.coaService.getAccountGroups()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (groups) => {
-          this.accountGroups = groups;
-        },
-        error: (err) => {
-          console.warn(`${LOG} tải nhóm TK lỗi — ${httpErrorText(err)}`);
-        }
-      });
+  /** Nhóm theo Loại 1–9 (như `ChartOfAccountsService.getAccountGroups()` nhưng không gọi lại API) */
+  private buildGroups(accounts: Account[]): AccountGroup[] {
+    return this.accountTypes.map((t, i) => {
+      const list = accounts.filter(a => a.type === t.value);
+      return { code: String(i + 1), name: getAccountTypeName(t.value), type: t.value, accounts: list, total: list.length };
+    });
+  }
+
+  /** Lọc tại máy — cùng điều kiện BE: loại TK, trạng thái, chỉ TK được hạch toán (lá + đang dùng) */
+  private filterLocal(): Account[] {
+    return this.accounts.filter(a =>
+      (!this.selectedType || a.type === this.selectedType) &&
+      (!this.statusFilter || a.status === this.statusFilter) &&
+      (!this.onlyPostable || !!a.postable)
+    );
+  }
+
+  private showFiltered(accounts: Account[], source: 'lọc tại máy' | 'gọi BE'): void {
+    this.filteredAccounts = accounts;
+    if (this.hasFilter) {
+      accounts.filter(a => a.isParent).forEach(a => this.expandedCodes.add(a.code));
+    }
+    const log = source === 'gọi BE' ? console.info : console.debug;
+    log(`${LOG} hiển thị ${accounts.length} TK (${source})`, this.filter);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -209,8 +223,14 @@ export class ChartOfAccountsPageComponent implements OnInit, OnDestroy {
     return !!(this.searchText.trim() || this.selectedType || this.statusFilter || this.onlyPostable);
   }
 
+  /** Có từ khóa → gọi BE (debounce 300ms); không có → lọc tại máy trên `accounts` (0 request) */
   applyFilter(): void {
-    this.filterChange$.next();
+    this.buildFilter();
+    if (this.searchText.trim()) {
+      this.searchChange$.next();
+      return;
+    }
+    this.showFiltered(this.filterLocal(), 'lọc tại máy');
   }
 
   onSearchChange(): void {

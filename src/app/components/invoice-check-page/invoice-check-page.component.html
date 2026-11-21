@@ -22,7 +22,7 @@
       }
     </div>
     <div class="row">
-      <span class="hint"><i class="fa-solid fa-file-pen"></i> Kiểm mọi <b>HĐ nháp còn tồn</b> (chưa phát hành) — không kiểm HĐ đã phát hành.</span>
+      <span class="hint"><i class="fa-solid fa-file-pen"></i> Kiểm mọi <b>HĐ có ngày HĐ hôm nay</b> — nháp và đã phát hành (CQT chấp nhận, phát hành lỗi, gửi CQT lỗi, đã gửi CQT, CQT từ chối). Mốc 00:00 kiểm cả hôm qua.</span>
       <button type="button" class="btn btn-primary" (click)="startCheck()" [disabled]="starting || !!list?.busy">
         <i class="fa-solid" [ngClass]="starting ? 'fa-spinner fa-spin' : 'fa-play'"></i>
         {{ list?.busy ? 'Đang kiểm...' : 'Kiểm tra ngay' }}
@@ -107,13 +107,20 @@
                 }
               </div>
             }
+            @if (statusChips.length) {
+              <div class="chips">
+                @for (c of statusChips; track c.value) {
+                  <button type="button" class="chip" [class.active]="statusFilter === c.value" (click)="statusFilter = c.value; page = 1">{{ c.label }} {{ c.n | number }}</button>
+                }
+              </div>
+            }
             <span class="total">{{ filteredBills.length | number }} HĐ</span>
           </div>
           @if (run.truncated && view === 'all') { <p class="hint">Kết quả lớn: máy chủ chỉ lưu HĐ có lỗi / cần xem.</p> }
           <div class="wrap">
             <table>
               <thead>
-                <tr><th>Mã HĐ</th><th>HĐĐT</th><th>Ngày</th><th>Hình thức thanh toán</th><th class="num">Chưa thuế</th><th class="num">Thuế</th>
+                <tr><th>Mã HĐ</th><th>HĐĐT</th><th>Ngày</th><th>Trạng thái</th><th>Hình thức thanh toán</th><th class="num">Chưa thuế</th><th class="num">Thuế</th>
                   <th class="num">Tổng TT</th><th>Kết quả</th><th title="PDF lúc bấm Phát hành so với dữ liệu HĐ">PDF</th><th>Chi tiết</th></tr>
               </thead>
               <tbody>
@@ -125,6 +132,7 @@
                     </td>
                     <td class="nowrap">{{ b.series }}{{ b.number ? '-' + b.number : '' }}</td>
                     <td class="nowrap">{{ billTime(b.date) }}</td>
+                    <td class="nowrap">{{ b.status ? (statusLabel[b.status] || b.status) : '—' }}</td>
                     <td>{{ b.payment }}</td>
                     <td class="num">{{ vnd(b.amount) }}</td>
                     <td class="num">{{ vnd(b.amount_vat) }}</td>
@@ -168,7 +176,7 @@
                     </td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="10" class="empty">{{ view === 'issues' ? 'Không có HĐ nào có lỗi / cần xem 🎉' : 'Không có HĐ.' }}</td></tr>
+                  <tr><td colspan="11" class="empty">{{ view === 'issues' ? 'Không có HĐ nào có lỗi / cần xem 🎉' : 'Không có HĐ.' }}</td></tr>
                 }
               </tbody>
             </table>
@@ -308,7 +316,7 @@
         @if (selectedRuns.size) { <button type="button" class="chip" (click)="selectRuns('none')">Bỏ chọn</button> }
         <button type="button" class="btn small danger" (click)="deleteSelectedRuns()" [disabled]="!selectedRuns.size || deletingRuns">
           <i class="fa-solid" [ngClass]="deletingRuns ? 'fa-spinner fa-spin' : 'fa-trash'"></i> Xóa đã chọn ({{ selectedRuns.size }})</button>
-        <span class="hint">Máy chủ tự giữ 60 lần gần nhất (khoảng 15 ngày lịch tự động), cũ hơn tự xóa.</span>
+        <span class="hint">Máy chủ tự giữ 60 lần gần nhất (khoảng 10 ngày lịch tự động), cũ hơn tự xóa.</span>
       </div>
       <div class="wrap">
         <table>
