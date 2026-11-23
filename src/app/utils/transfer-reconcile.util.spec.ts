@@ -297,7 +297,7 @@ describe('transfer-reconcile.util', () => {
         bill({}),
         bill({ id: 'B2', invoice_code: null, bill_number: 1400, payment_method_code: 'TM', note: '' }),
         bill({ id: 'B3', invoice_code: 'HD3', payment_method_code: 'TM', note: 'chuyển khoản 2 lần 30 + 14' }),
-        bill({ id: 'OLD', adjustment_type: 2 }),
+        bill({ id: 'OLD', invoice_code: 'HD9', adjustment_type: 2 }),
         bill({ id: 'NEW', invoice_code: null, adjustment_type: 3, origin_id: 'OLD' }),
         bill({ id: 'B4', status: 'GHI_TAM', total_payment: 0 }),
       ]);
@@ -305,6 +305,44 @@ describe('transfer-reconcile.util', () => {
       expect(fallback.map(i => i.code)).toEqual(['HĐĐT 1400']);
       expect(primary[0]).toEqual({ id: 'B1', code: 'HD1', total: 44000, time: '30/09/2026 23:59:58', note: 'chuyển khoản',
         einvoiceSerial: 'C26MSM', einvoiceNumber: '27852', einvoiceStatus: 'CQT chấp nhận', paymentMethod: 'CK', einvoiceIssue: '', einvoiceLate: '' });
+    });
+
+    it('HĐĐT thay thế nhiều lần: chỉ giữ HĐ cuối chuỗi, mang mã / giờ bán / ghi chú HĐ gốc (mẫu thật 36317 ← 36318 ← 36337)', () => {
+      const chain = [
+        bill({ id: 'R2', invoice_code: null, bill_number: 36337, total_payment: 174000, adjustment_type: 3, origin_id: 'R1', note: '',
+          created_at: '2026-11-23 09:26:17.643', bill_date: '2026-11-23 09:43:11.937' }),
+        bill({ id: 'R1', invoice_code: null, bill_number: 36318, total_payment: 174000, adjustment_type: 2, origin_id: 'R0', note: '',
+          created_at: '2026-11-23 09:11:37.737', bill_date: '2026-11-23 09:12:31.667' }),
+        bill({ id: 'R0', invoice_code: 'HD448890', bill_number: 36317, total_payment: 174000, adjustment_type: 2, origin_id: null,
+          created_at: '2026-11-22 21:09:18.060', bill_date: '2026-11-22 22:23:49.240' }),
+      ];
+      const { primary } = readEInvoiceBills(chain);
+      expect(primary.length).toBe(1);
+      expect(primary[0]).toEqual(jasmine.objectContaining({ id: 'R2', code: 'HD448890', einvoiceNumber: '36337',
+        time: '22/11/2026 21:09:18', note: 'chuyển khoản', einvoiceLate: '',
+        einvoiceRelated: 'HĐĐT 36337 thay thế 36318 ← 36317 (bán 22/11)' }));
+      const pairs = reconcileByAmount(expandInvoiceItems(primary), [txn('T1', 174000, '22/11/2026 07:34:16')]);
+      expect(pairs.map(p => p.kind)).toEqual(['matched']);
+      expect(reconPairHint(pairs[0])).toContain('thay thế 36318 ← 36317');
+      // kỳ 22/11 có, kỳ 23/11 không (theo ngày bán của HĐ gốc)
+      expect(readEInvoiceBills(chain, { from: '2026-11-22', to: '2026-11-22' }).primary.length).toBe(1);
+      expect(readEInvoiceBills(chain, { from: '2026-11-23', to: '2026-11-23' }).primary.length).toBe(0);
+      // HĐ gốc ngoài khoảng lấy (lấy từ 23/11) → chuỗi đứt → bỏ, không thành "HĐ thiếu GD"
+      expect(readEInvoiceBills(chain.slice(0, 2)).primary.length).toBe(0);
+      // HĐ thay thế phát hành sau khoảng lấy → HĐ bị thay vẫn đối soát, có ghi chú
+      const [only] = readEInvoiceBills([chain[2]]).primary;
+      expect(only.code).toBe('HD448890');
+      expect(only.einvoiceRelated).toBe('HĐĐT đã bị thay thế (HĐ thay thế ngoài khoảng lấy)');
+    });
+
+    it('HĐĐT điều chỉnh (origin_id, loại khác 2/3): giữ nguyên, ghi chú 2 phía', () => {
+      const { primary } = readEInvoiceBills([
+        bill({ id: 'G', invoice_code: 'HD1', bill_number: 100 }),
+        bill({ id: 'A', invoice_code: null, bill_number: 101, total_payment: 5000, adjustment_type: 4, origin_id: 'G' }),
+      ]);
+      expect(primary.map(i => i.id)).toEqual(['G', 'A']);
+      expect(primary[0].einvoiceRelated).toBe('HĐĐT có HĐ điều chỉnh: 101');
+      expect(primary[1].einvoiceRelated).toBe('HĐĐT điều chỉnh (loại 4) cho số 100');
     });
 
     it('readEInvoiceBills: nháp → không điền số HĐĐT', () => {

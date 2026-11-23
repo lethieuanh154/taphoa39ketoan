@@ -32,6 +32,7 @@ export interface ReconInvoice {
   einvoiceIssue?: string;   // HĐĐT chưa có số CQT: nháp / chưa được CQT chấp nhận — '' = ổn (readEInvoiceBills)
   einvoiceLate?: string;    // HĐĐT phát hành sau ngày bán (chỉ ghi chú, KHÔNG phải lỗi — 11/11/2026)
   einvoiceDuplicate?: string; // 1 HĐ KiotViet có ≥ 2 HĐĐT (chuyển trùng, vd HD447316 12/11/2026) — chỉ có khi trùng
+  einvoiceRelated?: string;   // HĐĐT thay thế / điều chỉnh / bị thay thế (23/11/2026, readEInvoiceBills) — chỉ ghi chú
 }
 
 export interface ReconEInvoiceInfo {
@@ -79,7 +80,7 @@ export interface EInvoiceBill {
   payment_method_code: string | null;   // 'CK' | 'TM' | 'TMCK'
   status: string | null;                // 'DA_TIEP_NHAN' = CQT chấp nhận, 'GHI_TAM' = nháp
   adjustment_type: number | null;       // 1 = gốc, 2 = đã bị thay thế, 3 = HĐ thay thế (origin_id = HĐ bị thay) — mẫu 23–24/10/2026
-  origin_id: string | null;
+  origin_id: string | null;             // HĐ loại 2 VẪN giữ origin_id nếu chính nó từng là HĐ thay thế (chuỗi 36317 ← 36318 ← 36337, 23/11/2026)
   note: string | null;                  // = Description HĐ KiotViet
 }
 
@@ -105,27 +106,61 @@ const EINVOICE_STATUS_LABEL: Record<string, string> = { DA_TIEP_NHAN: 'CQT chấ
  * Giờ HĐ = `created_at` (giờ bán; thiếu thì `bill_date`) vì `bill_date` đổi sang giờ phát hành. Mẫu thật HD445996: khách CK
  * 04/11 16:01, bán 04/11 21:24 (nháp), phát hành 05/11 08:28 → bill_date 05/11, created_at vẫn 04/11.
  * `period` ('yyyy-mm-dd'): chỉ giữ HĐ có NGÀY BÁN trong kỳ (gọi BE với khoảng dư EINVOICE_PUBLISH_LAG_DAYS ngày sau kỳ).
+ * HĐ thay thế (23/11/2026, mẫu thật 36317 HD448890 22/11 ← 36318 ← 36337 23/11, cùng 174.000): đi hết chuỗi origin_id
+ * (loại 2 còn giữ origin_id) → chỉ giữ HĐ CUỐI chuỗi, mang mã HĐ / giờ bán / ghi chú của HĐ GỐC (HĐ thay thế không có
+ * invoice_code, note rỗng, created_at = ngày thay) + `einvoiceRelated`. Chuỗi đứt (HĐ gốc ngoài khoảng lấy = bán trước kỳ,
+ * tiền đã đối soát ở kỳ đó) → bỏ khỏi đối soát. HĐ có origin_id nhưng adjustment_type khác 2/3 = HĐ điều chỉnh (chưa có
+ * mẫu thật) → giữ nguyên, chỉ ghi chú; loại 2 không có HĐ thay thế trong khoảng lấy → giữ nguyên, chỉ ghi chú.
  */
 export function readEInvoiceBills(
   bills: EInvoiceBill[],
   period?: { from: string; to: string }
 ): { primary: ReconInvoice[]; fallback: ReconInvoice[] } {
-  const replaced = new Set(bills.filter(b => Number(b.adjustment_type) === 3 && b.origin_id).map(b => b.origin_id));
+  const byId = new Map(bills.map(b => [b.id, b]));
+  const isReplacement = (b: EInvoiceBill) => !!b.origin_id && [2, 3].includes(Number(b.adjustment_type));
+  const replaced = new Set(bills.filter(isReplacement).map(b => b.origin_id));
+  const adjustedBy = new Map<string, EInvoiceBill[]>();
+  for (const b of bills) {
+    if (b.origin_id && !isReplacement(b)) adjustedBy.set(b.origin_id, [...(adjustedBy.get(b.origin_id) || []), b]);
+  }
   const primary: ReconInvoice[] = [];
   const fallback: ReconInvoice[] = [];
   let skipped = 0;
   let outOfPeriod = 0;
+  const outside: string[] = [];
   const day = (s: string | null | undefined) => (s || '').slice(0, 10);
+  const no = (b: EInvoiceBill | undefined) => String(b?.bill_number || 'nháp');
+  const dm = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
   for (const b of bills) {
     if (replaced.has(b.id) || !(Number(b.total_payment) > 0)) { skipped++; continue; }
-    const soldAt = b.created_at || b.bill_date;
+    const chain: EInvoiceBill[] = [];   // các HĐ bị thay, gần → xa (cuối = HĐ gốc)
+    let broken = false;
+    for (let cur = b; isReplacement(cur);) {
+      const o = byId.get(cur.origin_id!);
+      if (!o) { broken = true; break; }
+      if (o === b || chain.includes(o)) break;
+      chain.push(o);
+      cur = o;
+    }
+    if (broken) { outside.push(no(b)); continue; }
+    const root = chain[chain.length - 1] || b;
+    const soldAt = root.created_at || root.bill_date;
     if (period && (day(soldAt) < period.from || day(soldAt) > period.to)) { outOfPeriod++; continue; }
     const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}:\d{2}:\d{2})/.exec(soldAt || '');
     const accepted = b.status === 'DA_TIEP_NHAN';
-    const note = b.note || '';
+    const note = [b, ...chain].map(x => x.note || '').find(Boolean) || '';
+    const code = [b, ...chain].map(x => x.invoice_code).find(Boolean);
+    const related: string[] = [];
+    if (chain.length) related.push(`HĐĐT ${no(b)} thay thế ${chain.map(no).join(' ← ')} (bán ${dm(soldAt)})`);
+    else if (Number(b.adjustment_type) === 2) related.push('HĐĐT đã bị thay thế (HĐ thay thế ngoài khoảng lấy)');
+    if (b.origin_id && !isReplacement(b)) {
+      related.push(`HĐĐT điều chỉnh (loại ${b.adjustment_type ?? '?'}) cho số ${byId.has(b.origin_id) ? no(byId.get(b.origin_id)) : 'ngoài khoảng lấy'}`);
+    }
+    const adj = adjustedBy.get(b.id);
+    if (adj) related.push(`HĐĐT có HĐ điều chỉnh: ${adj.map(no).join(', ')}`);
     const inv: ReconInvoice = {
       id: b.id,
-      code: b.invoice_code || `HĐĐT ${b.bill_number ?? ''}`.trim(),
+      code: code || `HĐĐT ${b.bill_number ?? ''}`.trim(),
       total: Number(b.total_payment),
       time: m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : '',
       note,
@@ -134,12 +169,12 @@ export function readEInvoiceBills(
       einvoiceStatus: EINVOICE_STATUS_LABEL[b.status || ''] || b.status || '',
       paymentMethod: b.payment_method_code || '',
     };
-    const dm = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
     inv.einvoiceIssue = b.status === 'GHI_TAM' ? 'HĐĐT chưa phát hành (nháp)'
       : !accepted ? `HĐĐT chưa được CQT chấp nhận (${inv.einvoiceStatus || '?'})`
       : '';
-    inv.einvoiceLate = accepted && b.created_at && day(b.created_at) < day(b.bill_date)
+    inv.einvoiceLate = accepted && !chain.length && b.created_at && day(b.created_at) < day(b.bill_date)
       ? `HĐĐT phát hành trễ: bán ${dm(b.created_at)}, phát hành ${dm(b.bill_date)}` : '';
+    if (related.length) inv.einvoiceRelated = related.join('; ');
     const saysTransfer = /chuyen\s*khoan|\bck\b/.test(normalizeVi(note));
     (b.payment_method_code !== 'TM' || saysTransfer ? primary : fallback).push(inv);
   }
@@ -154,8 +189,13 @@ export function readEInvoiceBills(
     console.warn(`[TransferReconcile] ${label}`);
   }
   const issues = primary.filter(i => i.einvoiceIssue).length;
+  const related = [...primary, ...fallback].filter(i => i.einvoiceRelated);
   console.debug(`[TransferReconcile] HĐĐT ${bills.length}: CK ${primary.length} (${issues} chưa có số CQT), TM dự phòng ${fallback.length}, bỏ ${skipped} (bị thay thế / tiền ≤ 0)` +
-    (period ? `, bỏ ${outOfPeriod} ngày bán ngoài ${period.from}→${period.to}` : ''));
+    (period ? `, bỏ ${outOfPeriod} ngày bán ngoài ${period.from}→${period.to}` : '') +
+    `, ${related.length} HĐ thay thế / điều chỉnh` + (related.length ? ` (${related.map(i => i.einvoiceNumber || i.code).join(', ')})` : ''));
+  if (outside.length) {
+    console.warn(`[TransferReconcile] Bỏ ${outside.length} HĐĐT thay thế cho HĐ gốc ngoài khoảng lấy (bán trước kỳ): ${outside.join(', ')}`);
+  }
   return { primary, fallback };
 }
 
@@ -622,6 +662,7 @@ export function pairFlags(p: ReconPair): string[] {
   if (p.item?.invoice.einvoiceDuplicate) flags.push(p.item.invoice.einvoiceDuplicate);
   if (p.item?.invoice.einvoiceIssue) flags.push(p.item.invoice.einvoiceIssue);
   if (p.item?.invoice.einvoiceLate) flags.push(p.item.invoice.einvoiceLate);
+  if (p.item?.invoice.einvoiceRelated) flags.push(p.item.invoice.einvoiceRelated);
   if (p.amountDiff) flags.push(`lệch tiền lẻ ${p.amountDiff > 0 ? '+' : '−'}${Math.abs(p.amountDiff).toLocaleString('vi-VN')} ₫`);
   if (p.txn && p.item?.invoice.paymentMethod === 'TM') flags.push('HĐĐT ghi Tiền mặt');
   return flags;
