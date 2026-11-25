@@ -1,0 +1,36 @@
+.ivi { display: flex; flex-direction: column; gap: 0.9rem; font-size: 0.875rem; color: #1e293b; }
+.ivi-head { display: flex; align-items: center; justify-content: space-between; }
+.ivi-head h3 { margin: 0; font-size: 1.05rem; }
+.ivi-close { border: none; background: transparent; font-size: 1.1rem; color: #64748b; cursor: pointer; }
+.ivi-step { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.9rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; }
+.ivi-step h4 { margin: 0; font-size: 0.95rem; }
+.ivi-step h5 { margin: 0.25rem 0 0; font-size: 0.9rem; }
+.ivi-hint { margin: 0; color: #475569; line-height: 1.5; }
+.ivi-muted { color: #64748b; font-size: 0.8rem; font-weight: 400; }
+.ivi-alert { padding: 0.55rem 0.75rem; border-radius: 6px; }
+.ivi-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.ivi-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.ivi-stats { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; padding: 0.5rem 0.75rem; background: #f8fafc; border-radius: 6px; }
+.ivi-stats .warn, .ivi-table .warn { color: #b45309; }
+.ivi-stats .muted { color: #64748b; }
+.ivi details summary { cursor: pointer; color: #334155; font-weight: 500; }
+.ivi-table-wrap { max-height: 280px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 6px; margin-top: 0.4rem; }
+.ivi-table { width: 100%; border-collapse: collapse; }
+.ivi-table th, .ivi-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #f1f5f9; text-align: left; vertical-align: top; }
+.ivi-table th { position: sticky; top: 0; background: #f1f5f9; font-weight: 600; }
+.ivi-table .code { font-family: ui-monospace, Consolas, monospace; white-space: nowrap; }
+.ivi-table .chk { width: 32px; text-align: center; }
+.ivi-table tr.picked { background: #eff6ff; }
+.ivi-table .old { color: #64748b; text-decoration: line-through; }
+.ivi-table .new { color: #15803d; font-weight: 500; }
+.ivi-actions { display: flex; gap: 0.5rem; }
+/* Style nút riêng: CSS của trang (.btn…) bị đóng gói theo component, không áp vào đây */
+.btn { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.55rem 1rem; border-radius: 8px; border: 1px solid transparent;
+  font-size: 0.875rem; font-weight: 500; line-height: 1.2; cursor: pointer; margin: 0; user-select: none; align-self: flex-start;
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; }
+.btn:hover:not(:disabled):not(.disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12); }
+.btn:disabled, .btn.disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
+.btn-primary { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+.btn-primary:hover:not(:disabled):not(.disabled) { background: #6d28d9; }
+.btn-outline-primary { background: #fff; border-color: #7c3aed; color: #7c3aed; }
+.btn-outline-primary:hover:not(:disabled):not(.disabled) { background: #f5f3ff; }

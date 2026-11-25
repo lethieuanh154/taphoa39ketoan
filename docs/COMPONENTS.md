@@ -489,9 +489,11 @@ chưa có bản lưu. 2 tab, chip Tất cả / Lệch / Ghi chú lệch, ô tìm
 - (26/10/2026) Xóa lần kiểm: ô chọn từng dòng + chọn nhanh Tất cả / Lịch tự động / Người bấm → **Xóa đã chọn**; nút thùng rác
   từng dòng. Có hỏi xác nhận; lần đang chạy không chọn / xóa được. Xóa lần đang xem → mở lần mới nhất còn lại. Máy chủ vẫn tự
   giữ 60 lần gần nhất (`EINVOICE_CHECK_KEEP_RUNS`).
-- (21/11/2026) "Kiểm tra ngay" + lịch tự động kiểm **HĐ hôm nay mọi trạng thái** (scope `today`; mốc 00:00 kiểm cả hôm qua),
-  không kiểm lại HĐ cũ. Bảng có cột **Trạng thái** (Nháp / Phát hành lỗi / Gửi CQT lỗi / Đã gửi CQT / CQT chấp nhận / CQT từ chối)
-  + chip lọc theo trạng thái kèm số HĐ (`statusFilter`, chỉ hiện trạng thái có trong lần kiểm). Lần kiểm cũ không có `status` → `—`.
+- (21/11/2026 → bỏ 25/11/2026) thử kiểm HĐ hôm nay mọi trạng thái; nay quay lại chỉ HĐ nháp.
+- (25/11/2026) **Tự sửa HĐ nháp**: sau mỗi lần kiểm, máy chủ tự sửa lỗi thuế suất / tiền dòng / tổng hợp thuế (giữ tiền sau thuế)
+  rồi kiểm lại (`TapHoa39KeToanBackEnd/docs/TIEN-ICH-JOBS.md`). Trang: thẻ "HĐ đã tự sửa", tab **Đã tự sửa**, cột Kết quả hiện
+  mức trước → sau, ô Chi tiết có khung trước / sau từng dòng (TS, đơn giá, chưa thuế, thuế, sau thuế) + tổng HĐ + "Lỗi trước khi
+  sửa", rồi tới lỗi sau khi sửa. Kiểu `BillFix` trong `einvoice-check.service.ts`.
 - (30/10/2026) **Kiểm PDF lúc phát hành**: máy chủ lấy PDF einvoice dựng khi bấm "Phát hành" (gộp 5 HĐ / lần như phát hành nhiều HĐ)
   rồi so với dữ liệu HĐ → lỗi loại `PDF: ...` hiện chung bảng lỗi (không cần UI riêng). Tóm tắt lần kiểm thêm dòng "Đã so PDF lúc phát
   hành của n HĐ" (`counts.pdf_checked`, `pdf_single`, `pdf_errors`). Chi tiết: `TapHoa39KeToanBackEnd/docs/TIEN-ICH-JOBS.md`.

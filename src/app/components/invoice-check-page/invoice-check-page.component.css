@@ -131,3 +131,11 @@ select { height: 24px; border: 1px solid #d1d5db; border-radius: 4px; font-size:
 
 /* vòng xoay đang tải (app-table-loading overlay) */
 .card, .wrap.rel { position: relative; }
+
+/* Tự sửa HĐ nháp (25/11/2026) — trước / sau */
+.fixbox { border: 1px solid #bfdbfe; background: #eff6ff; border-radius: 6px; padding: 0.35rem 0.5rem; margin-bottom: 0.35rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.fixtable { border-collapse: collapse; font-size: 0.72rem; width: auto; }
+.fixtable th, .fixtable td { padding: 0.1rem 0.4rem; border-bottom: 1px solid #dbeafe; white-space: nowrap; }
+.fixtable tr.before td { color: #9b2c2c; }
+.fixtable tr.after td { color: #276749; font-weight: 600; }
+.fixbox details summary { cursor: pointer; font-size: 0.75rem; color: #4a5568; }

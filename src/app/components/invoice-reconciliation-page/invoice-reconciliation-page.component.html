@@ -88,7 +88,7 @@
     <div class="msg error"><i class="fa-solid fa-circle-exclamation"></i> {{ oldError }}</div>
     }
     @if (codeTab) {
-    <div class="code-panel">
+    <div class="code-panel fullscreen">
     <nav class="code-tabs">
       <button type="button" [class.active]="codeTab === 'unmatched'" (click)="setCodeTab('unmatched')">
         <i class="fa-solid fa-link-slash"></i> Mã cũ chưa ghép @if (unmatched) { ({{ unmatched.length | number }}) }
@@ -116,8 +116,9 @@
         <i class="fa-solid fa-rotate" [class.fa-spin]="unmatchedLoading"></i> Tải lại</button>
     </div>
     @if (assignMsg) { <div class="hint indent">{{ assignMsg }}</div> }
-    <div class="runs-wrap review-frame">
-      <table class="runs review">
+    <div class="runs-wrap review-frame no-hscroll">
+      <table class="runs review unmatched">
+        <colgroup><col style="width: 9%"><col style="width: 22%"><col style="width: 7%"><col style="width: 20%"><col style="width: 42%"></colgroup>
         <thead>
           <tr><th class="vd">Mã cũ Vietda</th><th class="vd">Tên trên Vietda</th><th class="vd">ĐVT Vietda</th><th>Lý do chưa ghép</th>
             <th class="kv">Gán cho mã master KiotViet (bấm được nhiều mã)</th></tr>

@@ -16,7 +16,7 @@ import {
 const LOG = '[InvoiceCheck]';
 const POLL_MS = 1500;
 
-type View = 'issues' | 'all' | 'unknown' | 'unmapped' | 'rates';
+type View = 'issues' | 'all' | 'fixed' | 'unknown' | 'unmapped' | 'rates';
 
 @Component({
   selector: 'app-invoice-check-page',
@@ -48,8 +48,6 @@ export class InvoiceCheckPageComponent implements OnInit {
   // Kết quả
   view: View = 'issues';
   levelFilter: '' | BillLevel = '';
-  /** lọc theo trạng thái einvoice ('' = tất cả) — 21/11/2026 */
-  statusFilter = '';
   q = '';
   page = 1;
   readonly pageSize = 100;
@@ -67,10 +65,6 @@ export class InvoiceCheckPageComponent implements OnInit {
   readonly levelLabel: Record<BillLevel, string> = { error: 'Lỗi', warn: 'Cảnh báo', info: 'Lưu ý', ok: 'Không lỗi' };
   readonly levelChips: { value: '' | BillLevel; label: string }[] = [
     { value: '', label: 'Tất cả' }, { value: 'error', label: 'Lỗi' }, { value: 'warn', label: 'Cảnh báo' }, { value: 'ok', label: 'Không lỗi' }];
-  /** statusTab einvoice (HAR 21/11/2026) → nhãn như trang HĐĐT KiotViet */
-  readonly statusLabel: Record<string, string> = {
-    GHI_TAM: 'Nháp', PHAT_HANH_LOI: 'Phát hành lỗi', CHUA_GUI_CQT: 'Chưa gửi CQT', SEND_CQT_FAILED: 'Gửi CQT lỗi',
-    DA_GUI_CQT: 'Đã gửi CQT', DA_TIEP_NHAN: 'CQT chấp nhận', KHONG_HOP_LE: 'CQT từ chối' };
 
   ngOnInit(): void {
     this.destroyRef.onDestroy(() => this.stopPoll());
@@ -190,8 +184,8 @@ export class InvoiceCheckPageComponent implements OnInit {
     this.error = '';
     this.msg = '';
     try {
-      const id = await this.service.start('today');
-      console.log(`${LOG} Bắt đầu kiểm ${id} (HĐ hôm nay, mọi trạng thái)`);
+      const id = await this.service.start('draft');
+      console.log(`${LOG} Bắt đầu kiểm ${id} (HĐ nháp)`);
       this.view = 'issues';
       await this.loadList();
       await this.openRun(id);
@@ -209,23 +203,17 @@ export class InvoiceCheckPageComponent implements OnInit {
     return (this.run?.bills || []).filter(b => b.level === 'error' || b.level === 'warn');
   }
 
+  /** HĐ máy đã tự sửa (lưu lên einvoice) rồi kiểm lại — 25/11/2026 */
+  get fixedBills(): CheckBill[] {
+    return (this.run?.bills || []).filter(b => b.fix?.status === 'fixed');
+  }
+
   get filteredBills(): CheckBill[] {
-    let rows = this.view === 'issues' ? this.issueBills : (this.run?.bills || []);
+    let rows = this.view === 'issues' ? this.issueBills : this.view === 'fixed' ? this.fixedBills : (this.run?.bills || []);
     if (this.levelFilter) rows = rows.filter(b => b.level === this.levelFilter);
-    if (this.statusFilter) rows = rows.filter(b => b.status === this.statusFilter);
     const q = this.norm(this.q);
     if (q) rows = rows.filter(b => this.norm(`${b.code} ${b.series} ${b.number} ${b.issues.map(i => `${i.code} ${i.name} ${i.kind}`).join(' ')}`).includes(q));
     return rows;
-  }
-
-  /** chip trạng thái: chỉ trạng thái có trong lần kiểm (theo thứ tự tab einvoice), kèm số HĐ của view đang xem */
-  get statusChips(): { value: string; label: string; n: number }[] {
-    const rows = this.view === 'issues' ? this.issueBills : (this.run?.bills || []);
-    const n: { [s: string]: number } = {};
-    for (const b of rows) if (b.status) n[b.status] = (n[b.status] || 0) + 1;
-    const order = Object.keys(this.statusLabel);
-    const keys = Object.keys(n).sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
-    return keys.length ? [{ value: '', label: 'Tất cả', n: rows.length }, ...keys.map(k => ({ value: k, label: this.statusLabel[k] || k, n: n[k] }))] : [];
   }
 
   get pageBills(): CheckBill[] {
@@ -239,7 +227,6 @@ export class InvoiceCheckPageComponent implements OnInit {
     this.view = v;
     this.page = 1;
     this.levelFilter = '';
-    this.statusFilter = '';
     if (v === 'rates' && !this.ratesLoaded) this.loadRates();
   }
 

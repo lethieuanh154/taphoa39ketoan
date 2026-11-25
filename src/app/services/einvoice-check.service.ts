@@ -14,7 +14,7 @@ const LOG = '[EinvoiceCheck]';
 
 export type IssueLevel = 'error' | 'warn' | 'info';
 export type BillLevel = IssueLevel | 'ok';
-export type CheckScope = 'today' | 'draft' | 'accepted';
+export type CheckScope = 'draft' | 'accepted' | 'today';
 
 export interface CheckIssue {
   level: IssueLevel; kind: string; message: string;
@@ -24,8 +24,6 @@ export interface CheckIssue {
 
 export interface CheckBill {
   id: string; code: string; series: string; number: string; date: string; payment: string;
-  /** trạng thái einvoice (GHI_TAM, DA_TIEP_NHAN…) — từ 21/11/2026, lần kiểm cũ không có */
-  status?: string;
   amount: number; amount_vat: number; total: number; n_lines: number; level: BillLevel; issues: CheckIssue[];
   /** Tổng HĐ bán KiotViet cùng mã (đã so) */
   kv_total?: number;
@@ -33,9 +31,21 @@ export interface CheckBill {
   pdf?: PdfStatus;
   /** không khớp PDF gộp (phát hành nhiều HĐ) → máy đã đọc PDF riêng */
   pdf_single?: boolean;
+  /** tự sửa (25/11/2026) — lần kiểm cũ không có */
+  fix?: BillFix;
 }
 
 export type PdfStatus = 'ok' | 'diff' | 'error';
+
+/** 1 dòng / tổng HĐ trước hoặc sau khi tự sửa */
+export interface FixLineValues { vat: string; price: number; amount: number; amount_vat: number; after: number; }
+export interface FixTotals { amount: number; amount_vat: number; after: number; total: number; }
+/** Tự sửa HĐ nháp sau khi kiểm (25/11/2026): fixed = đã lưu bản sửa lên einvoice rồi kiểm lại (issues của HĐ = lỗi SAU khi sửa) */
+export interface BillFix {
+  status: 'fixed' | 'skipped' | 'error'; reason?: string; at?: string;
+  changes?: { line: number; code: string; name: string; before: FixLineValues; after: FixLineValues }[];
+  before?: FixTotals; after?: FixTotals; issues_before?: CheckIssue[]; level_before?: BillLevel; pdf_before?: PdfStatus | null;
+}
 
 export interface UnknownMaster { master_code: string; master_name: string; name: string; codes: string[]; rates: { [rate: string]: number }; lines: number; }
 export interface UnmappedCode { code: string; name: string; rates: { [rate: string]: number }; lines: number; }
@@ -46,8 +56,8 @@ export interface CheckCounts {
   catalog_refreshed?: boolean; rate_masters?: number; rate_manual?: number; kv_compared?: number | null;
   /** Kiểm PDF lúc phát hành (30/10/2026): null = BE tắt; pdf_single = HĐ không khớp PDF gộp phải đọc riêng */
   pdf_checked?: number | null; pdf_errors?: number; pdf_single?: number;
-  /** số HĐ theo trạng thái einvoice (21/11/2026) */
-  statuses?: { [status: string]: number };
+  /** tự sửa HĐ nháp (25/11/2026): autofix = BE bật EINVOICE_CHECK_AUTOFIX */
+  autofix?: boolean; fixed?: number; fix_skipped?: number; fix_errors?: number;
 }
 
 export interface CheckRun {

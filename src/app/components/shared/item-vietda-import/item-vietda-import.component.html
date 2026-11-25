@@ -1,0 +1,165 @@
+<div class="ivi">
+  <div class="ivi-head">
+    <h3><i class="fa-solid fa-file-import"></i> Nạp danh mục hàng hóa từ Vietda</h3>
+    <button type="button" class="ivi-close" (click)="close()" [disabled]="busy" title="Đóng"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
+  @if (error) { <div class="ivi-alert ivi-error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div> }
+  @if (success) { <div class="ivi-alert ivi-success"><i class="fa-solid fa-circle-check"></i> {{ success }}</div> }
+
+  <!-- BƯỚC 1 -->
+  <section class="ivi-step">
+    <h4>Bước 1 — File danh mục Vietda (VAT TU HH.xlsx)</h4>
+    <p class="ivi-hint">Cột <b>Mã hàng / Tên hàng hóa - vật tư / ĐVT</b>; chỉ lấy mã HH / KM. Mã đã có (HH17 = HH0017) mà tên / ĐVT khác → liệt kê,
+      tick mới cập nhật. Chạy lại không tạo trùng.</p>
+    <label class="btn btn-primary" [class.disabled]="busy">
+      <i class="fa-solid" [class.fa-spinner]="busy" [class.fa-spin]="busy" [class.fa-file-excel]="!busy"></i>
+      {{ file ? 'Chọn file khác' : 'Chọn file .xlsx' }}
+      <input type="file" accept=".xlsx,.xls" (change)="onFileSelected($event)" [disabled]="busy" hidden>
+    </label>
+    @if (file) { <span class="ivi-muted">{{ file.name }}</span> }
+
+    @if (vd) {
+      <div class="ivi-stats">
+        <span>{{ vd.rows }} dòng</span>
+        <span>{{ vd.dryRun ? 'Sẽ tạo' : 'Đã tạo' }}: <b>{{ vd.create.length }}</b></span>
+        <span>Giống (bỏ qua): <b>{{ vd.same }}</b></span>
+        <span class="warn">Khác thông tin: <b>{{ vd.update.length }}</b></span>
+        <span class="muted">Bỏ qua: <b>{{ vd.skipTotal }}</b></span>
+      </div>
+
+      @if (vd.create.length) {
+        <details>
+          <summary>{{ vd.dryRun ? 'Sẽ tạo' : 'Đã tạo' }} {{ vd.create.length }} mặt hàng{{ vd.create.length > showMax ? ' (hiện ' + showMax + ' dòng đầu)' : '' }}</summary>
+          <div class="ivi-table-wrap">
+            <table class="ivi-table">
+              <thead><tr><th>Mã</th><th>Tên</th><th>ĐVT</th></tr></thead>
+              <tbody>
+                @for (c of vd.create.slice(0, showMax); track c.code) {
+                  <tr><td class="code">{{ c.code }}</td><td>{{ c.name }}</td><td>{{ c.unit }}</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </details>
+      }
+
+      @if (vd.update.length) {
+        <h5>Khác thông tin {{ vd.update.length }} <span class="ivi-muted">{{ vd.dryRun ? '— tick dòng muốn cập nhật theo file (không tick = giữ bản đang lưu)' : '' }}</span></h5>
+        <div class="ivi-table-wrap">
+          <table class="ivi-table">
+            <thead>
+              <tr>
+                @if (vd.dryRun) { <th class="chk"><input type="checkbox" [checked]="allUpdatesSelected" (change)="toggleAllUpdates()" title="Chọn tất cả"></th> }
+                <th>Mã</th><th>Đang lưu</th><th>Trong file</th>
+                @if (!vd.dryRun) { <th>Kết quả</th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (u of vd.update; track u.code) {
+                <tr [class.picked]="vd.dryRun && selectedUpdates.has(u.code)">
+                  @if (vd.dryRun) {
+                    <td class="chk">
+                      @if (!(u.unitLocked && u.fields.length === 1)) {
+                        <input type="checkbox" [checked]="selectedUpdates.has(u.code)" (change)="toggleUpdate(u.code)">
+                      }
+                    </td>
+                  }
+                  <td class="code">{{ u.code }}@if (u.fileCode !== u.code) { <span class="ivi-muted"> ({{ u.fileCode }})</span> }</td>
+                  <td>
+                    @if (u.fields.includes('name')) { <div class="old">{{ u.oldName }}</div> }
+                    @if (u.fields.includes('unit')) { <div class="old">ĐVT: {{ u.oldUnit }}</div> }
+                  </td>
+                  <td>
+                    @if (u.fields.includes('name')) { <div class="new">{{ u.newName }}</div> }
+                    @if (u.fields.includes('unit')) {
+                      <div class="new">ĐVT: {{ u.newUnit }}</div>
+                      @if (u.unitLocked) { <div class="warn">Đã có ĐVT phụ / mã master — không đổi ĐVT khi nạp; sửa trên trang để nhập lại hệ số</div> }
+                    }
+                  </td>
+                  @if (!vd.dryRun) { <td>{{ u.applied ? 'Đã cập nhật' : 'Giữ nguyên' }}</td> }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      @if (vd.skipTotal) {
+        <details>
+          <summary>Bỏ qua {{ vd.skipTotal }} dòng{{ vd.skipTotal > vd.skip.length ? ' (hiện ' + vd.skip.length + ')' : '' }}</summary>
+          <div class="ivi-table-wrap">
+            <table class="ivi-table">
+              <thead><tr><th>Dòng</th><th>Lý do</th></tr></thead>
+              <tbody>
+                @for (s of vd.skip; track $index) { <tr><td class="code">{{ s.key }}</td><td>{{ s.reason }}</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        </details>
+      }
+
+      @if (vd.dryRun) {
+        <div class="ivi-actions">
+          <button type="button" class="btn btn-primary" (click)="confirmVd()" [disabled]="busy || !canConfirmVd">
+            <i class="fa-solid fa-check"></i>
+            @if (vd.create.length) { Tạo {{ vd.create.length }} }
+            @if (vd.create.length && selectedUpdates.size) { + }
+            @if (selectedUpdates.size) { Cập nhật {{ selectedUpdates.size }} }
+            @if (!vd.create.length && !selectedUpdates.size) { Không có gì để ghi }
+          </button>
+        </div>
+      }
+    }
+  </section>
+
+  <!-- BƯỚC 2 -->
+  <section class="ivi-step">
+    <h4>Bước 2 — Ghép mã master KiotViet (từ Đối soát hóa đơn XML)</h4>
+    <p class="ivi-hint">Lấy bảng "Mã HH đã ghép" hiện có (kèm hệ số ĐVT, masterId). Mặt hàng chưa có → nạp bước 1 trước. Mã master đã gán mặt
+      hàng khác trên danh mục mới → báo xung đột, không đè. Chạy lại để nạp bổ sung phần ghép làm thêm.</p>
+    <button type="button" class="btn btn-outline-primary" (click)="loadMasters()" [disabled]="busy">
+      <i class="fa-solid" [class.fa-spinner]="busy" [class.fa-spin]="busy" [class.fa-link]="!busy"></i> Lấy bảng ghép + xem trước
+    </button>
+    @if (masterSourceInfo) { <span class="ivi-muted">{{ masterSourceInfo }}</span> }
+
+    @if (mi) {
+      <div class="ivi-stats">
+        <span>{{ mi.dryRun ? 'Sẽ gán' : 'Đã gán' }}: <b>{{ mi.link.length }}</b></span>
+        <span>Bổ sung masterId: <b>{{ mi.filledId }}</b></span>
+        <span class="warn">Xung đột: <b>{{ mi.conflict.length }}</b></span>
+        <span class="muted">Bỏ qua: <b>{{ mi.skipTotal }}</b></span>
+      </div>
+      @if (mi.conflict.length) {
+        <h5>Xung đột {{ mi.conflict.length }}</h5>
+        <div class="ivi-table-wrap">
+          <table class="ivi-table">
+            <thead><tr><th>Mã master → mã hàng</th><th>Lý do</th></tr></thead>
+            <tbody>
+              @for (c of mi.conflict.slice(0, showMax); track $index) { <tr><td class="code">{{ c.key }}</td><td>{{ c.reason }}</td></tr> }
+            </tbody>
+          </table>
+        </div>
+      }
+      @if (mi.skipTotal) {
+        <details>
+          <summary>Bỏ qua {{ mi.skipTotal }}{{ mi.skipTotal > mi.skip.length ? ' (hiện ' + mi.skip.length + ')' : '' }}</summary>
+          <div class="ivi-table-wrap">
+            <table class="ivi-table">
+              <tbody>
+                @for (s of mi.skip; track $index) { <tr><td class="code">{{ s.key }}</td><td>{{ s.reason }}</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        </details>
+      }
+      @if (mi.dryRun) {
+        <div class="ivi-actions">
+          <button type="button" class="btn btn-primary" (click)="confirmMi()" [disabled]="busy || !canConfirmMi">
+            <i class="fa-solid fa-check"></i> Gán {{ mi.link.length }} mã master{{ mi.filledId ? ' + bổ sung ' + mi.filledId + ' masterId' : '' }}
+          </button>
+        </div>
+      }
+    }
+  </section>
+</div>

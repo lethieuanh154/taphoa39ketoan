@@ -22,7 +22,7 @@
       }
     </div>
     <div class="row">
-      <span class="hint"><i class="fa-solid fa-file-pen"></i> Kiểm mọi <b>HĐ có ngày HĐ hôm nay</b> — nháp và đã phát hành (CQT chấp nhận, phát hành lỗi, gửi CQT lỗi, đã gửi CQT, CQT từ chối). Mốc 00:00 kiểm cả hôm qua.</span>
+      <span class="hint"><i class="fa-solid fa-file-pen"></i> Kiểm mọi <b>HĐ nháp còn tồn</b> (chưa phát hành) — không kiểm HĐ đã phát hành.</span>
       <button type="button" class="btn btn-primary" (click)="startCheck()" [disabled]="starting || !!list?.busy">
         <i class="fa-solid" [ngClass]="starting ? 'fa-spinner fa-spin' : 'fa-play'"></i>
         {{ list?.busy ? 'Đang kiểm...' : 'Kiểm tra ngay' }}
@@ -65,6 +65,10 @@
           <div class="stat" [class.bad]="run.counts.bills_error"><b>{{ run.counts.bills_error | number }}</b><small>HĐ có lỗi</small></div>
           <div class="stat" [class.warnc]="run.counts.bills_warn"><b>{{ run.counts.bills_warn | number }}</b><small>HĐ cần xem</small></div>
           <div class="stat good"><b>{{ run.counts.bills_ok | number }}</b><small>HĐ không lỗi</small></div>
+          @if (run.counts.autofix) {
+            <div class="stat" [class.good]="run.counts.fixed" title="Máy tự sửa HĐ nháp có lỗi sửa được (thuế suất, tiền dòng, tổng hợp thuế) rồi kiểm lại">
+              <b>{{ (run.counts.fixed || 0) | number }}</b><small>HĐ đã tự sửa{{ run.counts.fix_skipped ? ' · ' + run.counts.fix_skipped + ' không sửa được' : '' }}{{ run.counts.fix_errors ? ' · ' + run.counts.fix_errors + ' lỗi' : '' }}</small></div>
+          }
           <div class="stat" [class.warnc]="run.counts.unknown_masters"><b>{{ run.counts.unknown_masters | number }}</b><small>mặt hàng chưa biết thuế suất đúng</small></div>
         </div>
         @if (run.counts.bills === 0) {
@@ -87,6 +91,9 @@
       @if (run.status === 'done') {
         <div class="tabs">
           <button type="button" class="tab" [class.active]="view === 'issues'" (click)="setView('issues')">HĐ có lỗi / cần xem <span class="count">{{ issueBills.length }}</span></button>
+          @if (fixedBills.length) {
+            <button type="button" class="tab" [class.active]="view === 'fixed'" (click)="setView('fixed')">Đã tự sửa <span class="count">{{ fixedBills.length }}</span></button>
+          }
           <button type="button" class="tab" [class.active]="view === 'all'" (click)="setView('all')">Tất cả HĐ <span class="count">{{ run.bills?.length || 0 }}</span></button>
           <button type="button" class="tab" [class.active]="view === 'unknown'" (click)="setView('unknown')">Chưa biết thuế suất đúng <span class="count">{{ run.unknown?.length || 0 }}</span></button>
           @if (run.unmapped?.length) {
@@ -96,7 +103,7 @@
         </div>
 
         <!-- HĐ -->
-        @if (view === 'issues' || view === 'all') {
+        @if (view === 'issues' || view === 'all' || view === 'fixed') {
           <div class="toolbar">
             <div class="search"><i class="fa-solid fa-magnifying-glass"></i>
               <input type="text" [(ngModel)]="q" (ngModelChange)="page = 1" placeholder="Mã HĐ, số HĐĐT, mã / tên hàng..."></div>
@@ -107,20 +114,13 @@
                 }
               </div>
             }
-            @if (statusChips.length) {
-              <div class="chips">
-                @for (c of statusChips; track c.value) {
-                  <button type="button" class="chip" [class.active]="statusFilter === c.value" (click)="statusFilter = c.value; page = 1">{{ c.label }} {{ c.n | number }}</button>
-                }
-              </div>
-            }
             <span class="total">{{ filteredBills.length | number }} HĐ</span>
           </div>
           @if (run.truncated && view === 'all') { <p class="hint">Kết quả lớn: máy chủ chỉ lưu HĐ có lỗi / cần xem.</p> }
           <div class="wrap">
             <table>
               <thead>
-                <tr><th>Mã HĐ</th><th>HĐĐT</th><th>Ngày</th><th>Trạng thái</th><th>Hình thức thanh toán</th><th class="num">Chưa thuế</th><th class="num">Thuế</th>
+                <tr><th>Mã HĐ</th><th>HĐĐT</th><th>Ngày</th><th>Hình thức thanh toán</th><th class="num">Chưa thuế</th><th class="num">Thuế</th>
                   <th class="num">Tổng TT</th><th>Kết quả</th><th title="PDF lúc bấm Phát hành so với dữ liệu HĐ">PDF</th><th>Chi tiết</th></tr>
               </thead>
               <tbody>
@@ -132,12 +132,16 @@
                     </td>
                     <td class="nowrap">{{ b.series }}{{ b.number ? '-' + b.number : '' }}</td>
                     <td class="nowrap">{{ billTime(b.date) }}</td>
-                    <td class="nowrap">{{ b.status ? (statusLabel[b.status] || b.status) : '—' }}</td>
                     <td>{{ b.payment }}</td>
                     <td class="num">{{ vnd(b.amount) }}</td>
                     <td class="num">{{ vnd(b.amount_vat) }}</td>
                     <td class="num">{{ vnd(b.total) }}</td>
-                    <td><span class="level" [ngClass]="b.level">{{ levelLabel[b.level] }}</span></td>
+                    <td class="nowrap">
+                      @if (b.fix?.status === 'fixed' && b.fix?.level_before) {
+                        <span class="level" [ngClass]="b.fix!.level_before!" title="Trước khi tự sửa">{{ levelLabel[b.fix!.level_before!] }}</span> →
+                      }
+                      <span class="level" [ngClass]="b.level">{{ levelLabel[b.level] }}</span>
+                    </td>
                     <td class="nowrap">
                       @if (b.pdf) {
                         <span class="level" [ngClass]="pdfLevel[b.pdf]" [title]="b.pdf_single ? 'Không khớp PDF gộp (phát hành nhiều HĐ) → máy đã đọc PDF riêng HĐ này' : ''">{{ pdfLabel[b.pdf] }}{{ b.pdf_single ? ' *' : '' }}</span>
@@ -147,6 +151,35 @@
                       </button>
                     </td>
                     <td class="issues">
+                      @if (b.fix?.status === 'fixed') {
+                        <div class="fixbox">
+                          <b><i class="fa-solid fa-wrench"></i> Máy đã tự sửa{{ b.fix!.at ? ' lúc ' + viTime(b.fix!.at!) : '' }} rồi kiểm lại</b>
+                          @if (b.fix!.changes?.length) {
+                            <table class="fixtable">
+                              <thead><tr><th>Dòng</th><th>Mặt hàng</th><th></th><th>TS</th><th class="num">Đơn giá</th><th class="num">Chưa thuế</th><th class="num">Thuế</th><th class="num">Sau thuế</th></tr></thead>
+                              <tbody>
+                                @for (c of b.fix!.changes; track $index) {
+                                  <tr class="before"><td rowspan="2">{{ c.line }}</td><td rowspan="2">{{ c.code }} {{ c.name }}</td><td>Trước</td>
+                                    <td>{{ c.before.vat }}</td><td class="num">{{ c.before.price | number:'1.0-2' }}</td><td class="num">{{ vnd(c.before.amount) }}</td><td class="num">{{ vnd(c.before.amount_vat) }}</td><td class="num">{{ vnd(c.before.after) }}</td></tr>
+                                  <tr class="after"><td>Sau</td>
+                                    <td>{{ c.after.vat }}</td><td class="num">{{ c.after.price | number:'1.0-2' }}</td><td class="num">{{ vnd(c.after.amount) }}</td><td class="num">{{ vnd(c.after.amount_vat) }}</td><td class="num">{{ vnd(c.after.after) }}</td></tr>
+                                }
+                              </tbody>
+                            </table>
+                          }
+                          @if (b.fix!.before && b.fix!.after) {
+                            <span class="ln">Tổng HĐ — chưa thuế {{ vnd(b.fix!.before!.amount) }} → {{ vnd(b.fix!.after!.amount) }} · thuế {{ vnd(b.fix!.before!.amount_vat) }} → {{ vnd(b.fix!.after!.amount_vat) }} · thanh toán {{ vnd(b.fix!.after!.total) }} (giữ nguyên)</span>
+                          }
+                          @if (b.fix!.issues_before?.length) {
+                            <details><summary>Lỗi trước khi sửa ({{ b.fix!.issues_before!.length }})</summary>
+                              @for (i of b.fix!.issues_before; track $index) {
+                                <div class="issue" [ngClass]="i.level"><b>{{ i.kind }}</b> @if (i.line) { <span class="ln">dòng {{ i.line }} · {{ i.code }}</span> } <span>{{ i.message }}</span></div>
+                              }
+                            </details>
+                          }
+                          <span class="ln">Sau khi sửa:</span>
+                        </div>
+                      }
                       @for (i of b.issues; track $index) {
                         <div class="issue" [ngClass]="i.level">
                           <b>{{ i.kind }}</b>
@@ -176,7 +209,7 @@
                     </td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="11" class="empty">{{ view === 'issues' ? 'Không có HĐ nào có lỗi / cần xem 🎉' : 'Không có HĐ.' }}</td></tr>
+                  <tr><td colspan="10" class="empty">{{ view === 'issues' ? 'Không có HĐ nào có lỗi / cần xem 🎉' : view === 'fixed' ? 'Không có HĐ nào được tự sửa.' : 'Không có HĐ.' }}</td></tr>
                 }
               </tbody>
             </table>

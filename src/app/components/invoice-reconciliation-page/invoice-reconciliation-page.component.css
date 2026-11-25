@@ -432,6 +432,52 @@ a.btn {
   border-radius: 8px;
 }
 
+/* Rà mã HH mở toàn màn hình, bảng tự giãn hết chiều cao còn lại (23/11/2026) */
+.code-panel.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  margin: 0;
+  padding: 0 1rem 1rem;
+  border: none;
+  border-radius: 0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.code-panel.fullscreen>* {
+  flex-shrink: 0;
+}
+
+.code-panel.fullscreen>.review-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+/* Mã cũ chưa ghép: bỏ scroll ngang — cột cố định, chữ xuống dòng */
+.review-frame.no-hscroll {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.runs.review.unmatched {
+  table-layout: fixed;
+}
+
+.runs.review.unmatched th,
+.runs.review.unmatched td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.runs.review.unmatched td.kv .input {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .code-tabs {
   display: flex;
   align-items: center;
