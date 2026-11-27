@@ -40,6 +40,11 @@ export interface ReconciliationRun {
   mapping_tabs?: RunTab[]; has_clone_zip?: boolean; source_run?: string;
   /** số mã master chưa có mã HH lúc chạy (16/11/2026) — > 0 thì không có XML quy đổi; undefined = lần chạy cũ */
   hh_missing?: number;
+  /** 26/11/2026 (spec 004): mã HH lấy từ danh mục hàng hóa ledger. ledger_error = không đọc được ledger lúc chạy
+   *  (unreachable / auth / http) → không có XML quy đổi, không có danh sách "Hàng chưa có mã HH" */
+  catalog_source?: 'ledger'; ledger_error?: 'unreachable' | 'auth' | 'http';
+  /** mã master KiotViet đổi mã vạch (cùng masterId) đã cập nhật trên ledger */
+  ledger_rekey?: { updated: number; skip: number };
   /** Tab Số liệu khai thuế (bảng kê, PL142) + file bảng kê Excel — bước 5 */
   tax_tabs?: RunTab[]; has_bang_ke?: boolean;
   options?: { mst: string; tu_ngay: string; den_ngay: string; file_count: number; toan_bo?: boolean };
@@ -57,8 +62,6 @@ export interface TabPage {
 
 export interface CatalogStatus {
   exists: boolean; exportedAt?: string; count?: number; ageHours?: number | null;
-  /** refresh: mã HH cấp thêm cho mã master mới */
-  codes?: { added: number; status: HhCodeStatus };
 }
 
 /** Bảng mã HH Vietda theo mã master KiotViet (02/11/2026) — /api/vietda-codes */
@@ -74,45 +77,21 @@ export interface HhCodeStatus {
 }
 export interface HhCode { hh: string; master_code: string; name: string; unit: string; }
 
-/** POST /api/vietda-codes/old-catalog — tải danh mục Vietda → giữ mã HH cũ (14/11/2026 nối FE) */
-export interface OldCatalogResult {
-  old_count: number; skipped: { [reason: string]: number }; remapped: number; added: number; old_used: number;
-  unmatched: { [reason: string]: number }; status: HhCodeStatus;
-}
-export interface OldCodeSuggestion {
-  master_code: string; name: string; unit: string; score: number; unit_ok: boolean; current_hh: string; current_source: string;
-}
-/** Mã HH cũ chưa ghép mã master nào → kế toán gán tay */
-export interface OldUnmatchedRow { hh: string; name: string; unit: string; reason: string; suggestions: OldCodeSuggestion[]; }
-
-/** PUT /api/vietda-codes/manual → 409 detail khi ĐVT Vietda khác ĐVT nhỏ nhất KiotViet mà chưa gửi he_so (17/11/2026) */
-export interface NeedFactorDetail {
-  message: string; code: 'need_factor'; hh: string; master_code: string; vd_unit: string; kv_unit: string;
-  /** 1 ĐVT Vietda = suggested ĐVT KiotViet (từ quy đổi ĐVT KiotViet), null = không suy ra được */
-  suggested: number | null; kv_units: string;
-}
-
-/** GET /api/vietda-codes/assigned — mã master đang có mã HH + cờ đáng ngờ (17/11/2026) */
-export type AssignedFlagKind = 'size' | 'name' | 'unit' | 'kind' | 'no_kv';
-export interface AssignedCodeRow {
-  master_code: string; kv_name: string; kv_unit: string; hh: string; vd_name: string; vd_unit: string;
-  /** Hệ số ĐVT (17/11/2026): 1 ĐVT Vietda = he_so ĐVT nhỏ nhất KiotViet; null = cùng ĐVT / chưa có */
-  he_so: number | null; he_so_text: string;
-  source: 'vietda' | 'manual'; shared: number; flags: { kind: AssignedFlagKind; text: string }[];
-}
-export interface AssignedCodesResult {
-  version: number; total: number; flagged: number; flag_kinds: { [kind: string]: number }; has_catalog: boolean;
-  items: AssignedCodeRow[];
-}
-
-/** Mã master của 1 lần đối soát chưa có mã HH Vietda (16/11/2026 — máy không tự cấp mã nữa) */
-export interface HhMissingSuggestion { hh: string; name: string; unit: string; unit_ok: boolean; score: number; }
+/** Mã master của 1 lần đối soát chưa có mã HH (16/11/2026 — máy không tự cấp mã). 26/11/2026: tính theo danh mục ledger,
+ *  gợi ý = mặt hàng ledger đang dùng có tên gần; suggested = hệ số gợi ý khi ĐVT lệch (1 ĐVT Vietda = suggested ĐVT KiotViet) */
+export interface HhMissingSuggestion { hh: string; name: string; unit: string; unit_ok: boolean; score: number; suggested: number | null; }
 export interface HhMissingRow {
-  master_code: string; name: string; unit: string; kind: 'HH' | 'KM' | ''; in_kiotviet: boolean; unassigned: boolean;
+  master_code: string; master_id: number | null; name: string; unit: string; kind: 'HH' | 'KM' | ''; in_kiotviet: boolean;
   n_items: number; lines_in: number; lines_out: number; suggestions: HhMissingSuggestion[];
 }
 export interface HhMissingResult {
-  run_id: string; has_clone_zip: boolean; total: number; old_count: number; old_file: string; items: HhMissingRow[];
+  run_id: string; has_clone_zip: boolean; total: number; catalog_count: number; items: HhMissingRow[];
+}
+/** GET /api/reconciliation/hh-hint — kiểm trước khi gán mã master → mặt hàng ledger (không ghi). current_hh = mặt hàng đang giữ
+ *  mã master này ('' = chưa gán; khác hh → ledger sẽ từ chối LA222) */
+export interface HhHint {
+  hh: string; name: string; vd_unit: string; kv_unit: string; unit_ok: boolean; suggested: number | null; kv_units: string;
+  master_code: string; master_id: number | null; current_hh: string;
 }
 
 const HH_BASE = `${environment.ketoanBackendUrl}/api/vietda-codes`;
@@ -304,59 +283,6 @@ export class ReconciliationService {
     );
   }
 
-  /** Danh mục Vật tư hàng hóa xuất từ Vietda (.xlsx) → máy chủ dùng lại mã HH / KM cũ cho mã master khớp chắc chắn */
-  uploadOldCatalog(file: File): Observable<OldCatalogResult> {
-    const form = new FormData();
-    form.append('file', file, file.name);
-    console.info(`${LOG} Tải danh mục Vietda '${file.name}' (${file.size.toLocaleString('vi-VN')} byte)`);
-    return this.http.post<any>(`${HH_BASE}/old-catalog`, form).pipe(
-      map(r => r as OldCatalogResult),
-      tap({
-        next: r => console.info(`${LOG} Danh mục Vietda: ${r.old_count} mã, dùng mã cũ ${r.old_used}, ghép thêm ${r.remapped}, cấp mới ${r.added}`),
-        error: e => console.warn(`${LOG} Tải danh mục Vietda lỗi: ${httpErrorText(e)}`)
-      })
-    );
-  }
-
-  oldUnmatched(): Observable<{ total_old: number; items: OldUnmatchedRow[] }> {
-    return this.http.get<any>(`${HH_BASE}/old-unmatched`, { params: { _: Date.now() } }).pipe(
-      map(r => ({ total_old: r.total_old as number, items: (r.items || []) as OldUnmatchedRow[] })),
-      tap({
-        next: r => console.info(`${LOG} Mã HH cũ chưa ghép: ${r.items.length}/${r.total_old}`),
-        error: e => console.warn(`${LOG} Lấy mã HH cũ chưa ghép lỗi: ${httpErrorText(e)}`)
-      })
-    );
-  }
-
-  /** Bảng "Mã HH đã ghép" + cờ đáng ngờ (17/11/2026) */
-  assignedCodes(): Observable<AssignedCodesResult> {
-    return this.http.get<any>(`${HH_BASE}/assigned`, { params: { _: Date.now() } }).pipe(
-      map(r => ({ version: r.version, total: r.total, flagged: r.flagged, flag_kinds: r.flag_kinds || {},
-        has_catalog: !!r.has_catalog, items: (r.items || []) as AssignedCodeRow[] })),
-      tap({
-        next: r => console.info(`${LOG} Mã HH đã ghép: ${r.total} mã master, ${r.flagged} đáng ngờ`, r.flag_kinds),
-        error: e => console.warn(`${LOG} Lấy mã HH đã ghép lỗi: ${httpErrorText(e)}`)
-      })
-    );
-  }
-
-  downloadAssignedCodes(): Promise<void> {
-    return this.download(`${HH_BASE}/assigned/export`, 'ma_HH_da_ghep.xlsx');
-  }
-
-  /** Gán tay mã HH cũ cho 1 mã master (hh rỗng = bỏ gán → chưa có mã). 1 mã HH gán được cho nhiều mã master (16/11/2026) */
-  setManualCode(masterCode: string, hh: string, heSo?: number): Observable<{ item: HhCode & { source: string }; status: HhCodeStatus }> {
-    const body = heSo === undefined ? { master_code: masterCode, hh } : { master_code: masterCode, hh, he_so: heSo };
-    return this.http.put<any>(`${HH_BASE}/manual`, body).pipe(
-      map(r => ({ item: r.item, status: r.status as HhCodeStatus })),
-      tap({
-        next: r => console.info(`${LOG} Gán ${r.item.hh || '(bỏ gán)'} (${r.item.source}) cho mã master ${masterCode}`),
-        error: e => console.warn(`${LOG} Gán ${hh || '(bỏ gán)'} → ${masterCode}`
-          + (heSo === undefined ? '' : ` (hệ số ${heSo})`) + ` lỗi: ${httpErrorText(e)}`)
-      })
-    );
-  }
-
   /** Bảng mã HH: dùng bản IndexedDB nếu cùng version máy chủ, không thì tải lại + lưu */
   async hhCodes(status: HhCodeStatus): Promise<HhCode[]> {
     const hit = await this.cache.get<{ version: number; items: HhCode[] }>(HH_CACHE_KEY);
@@ -459,6 +385,18 @@ export class ReconciliationService {
     );
   }
 
+  /** Trước khi gán: ĐVT Vietda (mặt hàng ledger) ↔ ĐVT nhỏ nhất KiotViet, hệ số gợi ý, mã đang gán (spec 004) */
+  hhHint(masterCode: string, hh: string): Observable<HhHint> {
+    return this.http.get<any>(`${BASE}/hh-hint`, { params: { master: masterCode, hh } }).pipe(
+      map(r => r as HhHint),
+      tap({
+        next: h => console.info(`${LOG} hh-hint ${h.hh} → ${h.master_code}: ĐVT ${h.unit_ok ? 'khớp' : 'lệch'}`
+          + (h.current_hh ? `, đang gán ${h.current_hh}` : '')),
+        error: e => console.warn(`${LOG} hh-hint ${hh} → ${masterCode} lỗi: ${httpErrorText(e)}`)
+      })
+    );
+  }
+
   downloadHhMissing(id: string): Promise<void> {
     return this.download(`${BASE}/runs/${id}/hh-missing/export`, `chua_co_ma_HH_${id}.xlsx`);
   }
@@ -475,7 +413,7 @@ export class ReconciliationService {
     return this.http.post<any>(`${environment.ketoanBackendUrl}/api/kiotviet/unit-conversion/refresh`, {}).pipe(
       map(r => r as CatalogStatus),
       tap({
-        next: st => console.info(`${LOG} Bảng quy đổi: ${st.count} dòng ĐVT (${st.exportedAt}), cấp thêm ${st.codes?.added ?? 0} mã HH`),
+        next: st => console.info(`${LOG} Bảng quy đổi: ${st.count} dòng ĐVT (${st.exportedAt}) — không tự ghép mã HH (spec 004)`),
         error: e => console.warn(`${LOG} Cập nhật bảng quy đổi lỗi: ${httpErrorText(e)}`)
       })
     );

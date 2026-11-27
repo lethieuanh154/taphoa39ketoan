@@ -14,6 +14,7 @@
 | CashFlowService | services/cash-flow.service.ts | 18 KB | LCTT |
 | ChartOfAccountsService | services/chart-of-accounts.service.ts | — | Hệ thống TK (ledger-rs) |
 | PartnerService | services/partner.service.ts | — | Danh mục đối tượng KH / NCC / NV / NH (ledger-rs) |
+| ItemService | services/item.service.ts | — | Danh mục hàng hóa HH / KM (ledger-rs) |
 | CashVoucherService | services/cash-voucher.service.ts | 17 KB | Phiếu thu/chi |
 | InvoiceService | **models**/invoice.service.ts | 28 KB | Hóa đơn |
 | AuditLogService | services/audit-log.service.ts | 13 KB | Audit trail |
@@ -530,4 +531,27 @@ getHistory(code): Observable<PartnerHistoryEntry[]>                  // chỉ t�
 exportExcel(role?): Observable<Blob>                                 // xlsx do BE tạo
 importXml(role, items, dryRun, updateCodes = []): Observable<PartnerImportResult>
   // dryRun → xem trước {create, update, skip}; ghi thật → tạo mới + cập nhật các mã trong updateCodes (≤ 5000 MST / lần)
+```
+
+## ItemService — danh mục hàng hóa (ledger-rs, 24/11/2026)
+
+**File**: `services/item.service.ts` · model `models/item.models.ts` · spec `TapHoa39KeToanBackEnd/specs/003-danh-muc-hang-hoa/`
+
+- Gọi `${environment.ledgerUrl}/api/ledger/items*` (HttpClient → `authInterceptor`), DTO snake_case → `Item` (kèm `units`, `masters`).
+- Hệ số ĐVT là chuỗi (`numeric::text`), gửi lên số hoặc chuỗi. Không cache IndexedDB — trang tải 1 lần, lọc tại máy.
+- Log `[Item]`: 4xx → `console.warn` mã lỗi `LA…`, khác → `console.error`; ném lại `HttpErrorResponse`.
+
+```typescript
+getItems(filter?: ItemFilter): Observable<Item[]>                   // search / kind / status (trang không truyền → lấy đủ)
+getItem(code): Observable<Item | null>                               // 404 → null
+getByMaster(masterCode, masterId?): Observable<Item | null>          // ưu tiên masterId
+addItem(input: NewItemInput): Observable<Item>                       // code 'HH' / 'KM' / trống + kind → BE tự cấp lớn nhất + 1
+updateItem(code, changes: ItemPatch): Observable<Item>               // đổi unit PHẢI kèm units + masters hệ số mới (BE LA224)
+deleteItem(code): Observable<void>
+setUnits(code, units: UnitInput[]): Observable<Item>                 // thay cả bộ ĐVT phụ
+addMaster(code, master: MasterInput) / removeMaster(code, masterCode): Observable<Item>
+getHistory(code): Observable<ItemHistoryEntry[]>                     // từ lần tạo gần nhất (item + ĐVT phụ + mã master)
+exportExcel(): Observable<Blob>
+importVietda(file, dryRun, updateCodes = []): Observable<VietdaImportResult>   // multipart; dryRun → xem trước
+importMasters(rows: MasterImportRow[], dryRun): Observable<MasterImportResult> // ≤ 10.000 dòng
 ```

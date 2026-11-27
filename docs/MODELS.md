@@ -463,3 +463,21 @@ PartnerImportResult { dryRun; create[]; update: PartnerImportChange[]; skip[] }
 PartnerImportChange { code; taxCode; oldName; newName; oldAddress; newAddress; fields: ('name'|'address')[]; applied }
 PARTNER_ROLES (nhãn + tiền tố KH / NCC / NV / NH), TAX_CODE_RE, PARTNER_CODE_RE, normalizeTaxCode()   // regex giống CHECK ở DB
 ```
+
+## item.models.ts — danh mục hàng hóa (24/11/2026)
+
+```typescript
+type ItemKind = 'GOODS' | 'PROMO';          // sinh từ tiền tố mã HH / KM
+interface Item {
+  code; kind; name; unit;                   // unit = ĐVT chính (ĐVT Vietda)
+  inventoryAccount;                         // TK kho, mặc định 1561
+  vatRate?: '0'|'5'|'8'|'10'|'KCT'|'KKKNT'; note; status: 'ACTIVE' | 'INACTIVE';
+  units: ItemUnit[];                        // { unit; factor: string }   1 unit = factor ĐVT chính
+  masters: ItemMaster[];                    // { masterCode; masterId?; kvUnit; factor: string; source: 'import'|'manual' }
+  createdAt; updatedAt; createdBy; updatedBy;
+}
+NewItemInput / ItemPatch / UnitInput / MasterInput   // factor nhận số hoặc chuỗi
+VietdaImportResult { dryRun; rows; create[]; update[] (fields, unitLocked, applied); same; skipTotal; skip[] }
+MasterImportRow { masterCode; masterId?; hh; kvUnit?; heSo? } · MasterImportResult { dryRun; link[]; filledId; skipTotal; skip[]; conflict[] }
+ITEM_KINDS, VAT_RATES, ITEM_CODE_RE (giống CHECK ở DB), formatFactor(), unitText(), masterFactorText(), getItemKindName()
+```

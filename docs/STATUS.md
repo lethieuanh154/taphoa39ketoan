@@ -62,7 +62,7 @@ tài khoản, CĐKT, KQKD, LCTT, Tờ khai GTGT đều ra **số giả**. Đây 
 | | Khách hàng | `customer-page` | 🟢 | 17/11/2026: ledger-rs `/api/ledger/partners` (vai CUSTOMER), thêm / sửa / ngừng dùng / xóa, lịch sử, Excel, tạo từ XML HĐ đầu ra (người mua có MST). Phiếu kho vẫn chọn KH từ `CustomerService` demo |
 | | Nhà cung cấp | `supplier-page` | 🟢 | 17/11/2026: ledger-rs (vai SUPPLIER), như KH + tạo từ XML HĐ đầu vào, "Khác thông tin" tick để cập nhật. Phiếu kho vẫn dùng `SupplierService` demo |
 | | Nhân viên | `employee-page` | 🟢 | 17/11/2026: ledger-rs (vai EMPLOYEE), chỉ thông tin cơ bản. Lương / Bảo hiểm vẫn dùng `EmployeeService` demo (phòng ban, lương… chưa có) |
-| | Hàng hóa - Dịch vụ | `product-page` | 🔴 | `loadDemoData()`; chưa dùng mã Vietda / mã master (plan mục 3) |
+| | Hàng hóa - Dịch vụ | `product-page` | 🟢 | 24/11/2026: ledger-rs `/api/ledger/items` (mã HH / KM Vietda, ĐVT phụ + hệ số, mã master KiotViet), thêm / sửa / ngừng dùng / xóa, lịch sử, Excel, nạp DM Vietda + bảng ghép. Phiếu kho / Thẻ kho / Báo cáo tồn kho vẫn dùng `ProductService` demo; đối soát XML vẫn đọc Firestore |
 | | Ngân hàng | `bank-page` | 🟢 | 17/11/2026: ledger-rs (vai BANK), mỗi dòng = 1 tài khoản NH của công ty (số TK không trùng). Sổ tiền gửi / trả lương / bank-transaction vẫn dùng `BankService` demo |
 | 2. Chứng từ | Phiếu thu, Phiếu chi | `cash-voucher-page/receipt`, `/payment` | 🟡 | Lưu thật (`/api/cash-vouchers`). Xuất Excel / PDF trả file rỗng "Demo". POSTED chưa sinh bút toán |
 | | Phiếu nhập kho, Phiếu xuất kho | `warehouse-page/receipt`, `/issue` | 🟡 | Phiếu lưu thật (warehouse-voucher API). Danh sách kho ở localStorage; hàng hóa / KH / NCC chọn từ danh mục demo |

@@ -646,3 +646,22 @@ Giống "Chuyển khoản HĐ đầu ra" nhưng HĐ là HĐ **mua vào** và ti�
   bỏ trống + chọn tất cả), "Bỏ qua" (lý do). Xác nhận = ghi thật, BE tính lại từ đầu.
 - Style nút riêng trong component (CSS `.btn` của trang không áp vào component con).
 - Log `[PartnerXmlImport]` số file / HĐ / MST.
+
+## ProductPageComponent — Danh mục hàng hóa (ledger-rs, 24/11/2026)
+
+`components/product-page/*` — qua `ItemService` (ledger-rs `/api/ledger/items`). Spec `TapHoa39KeToanBackEnd/specs/003-danh-muc-hang-hoa/`.
+- Tải 1 lần (1 request), lọc tại máy (mã / mã master / tên không dấu, loại HH / KM, trạng thái), phân trang 100 dòng. Không IndexedDB.
+- Thêm (mã để `HH` / `KM` hoặc trống = tự cấp) / sửa / ngừng dùng / xóa / Xuất Excel. TK kho tải lazy (`getLeafAccounts`, lọc INVENTORY).
+- Form có bảng ĐVT phụ (1 ĐVT phụ = hệ số × ĐVT chính). Đổi ĐVT chính → khung bắt nhập lại hệ số cho mọi ĐVT phụ / mã master.
+- Chi tiết: mã master đã gán (ĐVT KiotViet, hệ số, cảnh báo lệch ĐVT), ô tìm KiotViet (`ReconciliationService.searchCatalog`) → gán /
+  bỏ gán, lịch sử sửa.
+- Nút "Nạp từ Vietda" → modal `<app-item-vietda-import>`. Modal / toast theo khuôn Danh mục đối tượng. Log `[ProductPage]`.
+
+## ItemVietdaImportComponent — nạp DM Vietda + mã master (24/11/2026)
+
+`components/shared/item-vietda-import/*` (standalone) — output `imported`, `closed`.
+- Bước 1: file VAT TU HH.xlsx → `importVietda(dryRun)` → "Sẽ tạo", "Giống", "Khác thông tin" (tick mới cập nhật; dòng `unitLocked` chỉ
+  khác ĐVT không có ô tick — sửa trên trang), "Bỏ qua" → xác nhận ghi thật.
+- Bước 2: lấy bảng "Mã HH đã ghép" (`ReconciliationService.hhCodes()` → FastAPI `GET /api/vietda-codes`, chỉ `source` vietda / manual, kèm hệ số + masterId) → `importMasters` xem
+  trước (gán / bổ sung masterId / xung đột / bỏ qua) → xác nhận.
+- Style nút riêng. Log `[ItemVietdaImport]` chỉ số lượng.
